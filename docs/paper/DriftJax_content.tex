@@ -2,13 +2,14 @@
 \noindent\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash\bfseries}p{0.24\linewidth}X@{}}
 \toprule
 Program title & DriftJax \\
-Version described & v0.1.16, release notes dated 14 September 2026 \\
+Version described & v0.1.17, release notes dated 15 September 2026 \\
 Programming language & Python with JAX \\
 Licensing provisions & MIT, as specified by the release documentation \\
 Nature of problem & Coupled electrostatics and carrier transport in layered
 photovoltaic devices, including sensitivities of scalar design objectives \\
 Solution method & Scharfetter--Gummel discretisation, analytical block
-Jacobian, Block-Thomas Newton solve, and dense-LU implicit adjoint \\
+Jacobian, pivoted banded (LAPACK \code{dgbsv}) Newton solve, and
+dense-LU implicit adjoint \\
 Precision & Float64 reference calculations; optional mixed-precision
 dense factorisation with iterative refinement \\
 Restrictions & One spatial dimension, prescribed temperature, fixed design
@@ -53,11 +54,21 @@ revision or compatibility-modified benchmark implementation.
 DriftJax addresses a specific numerical opportunity in the one-dimensional
 problem: each nodal residual couples only to neighbouring nodes. With
 three unknowns per node, the interleaved Jacobian consists of $3\times3$
-blocks on three block diagonals. Analytical assembly and a direct
-Block-Thomas solve exploit this structure during Newton iteration.
+blocks on three block diagonals (bandwidth $\mathrm{kl}=\mathrm{ku}=5$).
+Analytical assembly and a direct pivoted banded solve (LAPACK
+\code{dgbsv} via \code{scipy.linalg.solve_banded}) exploit this structure
+during Newton iteration, at $O(N\cdot\mathrm{kl}\cdot\mathrm{ku})$ flop
+cost. An earlier unpivoted block-Thomas implementation was replaced in
+v0.1.17 after controlled comparisons showed it failing on
+ill-conditioned heterojunctions (residuals $\sim2$--$3.7\times10^{2}$)
+while the pivoted banded solver remained accurate
+($\sim10^{-9}$; Section~\ref{sec:conditioning}).
 The production backward pass makes a different choice: it uses pivoted
 dense LU after earlier structured-transpose experiments exhibited
-gradient discrepancies on ill-conditioned systems.
+gradient discrepancies on ill-conditioned systems. The forward banded
+solve runs through a host callback, so forward Newton steps are not
+differentiable through; gradients flow exclusively through the
+\code{custom_vjp} implicit-adjoint path.
 
 The article is organised around three questions:
 \begin{enumerate}[leftmargin=*,itemsep=2pt]
@@ -75,7 +86,7 @@ structured forward algebra, an explicit backward stability strategy, and
 derivative verification. Detailed derivations, auxiliary solvers, and
 reproduction requirements are provided in Supplementary Sections
 S1--S9. Implementation statements refer
-to the supplied DriftJax v0.1.16 documentation unless a reference-code
+to the v0.1.17 source tree described here unless a reference-code
 inspection is explicitly identified; numerical examples are retained
 results whose provenance and limitations are specified with the comparisons.
 
@@ -90,8 +101,8 @@ supplied release documentation, not an independently inspected source tree.
 \begin{papertable}
 \centering
 \caption{Implementation comparison. The reference column describes inspected
-$\partial\mathrm{PV}$ source; the DriftJax column describes v0.1.16
-documentation. Shared components are not claimed as new methods.}
+$\partial\mathrm{PV}$ source; the DriftJax column describes v0.1.17
+code as released. Shared components are not claimed as new methods.}
 \label{tab:deltapv-comparison}
 \small
 \begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{0.19\linewidth}
@@ -102,7 +113,8 @@ Component & $\partial\mathrm{PV}$~\cite{deltapvsource} & DriftJax \\
 Jacobian & Explicit analytical derivatives in compact band storage
 & Analytical $3\times3$ block-tridiagonal assembly \\
 Newton step & GMRES with incomplete-LU preconditioning; dense fallback
-& Direct Block-Thomas elimination, $O(N)$ per linear solve \\
+& Direct pivoted banded elimination (LAPACK \code{dgbsv}),
+$O(N\cdot\mathrm{kl}\cdot\mathrm{ku})$ per linear solve \\
 Implicit derivative & Custom JVP rules; explicit current adjoint uses
 a dense transpose solve & Custom VJP; production adjoint uses pivoted
 dense LU with per-bias checkpointing \\
@@ -143,10 +155,11 @@ closure as its default and provides numerical Fermi--Dirac evaluation as
 an option without claiming thermodynamic consistency of the resulting
 flux. The analysis of inexact implicit gradients~\cite{ehrhardt2024}
 is directly relevant to the reported adjoint errors and to the choice
-between iterative and direct transpose solves. A pivoted banded solver
-(e.g., LAPACK's \code{dgbsv}) represents an intermediate option between
-the structured transpose and full dense factorisation that was not
-included in the present comparisons. Bank et al.~\cite{bank1983}
+between iterative and direct transpose solves. The pivoted banded solver
+(LAPACK's \code{dgbsv}) used as the v0.1.17 forward default was compared
+against the former unpivoted block-Thomas elimination and dense LU on
+identical saved matrices in Section~\ref{sec:conditioning}; pivoting
+proved essential on the heterojunction Jacobians. Bank et al.~\cite{bank1983}
 review the tradeoffs between direct and iterative solvers for
 semiconductor device simulation in detail.
 
@@ -255,10 +268,12 @@ At each damped Newton iteration~\cite{mann2022partial},
 \end{equation}
 The damping parameter $\alpha_k\in(0,1]$ is determined by a line search
 that sufficient decreases the residual norm, or by pseudo-transient
-continuation~\cite{kelley1996}. Block elimination and back-substitution
-solve the linear system with $O(N)$ work and storage at fixed block
-size; this is the block-LU construction specialised to the three block
-diagonals~\cite{thomas1949,demmel1995}. Bias continuation reuses the
+continuation~\cite{kelley1996}. Banded LU factorisation with partial
+pivoting solves the linear system with $O(N\cdot\mathrm{kl}\cdot
+\mathrm{ku})$ work ($\mathrm{kl}=\mathrm{ku}=5$ for the interleaved
+$3\times3$ blocks) and $O(N\cdot(\mathrm{kl}+\mathrm{ku}))$ storage;
+see \cite{thomas1949,demmel1995,lapack1999} for the unpivoted
+block-Thomas predecessor and general band-solver analysis. Bias continuation reuses the
 previous converged state; damping and pseudo-transient continuation aid
 globalisation~\cite{mann2022partial,kelley1996}. The release also
 describes a serial fallback for non-finite fused-sweep outputs. None of
@@ -320,8 +335,9 @@ $\boldsymbol{r}=\boldsymbol{g}-\jac^T\widehat{\boldsymbol{\lambda}}$,
 Pivoting improves robustness but does not remove ill-conditioning or
 guarantee accurate physical derivatives~\cite{lapack1999,demmel1995,ehrhardt2024}. Independent finite-difference
 checks remain necessary. The production adjoint costs $O(N^3)$ work and
-$O(N^2)$ matrix storage per bias, in contrast to the linear-cost forward
-step. Supplementary Sections S3 and S4 detail the transpose layout,
+$O(N^2)$ matrix storage per bias, in contrast to the $O(N\cdot
+\mathrm{kl}\cdot\mathrm{ku})$ forward factorisation (near-flat measured
+scaling at $N\leq400$ where fixed overhead dominates). Supplementary Sections S3 and S4 detail the transpose layout,
 error diagnostics, and complete multi-bias derivative.
 
 \section{Software architecture}\label{sec:software}
@@ -340,8 +356,8 @@ algorithm permits direct Jacobian testing and avoids differentiating
 through the entire Newton iteration history~\cite{blondel2022}.
 \begin{papertable}
 \centering\small
-\caption{Mapping of mathematical responsibilities to the documented
-v0.1.16 implementation.}
+\caption{Mapping of mathematical responsibilities to the v0.1.17
+implementation.}
 \label{tab:architecture}
 \begin{tabularx}{\linewidth}{@{}p{0.35\linewidth}X@{}}
 \toprule
@@ -376,7 +392,11 @@ gradient = jax.grad(
 \end{lstlisting}
 \end{minipage}
 
-Continuous design leaves participate in the derivative. Integer topology,
+Scalar design parameters threaded through the device builder (material
+coefficients, layer widths, doping levels) participate in the
+derivative; \code{Device.design()} caches the built design, so mutating
+the stored \code{Ns}/\code{Ls} arrays post-hoc does not affect the
+simulation or its gradient. Integer topology,
 model selection, and mesh size are fixed choices, not differentiable
 coordinates. Positive parameters such as mobility and lifetime are often
 optimised in logarithmic coordinates, a common reparameterisation for
@@ -462,7 +482,7 @@ Quantity & Reported outcome & Scope \\
 \midrule
 Analytical versus AD Jacobian & Order $10^{-12}$ discrepancy & Same
 residual and state ordering; norm and scaling must be recorded \\
-Block linear solve & Relative residual $<10^{-14}$ & Backward-error
+Banded linear solve & Relative residual $<10^{-14}$ & Backward-error
 check, not a uniform forward-error bound \\
 Poisson manufactured solution & Second-order decay & Selected smooth
 solution and mesh family \\
@@ -498,28 +518,37 @@ specifies these diagnostics and the complementary directional Taylor test;
 no new step-size sequence was performed for this revision.
 
 To address this gap, a directional step-size study was performed on the
-CdS/CdTe heterojunction at a single operating point (absorber thickness
-scaling factor $x=1$). The adjoint gradient is $g_{\mathrm{adj}}=
--2.2059\times10^{-2}$. Central-difference estimates converge with
-decreasing step size: at $h=10^{-2}$ the relative error is $1.2\times
-10^{-4}$; at $h=10^{-4}$ it reaches $1.6\times10^{-7}$ (the
-truncation/solver-noise plateau); smaller steps degrade to $7.5\times
-10^{-5}$ at $h=10^{-7}$ due to Newton convergence tolerance. The
-directional Taylor remainder $|f(x{+}h)-f(x)-hg_{\mathrm{adj}}|/
-|h g_{\mathrm{adj}}|$ decreases linearly with $h$ from $8.0\times
-10^{-3}$ at $h=10^{-1}$ to $7.6\times10^{-6}$ at $h=10^{-5}$,
-consistent with first-order accuracy. At $h\leq10^{-6}$, rounding
-error in the forward solve dominates. The heterojunction adjoint is
-therefore correct to at least $10^{-5}$ relative accuracy on this
-operating point; the previously reported $4.2\times10^{-3}$ single-point
-discrepancy for the 16-parameter multilayer reflects concentrated
-sensitivity to interface parameters under ill-conditioning (Section
-\ref{sec:conditioning}), not a systematic adjoint failure.
+CdS/CdTe heterojunction along three builder-threaded design coordinates
+(log window doping, log absorber doping, absorber thickness scale) at
+two meshes ($N=200$ and $N=500$), for fixed-bias power near $V=0.7$~V
+(machine-readable record in
+\code{docs/paper/records/gradient\_evidence\_hetero.json}). In all six
+cases the central-difference estimates show the expected
+truncation--plateau--rounding structure: best relative agreement of
+$2\times10^{-10}$--$4\times10^{-8}$ at $h=10^{-4}$--$10^{-3}$, and
+directional Taylor remainders $|f(x{+}h)-f(x)-hg_{\mathrm{adj}}|/
+|hg_{\mathrm{adj}}|$ decreasing linearly with $h$ (e.g.\ $10^{-2}$ at
+$h=10^{-1}$ to $10^{-5}$--$10^{-6}$ at $h=10^{-5}$) before the Newton
+rounding floor at $h\leq10^{-6}$. Adjoint gradients are mesh-stable
+across $N=200$ and $N=500$ to $1$--$4\%$ in all three directions. An
+earlier single-point study on the same device reported
+$g_{\mathrm{adj}}=-2.2059\times10^{-2}$ with best agreement
+$1.6\times10^{-7}$ at $h=10^{-4}$. The heterojunction adjoint is
+therefore correct to at least $10^{-5}$ relative accuracy on these
+operating points; the previously reported $4.2\times10^{-3}$
+single-point discrepancy for the 16-parameter multilayer reflects
+concentrated sensitivity to interface parameters under
+ill-conditioning (Section~\ref{sec:conditioning}), not a systematic
+adjoint failure.
 
 \subsection{Physical consistency verification}
 Six physical-consistency tests were performed on three device types
 (homojunction, heterojunction, perovskite) using the v0.1.16 release
-code. Dark-equilibrium carrier densities satisfy the mass-action law
+code; these assert residual identities (mass action, conservation,
+contact residuals) that are independent of the v0.1.17 linear-solver
+change, and the full 15-example gallery was re-executed on the v0.1.17
+tree with matching metrics (Section~\ref{sec:applications} and
+\code{docs/paper/records/}). Dark-equilibrium carrier densities satisfy the mass-action law
 $np=n_i^2$ to machine precision: maximum relative errors of
 $2.3\times10^{-16}$ (homojunction), $7.7\times10^{-9}$
 (heterojunction), and $7.4\times10^{-15}$ (perovskite). The
@@ -537,11 +566,14 @@ implemented residual represents the stated physical model; they do not
 independently verify the numerical accuracy of the Newton convergence
 or the derivative computation.
 
-\subsection{Structured-adjoint diagnosis}
-A systematic comparison of Block-Thomas and dense-LU solves on identical
+\subsection{Structured-solver diagnosis and the v0.1.17 switch}
+A systematic comparison of the former unpivoted block-Thomas solver,
+pivoted banded (\code{dgbsv}), and dense-LU solves on identical
 saved Jacobians and right-hand sides from five test devices (homojunction
 $N$=200 and 500, heterojunction $N$=500, highly-doped $N$=500, and
-ill-conditioned SRV-contrast $N$=500) reveals the following.
+ill-conditioned SRV-contrast $N$=500) reveals the following. This
+comparison motivated the v0.1.17 replacement of block-Thomas with the
+pivoted banded solver as the production forward default.
 
 The analytic and AD Jacobians agree to $<5\times10^{-17}$ relative error
 in all cases, confirming the block assembly is bit-accurate. The forward
@@ -575,8 +607,8 @@ fails completely (residuals $\sim2$--$3.7\times10^{2}$), while the
 pivoted banded solver remains accurate ($\sim10^{-9}$). The dense LU
 solutions agree with the banded results to $<10^{-9}$ on all devices.
 This confirms that pivoting is essential for the heterojunction Jacobian
-and validates the production code's fallback logic (Section
-\ref{sec:newton}).
+and motivated the v0.1.17 production default (Section~\ref{sec:newton});
+the dense fallback is retained for singular or non-finite blocks.
 
 \subsection{Mesh refinement and cross-code comparison}
 Five systematic mesh refinements ($N=62$, 125, 250, 500, 1000) on a
@@ -622,8 +654,8 @@ $3.6\times10^{-3}$~A\,cm$^{-2}$ (Figure~\ref{fig:crosscode}). The latter
 is 3.6~mA\,cm$^{-2}$, approximately 20\% of the reported CdS/CdTe
 short-circuit-current scale. Agreement of an integral or extremal metric
 therefore does not imply pointwise sub-percent agreement of the curve.
-The figure identifies earlier plotting revisions and is not a new
-v0.1.16 rerun.
+The figure is a retained comparison against bundled reference curves,
+not a controlled same-revision rerun of both codes.
 
 \paperfigure{research_15_deltapv_crosscode.png}{Current--voltage comparison
 with bundled $\partial\mathrm{PV}$ reference curves for a homojunction
@@ -774,19 +806,22 @@ these correspond to approximately 108~kB and 18~MB in float64, a
 $167\times$ storage ratio, before factorisation workspace or
 compiler-managed intermediates.
 
-Controlled benchmarks on a modern x86-64 CPU (JAX 0.10.2, float64)
-yield the following measured results. For the linear solve alone at
-$N=500$, Block-Thomas costs $126\pm17$~ms versus $147\pm48$~ms for
-dense LU, a $1.2\times$ ratio; the JAX dispatch overhead dominates at
-this problem size. The complete forward sweep (61 bias points, vmax
-$=1.1$~V) requires $753$~ms at $N=500$ after JIT compilation; the
-first-call compilation overhead is approximately $7.6\times$ the warm
-execution time. The adjoint gradient (forward plus backward) takes
-$14.7\pm2.4$~s warm, approximately $20\times$ the forward cost. The
-observed forward-time scaling is approximately $O(N^{2.8})$ across the
-range $N=100$--$800$, consistent with Jacobian assembly dominating at
-moderate mesh sizes. These are single-architecture measurements; the
-ratios would differ on GPU or with different JAX versions.
+Controlled benchmarks of the shipped v0.1.17 code on an x86-64 CPU
+(Linux 6.8.0, Python 3.13.13, JAX 0.10.2, float64; machine-readable
+record in \code{docs/paper/records/bench\_v017\_dgbsv.json}) yield the
+following. A full single-bias Newton solve (tolerance $10^{-10}$,
+$\leq30$ steps, warm, mean of 10) costs 30.7~ms at $N=50$, 35.2~ms at
+$N=100$, 37.2~ms at $N=200$, and 47.8~ms at $N=400$: near-flat scaling
+consistent with fixed JIT/host-callback overhead dominating the
+$O(N\cdot\mathrm{kl}\cdot\mathrm{ku})$ factorisation at these sizes.
+A complete forward sweep at $N=100$ takes 57.6~ms (10 biases) and
+111.8~ms (20 biases) warm. The adjoint gradient (forward plus backward)
+at $N=100$ with 10 biases takes $\sim$1.0~s warm, approximately
+$17\times$ the corresponding forward sweep, consistent with the
+$O(KN^3)$ dense-adjoint accounting. These are single-architecture
+measurements; ratios would differ on GPU or with different JAX
+versions, and the host-callback round trip in each Newton iteration
+precludes GPU-resident execution of the forward linear solve.
 
 No historical cross-implementation timing ratios are reported: earlier
 timing pairs were collected on unmatched hardware, tolerances, and code
@@ -804,12 +839,13 @@ synchronised before stopping the timer~\cite{jaxbenchmark}. Peak process
 memory is a different quantity from matrix-storage estimates. The
 required metadata are listed in Supplementary Section S9. A controlled
 ablation study should separately measure the cost contributions of
-block-Thomas forward solving, dense adjoint factorisation, assembly
-overhead, nonlinear iteration count, and JAX transformation effects.
-Comparison against a pivoted banded direct solver (e.g., LAPACK's
-\code{dgbsv}) on identical saved matrices and right-hand sides would
-isolate the factorisation benefit from other implementation
-differences.
+banded forward solving (including the host-callback round trip), dense
+adjoint factorisation, assembly overhead, nonlinear iteration count,
+and JAX transformation effects. The saved-matrix comparison of
+Section~\ref{sec:conditioning} already isolates the factorisation
+difference (pivoted banded vs unpivoted block-Thomas vs dense LU);
+what remains is a per-iteration wall-time decomposition on the live
+solver path.
 
 \subsection{Physical and numerical limitations}
 The model is one-dimensional and uses a prescribed temperature. It does
@@ -849,14 +885,14 @@ SRV boundary conditions; row equilibration reduces the condition number
 by six orders of magnitude, confirming that the issue is structural
 scaling rather than a fundamental factorisation failure.
 
-\textbf{Performance.} Controlled single-architecture benchmarks show
-Block-Thomas provides a $1.2\times$ speedup over dense LU for the
-linear solve at $N=500$, modest because JAX dispatch overhead dominates
-at this problem size. The forward sweep scales as $O(N^{2.8})$; the
-adjoint gradient costs approximately $20\times$ the forward. Dense Jacobian
-storage is $167\times$ larger than block storage. Historical
-cross-implementation timing ratios are withdrawn; only the controlled
-single-architecture measurements above are retained.
+\textbf{Performance.} Controlled single-architecture benchmarks of the
+shipped v0.1.17 code show a full single-bias Newton solve costing
+30.7--47.8~ms warm from $N=50$ to $N=400$ (near-flat scaling: fixed
+JIT/host-callback overhead dominates at these sizes). The adjoint
+gradient costs approximately $17\times$ the forward sweep at $N=100$.
+Dense Jacobian storage is $167\times$ larger than block storage.
+Historical cross-implementation timing ratios are withdrawn; only the
+controlled single-architecture measurements above are retained.
 
 \textbf{Usefulness.} Adjoint gradients reduce the number of objective
 evaluations by $20\times$ compared with finite differences in a
@@ -876,13 +912,13 @@ necessary for stronger quantitative conclusions.
 The release documentation identifies
 \url{https://github.com/medmo13/driftjax} as the source repository and
 specifies an MIT licence. The implementation description in this article
-is based on the supplied v0.1.16 overview, README, and release history;
-the manuscript source and the codebase may not be synchronised to the
-same commit. The repository should be pinned to a specific release tag
-(v0.1.16) for reproducibility. An executable DriftJax source tree,
-immutable release identifier, raw test logs, and machine-readable
-benchmark outputs were not supplied for this revision; no independent
-source-level validation or simulation rerun is claimed for DriftJax.
+is based on the v0.1.17 source tree described here (HEAD \code{b7e80ae}
+plus the v0.1.17 synchronisation revision); the repository should be
+pinned to the v0.1.17 release tag for reproducibility. Raw test logs,
+per-example JSON sidecars and execution logs, and the machine-readable
+benchmark record (\code{docs/paper/records/bench\_v017\_dgbsv.json})
+are archived with the revision. No independent external validation
+beyond the reported test suite and example reruns is claimed.
 The reference-code comparison in Section~\ref{sec:deltapv-comparison}
 instead uses the publicly accessible
 $\partial\mathrm{PV}$ source~\cite{deltapvsource}, with inspection scope

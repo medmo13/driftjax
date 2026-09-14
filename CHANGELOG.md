@@ -1,5 +1,31 @@
 # Changelog
 
+## v0.1.17 (2026-09-15, adversarial-review synchronisation)
+
+### Solver (breaking change, documented)
+- Forward Newton default replaced: unpivoted block-Thomas → pivoted banded
+  (LAPACK `dgbsv` via `scipy.linalg.solve_banded`), after controlled
+  5-device comparison showed block-Thomas failing on heterojunctions
+  (residuals ~2--370) while banded stays at ~1e-9.
+- `src/driftjax/numerics/block_thomas.py` → `banded_solve.py`; legacy
+  routines retained as `_legacy_*` for validation only.
+- Public API `BlockThomas` renamed `BandedLapack` with a backwards-compatible
+  alias; forward steps run through a host callback (opaque to AD — gradients
+  flow only via the `custom_vjp` implicit adjoint; `jvp` raises loudly).
+- Corrected flop complexity to O(N·bw²), bw=11 (was misstated as O(N·κ²)).
+
+### Manuscript
+- Resynchronised to v0.1.17 code: program summary, solver table, Newton
+  section, §6 benchmarks rerun on shipped code (records/bench_v017_dgbsv.json).
+- Gradient evidence extended: 3 directions × 2 meshes Taylor-remainder study
+  on the CdS/CdTe heterojunction (records/gradient_evidence_hetero.json),
+  FD agreement to ~1e-8, mesh-stable to 1--4%.
+- Clarified builder-threaded vs cached design leaves for differentiation.
+
+### Tests
+- New `tests/unit/test_banded_solve.py` (dense agreement, residual, LAPACK
+  layout, JVP loud-failure pin); provenance link repaired.
+
 ## v0.1.16 (release, 2026-09-14)
 
 ### Repository

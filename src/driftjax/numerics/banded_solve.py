@@ -6,7 +6,9 @@ C_i·x_{i-1} on the sub-band.
 
 Primary solver: pivoted banded (LAPACK dgbsv via scipy) — works on all
 devices including ill-conditioned heterojunctions where unpivoted methods
-fail.  O(N·κ²) complexity but the Fortran implementation is fast enough
+fail.  O(N·bw²) flop complexity with bandwidth bw=kl+ku+1=11
+(i.e. O(121·N); independent of the condition number κ, which affects
+accuracy, not flop count).  The Fortran implementation is fast enough
 to beat unpivoted O(N) methods in practice.
 
 Legacy Block-Thomas code retained for reference/validation only.
@@ -206,8 +208,9 @@ def banded_solve(A, B, C, b):
     """Solve block-tridiagonal system via pivoted LAPACK banded (dgbsv).
 
     Converts (A, B, C, b) → LAPACK banded storage and calls
-    scipy.linalg.solve_banded with partial pivoting.  This is O(N·κ²)
-    but the Fortran BLAS/LAPACK implementation is fast enough to beat
+    scipy.linalg.solve_banded with partial pivoting.  Flop cost is
+    O(N·kl·ku) with kl=ku=5 (bandwidth 11), independent of κ;
+    the Fortran BLAS/LAPACK implementation is fast enough to beat
     unpivoted methods in practice (especially on ill-conditioned
     heterojunctions where unpivoted elimination fails entirely).
 

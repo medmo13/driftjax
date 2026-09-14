@@ -82,7 +82,7 @@ def AM15G():
 
 from driftjax.simulate import simulate  # (new, composable entry point)
 from driftjax.solution import Solution
-from driftjax.solvers.api import BandedLapack, Newton
+from driftjax.solvers.api import BandedLapack, BlockThomas, Newton
 from driftjax.units import Vt, current, energy
 from driftjax.viz.plotting import (
     plot_band_diagram,
@@ -91,7 +91,7 @@ from driftjax.viz.plotting import (
     plot_iv_curve,
 )
 
-__version__ = "0.1.16"
+__version__ = "0.1.17"
 
 
 __all__ = [
@@ -124,6 +124,7 @@ __all__ = [
     "Sweep",
     "Newton",
     "BandedLapack",
+    "BlockThomas",
     "BeerLambert",
     "TMM",
     "Fresnel",

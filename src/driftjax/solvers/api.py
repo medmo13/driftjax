@@ -19,6 +19,12 @@ class BandedLapack(AbstractLinearSolver):
     batched: bool = False
 
 
+# Backwards-compatibility alias: v0.1.16 and earlier exposed this solver
+# as ``BlockThomas``.  Retained so external scripts keep importing;
+# new code should use ``BandedLapack``.
+BlockThomas = BandedLapack
+
+
 class AbstractSolver(eqx.Module):
     """Base class for nonlinear solvers."""
 

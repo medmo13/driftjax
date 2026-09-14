@@ -21,8 +21,8 @@ authors:
   - family-names: Maoudj
     given-names: Mohamed
     affiliation: "Research Center in Semiconductor Technology for Energetics (CRTSE), 02 Bd. Frantz Fanon, B.P. 140, Alger - 7 Merveilles 16038, Algiers, Algeria"
-version: 0.1.16
-date-released: 2026-09-14
+version: 0.1.17
+date-released: 2026-09-15
 license: MIT
 repository-code: "https://github.com/medmo13/driftjax"
 url: "https://github.com/medmo13/driftjax"
