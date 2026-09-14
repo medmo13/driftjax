@@ -236,9 +236,9 @@ def _step_newton_impl(cell, bound, x, dense, refinement, analytic, fused):
             else:
                 A, B, C = banded_jacobian(cell, bound, pot)
         # Pivoted banded solve (LAPACK dgbsv): works on all devices including
-        # ill-conditioned heterojunctions where unpivoted Block-Thomas fails.
+        # ill-conditioned heterojunctions where unpivoted elimination fails.
         from driftjax.numerics.analytic_jacobian import blockwise_residual
-        from driftjax.numerics.block_thomas import banded_solve
+        from driftjax.numerics.banded_solve import banded_solve
 
         # Check for non-finite Jacobian blocks (e.g. NaN from bad init).
         blocks_finite = (
@@ -520,7 +520,7 @@ def _solve_newton_while(
     f_tol_active = f_tol is not None
     # Best-iterate state: (best_pot, best_resid) ride along in the loop carry
     # (two extra 3N-vectors of device-local traffic per iteration — negligible
-    # next to one Jacobian assembly + Block-Thomas solve). `failed` freezes the
+    # next to one Jacobian assembly + banded solve). `failed` freezes the
     # iterate on NaN steps (eager returns best immediately; here we flag exit
     # and let the post-loop rebound logic select best).
 

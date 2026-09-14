@@ -1,13 +1,15 @@
-"""Exact O(N) Block-Thomas solver for the interleaved 3×3-block DDP Jacobian.
+"""Banded linear solvers for the interleaved 3×3-block DDP Jacobian.
 
 The DDP Jacobian is block-tridiagonal in the interleaved ordering
 [φn_i, φp_i, φ_i]: A_i·x_i + B_i·x_{i+1} = d_i on the diagonal bands with
-C_i·x_{i-1} on the sub-band.  Block-Thomas eliminates the sub-diagonal
-with O(N) 3×3 solves — an *exact* direct solver (no Krylov, no ILU),
-fully JAX-native, differentiable, and vmappable (the key property that
-enables batched bias/design sweeps).
+C_i·x_{i-1} on the sub-band.
 
-Scalar Thomas is provided for the equilibrium Poisson problem.
+Primary solver: pivoted banded (LAPACK dgbsv via scipy) — works on all
+devices including ill-conditioned heterojunctions where unpivoted methods
+fail.  O(N·κ²) complexity but the Fortran implementation is fast enough
+to beat unpivoted O(N) methods in practice.
+
+Legacy Block-Thomas code retained for reference/validation only.
 """
 
 from __future__ import annotations
@@ -75,8 +77,8 @@ def extract_blocks(J):
     return A, B, C
 
 
-def block_thomas_solve(A, B, C, b):
-    """Solve the block-tridiagonal system exactly in O(N)."""
+def _legacy_block_thomas_solve(A, B, C, b):
+    """Legacy O(N) unpivoted block-tridiagonal solve (retained for validation)."""
     N = A.shape[0]
     if N == 1:
         return _solve3(A[0], b[0][..., None])[..., 0][None, :]
@@ -104,11 +106,10 @@ def block_thomas_solve(A, B, C, b):
     return lax.fori_loop(0, N - 1, _bwd, x)
 
 
-def block_thomas_solve_batched(A, B, C, b):
-    """Batched node-major solve: A,B,C (N, B, 3, 3), b (N, B, 3) → (N, B, 3).
+def _legacy_block_thomas_solve_batched(A, B, C, b):
+    """Legacy batched node-major solve (retained for validation).
 
-    Pure lax.fori_loop (like serial block_thomas_solve) — single XLA program,
-    O(1) jaxpr size, not Python-unrolled. Vectorised over batch axis.
+    Pure lax.fori_loop — single XLA program, O(1) jaxpr size.
     """
     N = A.shape[0]
     if N == 1:
@@ -134,29 +135,24 @@ def block_thomas_solve_batched(A, B, C, b):
     return lax.fori_loop(0, N - 1, bwd, x)
 
 
-def block_thomas_with_residual(A, B, C, b_flat):
-    """Block-Thomas solve + FP64 linear residual (jrystal-style stability gate).
-
-    Returns (x_flat, rel_resid). Callers must fall back to a dense/pivoted
-    solve when rel_resid is large (degenerate equilibrium Jacobian,
-    cond ~ 1e18-1e28) instead of trusting the unpivoted elimination.
-    """
+def _legacy_block_thomas_with_residual(A, B, C, b_flat):
+    """Legacy solve + residual check (retained for validation)."""
     import jax.numpy as _jnp
 
     from driftjax.numerics.analytic_jacobian import dense_from_blocks as _dense_from_blocks
 
     n = A.shape[0]
-    x3 = block_thomas_solve(A, B, C, b_flat.reshape(n, 3))
+    x3 = _legacy_block_thomas_solve(A, B, C, b_flat.reshape(n, 3))
     x = x3.reshape(-1)
     J = _dense_from_blocks(A, B, C)
     rel = _jnp.linalg.norm(J @ x - b_flat) / (_jnp.linalg.norm(b_flat) + 1e-30)
     return x, rel
 
 
-def solve_block_tridiagonal(J, b):
-    """Solve J·x = b for a dense (3N, 3N) block-tridiagonal J (flat output)."""
+def _legacy_solve_block_tridiagonal(J, b):
+    """Legacy solve J·x = b for a dense block-tridiagonal J (retained for validation)."""
     A, B, C = extract_blocks(J)
-    return block_thomas_solve(A, B, C, b.reshape(-1, 3)).reshape(-1)
+    return _legacy_block_thomas_solve(A, B, C, b.reshape(-1, 3)).reshape(-1)
 
 
 # ---------------------------------------------------------------------------
@@ -212,8 +208,8 @@ def banded_solve(A, B, C, b):
     Converts (A, B, C, b) → LAPACK banded storage and calls
     scipy.linalg.solve_banded with partial pivoting.  This is O(N·κ²)
     but the Fortran BLAS/LAPACK implementation is fast enough to beat
-    the unpivoted O(N) Block-Thomas in practice (especially on
-    ill-conditioned heterojunctions where BT fails entirely).
+    unpivoted methods in practice (especially on ill-conditioned
+    heterojunctions where unpivoted elimination fails entirely).
 
     Returns x with shape (n, 3) matching b.shape.  If the banded matrix
     contains non-finite values (e.g. NaN from degenerate Jacobian blocks),

@@ -115,7 +115,7 @@ def sweep(
     # sign-change axis) and the MPP spline (length-1 diffs) — fail loudly.
     if int(n_steps) < 2:
         raise ValueError(f"sweep needs n_steps >= 2, got {n_steps!r}")
-    # Batched path: one vmapped Block-Thomas pass over bias axis (opt-in,
+    # Batched path: one vmapped banded-solver pass over bias axis (opt-in,
     # Boltzmann statistics / no warm-start / no progress reporting).  Jit-compatible
     # (lax.while_loop) so it works under jax.jit and the custom_vjp primal.
     # Fused flag propagates for optics+Jacobian fusion (single XLA program).

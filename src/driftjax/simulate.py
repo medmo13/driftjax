@@ -137,7 +137,7 @@ def _forward(
     statistics = statistics or "boltzmann"
     # Effective strategy flags. The ``Newton`` fields are authoritative;
     # the legacy ``Sweep.refinement`` / ``Sweep.fused`` flags act as OR-fallbacks
-    # so existing protocols keep working. ``BlockThomas(batched=True)`` (or the
+    # so existing protocols keep working. ``BandedLapack(batched=True)`` (or the
     # opt-in ``Sweep.batched`` flag) routes the sweep through the vmapped
     # batched banded-solver path where admissible.
     refinement = bool(solver.refinement or getattr(protocol, "refinement", False))

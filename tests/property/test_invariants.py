@@ -5,7 +5,7 @@ import jax.numpy as jnp
 import pytest
 
 from driftjax.fields import Potentials, pot2vec, vec2pot
-from driftjax.numerics.block_thomas import extract_blocks
+from driftjax.numerics.banded_solve import extract_blocks
 from driftjax.numerics.linalg import _banded_matvec, dense_to_banded, dense_to_csr
 from driftjax.numerics.residual import F_jacobian, comp_F
 
@@ -53,7 +53,7 @@ def test_banded_matvec_matches_dense():
 
 def test_extract_blocks_consistent():
     n = 20
-    from driftjax.numerics.block_thomas import solve_block_tridiagonal
+    from driftjax.numerics.banded_solve import _legacy_solve_block_tridiagonal as solve_block_tridiagonal
 
     A = jax.random.normal(jax.random.PRNGKey(2), (3 * n, 3 * n))
     A = jnp.tril(jnp.triu(A, -3), 3) + 30.0 * jnp.eye(3 * n)

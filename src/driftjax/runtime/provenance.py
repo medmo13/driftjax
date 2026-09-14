@@ -106,10 +106,10 @@ def _seed_defaults() -> None:
             "analytic banded Jacobian, == jacrev ~1e-12",
             "tests/unit/test_analytic_jacobian.py",
         ),
-        "block_thomas": (
+        "banded_solve": (
             "DriftJax",
-            "exact O(N) block-tridiagonal solve",
-            "tests/unit/test_block_thomas.py",
+            "pivoted banded solve (LAPACK dgbsv)",
+            "tests/unit/test_banded_solve.py",
         ),
         "checkpointing": (
             "DriftJax",

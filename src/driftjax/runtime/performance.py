@@ -9,7 +9,7 @@ Derivation
 * residual F:      per node ~ O(1) physics ops × 3 unknowns
 * Jacobian J:      jacrev of the residual — flops ≈ c_jac · flops_F (forward
                    AD overhead ~2–3×), banded width W = 13
-* linear solve:    Block-Thomas = 2·(N·3³) solves + (3N)·(2·3²) matvecs ⇒
+* linear solve:    banded = 2·(N·3³) solves + (3N)·(2·3²) matvecs ⇒
                    ≈ 54N + 54N = O(108N) flops; CSR spsolve similar O(N·W²)
 * memory traffic:  J is (3N)² but stored banded ⇒ 13·(3N)·8 bytes; the
                    dense path would move (3N)²·8 — the roofline position of

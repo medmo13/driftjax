@@ -25,7 +25,7 @@ from jax import vmap
 
 from driftjax.fields import Potentials, PVCell, vec2pot
 from driftjax.numerics.analytic_jacobian import banded_jacobian
-from driftjax.numerics.block_thomas import banded_solve_batched
+from driftjax.numerics.banded_solve import banded_solve_batched
 from driftjax.numerics.residual import comp_F
 from driftjax.science.contacts import boundary_bias
 

@@ -4,7 +4,7 @@ import jax
 import jax.numpy as jnp
 import pytest
 
-from driftjax.numerics.block_thomas import solve_block_tridiagonal
+from driftjax.numerics.banded_solve import _legacy_solve_block_tridiagonal as solve_block_tridiagonal
 from driftjax.numerics.scharfetter_gummel import bernoulli
 
 pytestmark = pytest.mark.smoke

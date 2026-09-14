@@ -19,7 +19,7 @@ done by the unit tests above, not inside the Newton loop. An earlier
 revision also used reverse-mode for the reference; forward-mode gives
 identical values ~2x faster to trace.)
 
-Block conventions (match numerics.block_thomas):
+Block conventions (match numerics.banded_solve):
   A[i] = J[row i, col i]        (diagonal)
   B[i] = J[row i, col i+1]      (super-diagonal, B[n−1] unused)
   C[i] = J[row i+1, col i]      (sub-diagonal, C[n−2] last used)

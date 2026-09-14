@@ -55,7 +55,7 @@ def solve_transient_step(cell, bound, pot_prev, dt, max_iter: int = 20, tol: flo
     instead of dense O(N²) Jacobian + O(N³) linalg.solve — ~10x faster at N=500.
     """
     from driftjax.numerics.analytic_jacobian import banded_jacobian
-    from driftjax.numerics.block_thomas import banded_solve
+    from driftjax.numerics.banded_solve import banded_solve
 
     eye3 = jnp.eye(3)
 

@@ -1,6 +1,6 @@
 """Analytic banded Jacobian must equal the canonical jacrev Jacobian.
 
-The fast solver backend (analytic_block_thomas) is only trustworthy while
+The fast solver backend (analytic banded) is only trustworthy while
 this pins the protocol (R1/R2): banded_jacobian == jacrev(comp_F) to
 ~1e-12 on p-n, n-p, heterojunction, and biased states, equilibrium and
 full coupled, Boltzmann statistics.

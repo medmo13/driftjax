@@ -23,7 +23,7 @@ import numpy as np
 import pytest
 
 import driftjax as dj
-from driftjax.numerics.block_thomas import _inv3
+from driftjax.numerics.banded_solve import _inv3
 from driftjax.numerics.linalg import linsolve
 from driftjax.science.optics import (
     _fresnel_per_lambda,
@@ -106,7 +106,7 @@ def test_fresnel_rb0_absorptance_identity():
 
 
 # ---------------------------------------------------------------------------
-# Block-Thomas singularity guard preserves sign
+# Banded solve singularity guard preserves sign
 # ---------------------------------------------------------------------------
 
 

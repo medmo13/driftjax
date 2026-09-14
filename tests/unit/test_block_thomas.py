@@ -1,4 +1,4 @@
-"""Block-Thomas O(N) solver == dense solve; scalar Thomas check."""
+"""Legacy Block-Thomas solver == dense solve; scalar Thomas check."""
 
 import jax
 import jax.numpy as jnp
@@ -6,7 +6,7 @@ import pytest
 
 pytestmark = pytest.mark.smoke  # no solves: pure linear algebra, milliseconds
 
-from driftjax.numerics.block_thomas import solve_block_tridiagonal
+from driftjax.numerics.banded_solve import _legacy_solve_block_tridiagonal as solve_block_tridiagonal
 
 
 def _random_block_tridiag(n, key):

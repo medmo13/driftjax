@@ -13,12 +13,8 @@ class AbstractLinearSolver(eqx.Module):
     """Base class for linear solvers used inside Newton."""
 
 
-class BlockThomas(AbstractLinearSolver):
-    """Pivoted banded solve (LAPACK dgbsv) — DriftJax default linear solver.
-
-    Note: the name is historical. The implementation now uses LAPACK's
-    dgbsv (pivoted banded) instead of the original unpivoted Block-Thomas.
-    """
+class BandedLapack(AbstractLinearSolver):
+    """Pivoted banded solve (LAPACK dgbsv) — DriftJax default linear solver."""
 
     batched: bool = False
 
@@ -37,4 +33,4 @@ class Newton(AbstractSolver):
     dense: bool = False
     refinement: bool = False
     fused: bool = True
-    linear_solver: AbstractLinearSolver = eqx.field(default_factory=BlockThomas)
+    linear_solver: AbstractLinearSolver = eqx.field(default_factory=BandedLapack)

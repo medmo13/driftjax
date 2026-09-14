@@ -48,8 +48,8 @@ def spsolve(data, indices, indptr, b, tol: float = 1e-6):
     """Sparse direct solve J·x = b from CSR triplets (host callback).
 
     Drop-in replacement for ``jax.experimental.sparse.linalg.spsolve`` kept
-    local to this module.  Not differentiable — under AD use the analytic
-    Block-Thomas or dense backends instead.
+    local to this module.      Not differentiable — under AD use the analytic
+    banded or dense backends instead.
     """
     del tol  # scipy's splu-based spsolve has no drop tolerance knob
     result_shape = jax.ShapeDtypeStruct(b.shape, b.dtype)
@@ -105,7 +105,7 @@ def blocks_to_csr(A, B, C) -> tuple:
     """CSR of the block-tridiagonal Jacobian from its 3×3 blocks (O(N)).
 
     Assembles the banded (3N,13) window directly from the 3×3 blocks
-    without dense (3N,3N) materialization. Prefer ``block_thomas``; use
+    without dense (3N,3N) materialization. Prefer ``banded_solve``; use
     this only where CSR is strictly required (legacy ``linsolve(csr)``).
     """
     N = A.shape[0]
@@ -175,7 +175,7 @@ def linsolve(J, rhs, backend: str = "auto", tol: float = 1e-6):
         # residual was 0/0=NaN, poisoning stats and solver-selection gates.
         return x, jnp.linalg.norm(J @ x - rhs) / (jnp.linalg.norm(rhs) + 1e-30), "dense"
     if backend == "banded":
-        from driftjax.numerics.block_thomas import banded_solve, extract_blocks
+        from driftjax.numerics.banded_solve import banded_solve, extract_blocks
 
         A, B, C = extract_blocks(J)
         x3 = banded_solve(A, B, C, rhs.reshape(-1, 3))
