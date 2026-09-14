@@ -51,11 +51,11 @@ def transient_residual(cell, bound, pot, pot_prev, dt):
 def solve_transient_step(cell, bound, pot_prev, dt, max_iter: int = 20, tol: float = 1e-6):
     """One backward-Euler step via lax.while_loop (trace-safe).
 
-    Uses O(N) block-tridiagonal Jacobian + Block-Thomas solve instead of
-    dense O(N²) Jacobian + O(N³) linalg.solve — ~10x faster at N=500.
+    Uses O(N) block-tridiagonal Jacobian + pivoted banded solve (LAPACK dgbsv)
+    instead of dense O(N²) Jacobian + O(N³) linalg.solve — ~10x faster at N=500.
     """
     from driftjax.numerics.analytic_jacobian import banded_jacobian
-    from driftjax.numerics.block_thomas import block_thomas_solve
+    from driftjax.numerics.block_thomas import banded_solve
 
     eye3 = jnp.eye(3)
 
@@ -73,7 +73,7 @@ def solve_transient_step(cell, bound, pot_prev, dt, max_iter: int = 20, tol: flo
         reg = jnp.max(jnp.abs(A_t)) * 1e-8
         reg = jnp.maximum(reg, 1e-10)
         A_r = A_t + reg * eye3[None, :, :]
-        delta = block_thomas_solve(A_r, B, C, -F.reshape(-1, 3)).reshape(-1)
+        delta = banded_solve(A_r, B, C, -F.reshape(-1, 3)).reshape(-1)
         dn = jnp.max(jnp.abs(delta))
         delta = jnp.where(dn > 1.0, delta * (1.0 / dn), delta)
 

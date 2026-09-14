@@ -157,3 +157,97 @@ def solve_block_tridiagonal(J, b):
     """Solve J·x = b for a dense (3N, 3N) block-tridiagonal J (flat output)."""
     A, B, C = extract_blocks(J)
     return block_thomas_solve(A, B, C, b.reshape(-1, 3)).reshape(-1)
+
+
+# ---------------------------------------------------------------------------
+# Pivoted banded solver (LAPACK dgbsv via scipy)
+# ---------------------------------------------------------------------------
+
+def _blocks_to_lapack_banded(A, B, C):
+    """Convert (A, B, C) block-tridiagonal to LAPACK banded storage ab(kl+ku+1, 3N).
+
+    For interleaved 3×3 blocks the bandwidth is kl=ku=5 (each block spans
+    3 diagonals; super/sub-diagonal blocks shift by ±3 rows).
+    LAPACK column-major storage: ab[ku + i - j, j] = M[i, j].
+    """
+    import jax.numpy as _jnp
+
+    n = A.shape[0]
+    N = 3 * n
+    kl, ku = 5, 5
+    ab = _jnp.zeros((kl + ku + 1, N), dtype=A.dtype)
+
+    idx = _jnp.arange(n)
+
+    # Diagonal blocks A[i]: block row = block col = i
+    for di in range(3):
+        for dj in range(3):
+            row = ku + (di - dj)
+            cols = 3 * idx + dj
+            ab = ab.at[row, cols].set(A[idx, di, dj])
+
+    # Super-diagonal blocks B[i]: block row = i, block col = i+1
+    for di in range(3):
+        for dj in range(3):
+            row = ku + (di - dj - 3)
+            cols = 3 * idx + 3 + dj
+            mask = (3 * idx + 3 + dj) < N
+            ab = ab.at[row, cols].set(jnp.where(mask, B[idx, di, dj], 0.0))
+
+    # Sub-diagonal blocks C[i]: block row = i+1, block col = i
+    for di in range(3):
+        for dj in range(3):
+            row = ku + (di + 3 - dj)
+            cols = 3 * idx + dj
+            mask = (3 * idx + 3 + di) < N
+            ab = ab.at[row, cols].set(jnp.where(mask, C[idx, di, dj], 0.0))
+
+    return ab, kl, ku
+
+
+def banded_solve(A, B, C, b):
+    """Solve block-tridiagonal system via pivoted LAPACK banded (dgbsv).
+
+    Converts (A, B, C, b) → LAPACK banded storage and calls
+    scipy.linalg.solve_banded with partial pivoting.  This is O(N·κ²)
+    but the Fortran BLAS/LAPACK implementation is fast enough to beat
+    the unpivoted O(N) Block-Thomas in practice (especially on
+    ill-conditioned heterojunctions where BT fails entirely).
+
+    Returns x with shape (n, 3) matching b.shape.  If the banded matrix
+    contains non-finite values (e.g. NaN from degenerate Jacobian blocks),
+    returns zeros — the caller should detect this via the residual check
+    and fall back to a dense pivoted solve.
+    """
+    import jax
+    import jax.numpy as _jnp
+    from scipy.linalg import solve_banded as _solve_banded
+
+    n = A.shape[0]
+    banded, kl, ku = _blocks_to_lapack_banded(A, B, C)
+    b_flat = b.reshape(-1)
+
+    def _solve(ab_flat, b_in):
+        import numpy as _np
+        ab_np = ab_flat.reshape(kl + ku + 1, 3 * n)
+        try:
+            from scipy.linalg import solve_banded as _sb
+            x_np = _sb((kl, ku), ab_np, b_in)
+        except Exception:
+            x_np = _np.zeros_like(b_in)
+        return x_np.astype(ab_flat.dtype)
+
+    def _do_solve(_):
+        return jax.pure_callback(
+            _solve,
+            jax.ShapeDtypeStruct(b_flat.shape, b_flat.dtype),
+            banded.reshape(-1),
+            b_flat,
+        )
+
+    def _zeros(_):
+        return jnp.zeros_like(b_flat)
+
+    has_nan = ~jnp.all(jnp.isfinite(banded))
+    x = jax.lax.cond(has_nan, _zeros, _do_solve, None)
+    return x.reshape(n, 3)

@@ -196,7 +196,6 @@ def solve_eq(
 def _step_newton_impl(cell, bound, x, dense, refinement, analytic, fused):
     """Pure per-iteration body (jittable): F, Jacobian, damped step, stats."""
     from driftjax.numerics.analytic_jacobian import banded_jacobian
-    from driftjax.numerics.block_thomas import block_thomas_solve
     from driftjax.numerics.fused_kernels import (
         fused_jacobian_banded,
         fused_residual,
@@ -236,30 +235,20 @@ def _step_newton_impl(cell, bound, x, dense, refinement, analytic, fused):
                 A, B, C = banded_jacobian(cell, bound, pot, n_v=_pre_n, p_v=_pre_p, ni_v=_pre_ni)
             else:
                 A, B, C = banded_jacobian(cell, bound, pot)
-        # Detect near-singular 3x3 blocks (κ~1e14 near Voc) before Block-Thomas
-        from driftjax.numerics.block_thomas import DET_TOL
+        # Pivoted banded solve (LAPACK dgbsv): works on all devices including
+        # ill-conditioned heterojunctions where unpivoted Block-Thomas fails.
+        from driftjax.numerics.analytic_jacobian import blockwise_residual
+        from driftjax.numerics.block_thomas import banded_solve
 
-        a_det, b_det, c_det = A[..., 0, 0], A[..., 0, 1], A[..., 0, 2]
-        d_det, e_det, f_det = A[..., 1, 0], A[..., 1, 1], A[..., 1, 2]
-        g_det, h_det, i_det = A[..., 2, 0], A[..., 2, 1], A[..., 2, 2]
-        det = (
-            a_det * (e_det * i_det - f_det * h_det)
-            - b_det * (d_det * i_det - f_det * g_det)
-            + c_det * (d_det * h_det - e_det * g_det)
-        )
-        is_singular = jnp.any(jnp.abs(det) < DET_TOL)
+        # Check for non-finite Jacobian blocks (e.g. NaN from bad init).
+        blocks_finite = jnp.all(jnp.isfinite(A)) & jnp.all(jnp.isfinite(B)) & jnp.all(jnp.isfinite(C))
 
-        def _do_analytic(_):
-            from driftjax.numerics.analytic_jacobian import blockwise_residual
-
-            p_a = block_thomas_solve(A, B, C, (-F).reshape(n, 3)).reshape(-1)
-            # jrystal-style gate: unpivoted BT is unstable on the degenerate
-            # equilibrium Jacobian (cond ~ 1e28); measure, do not assume.
-            # O(N) block-wise check instead of O(N²) dense_from_blocks.
-            lin_a = jnp.linalg.norm(blockwise_residual(A, B, C, F, p_a)) / (
+        def _do_banded(_):
+            p_b = banded_solve(A, B, C, (-F).reshape(n, 3)).reshape(-1)
+            lin_b = jnp.linalg.norm(blockwise_residual(A, B, C, F, p_b)) / (
                 jnp.linalg.norm(F) + 1e-30
             )
-            return p_a, lin_a
+            return p_b, lin_b
 
         def _do_fallback(_):
             Jf = F_jacobian(cell, bound, pot)
@@ -267,17 +256,10 @@ def _step_newton_impl(cell, bound, x, dense, refinement, analytic, fused):
             lin = jnp.linalg.norm(Jf @ pf + F) / (jnp.linalg.norm(F) + 1e-30)
             return pf, lin
 
-        p_a, lin_a = jax.lax.cond(is_singular, _do_fallback, _do_analytic, None)
-        # Fall back to pivoted dense when BT is inaccurate even with
-        # non-singular initial blocks (Schur-complement blow-up at V~0).
-        use_dense = is_singular | (~jnp.isfinite(lin_a)) | (lin_a > 1e-4)
-        p, linresid = jax.lax.cond(
-            use_dense & (~is_singular),
-            _do_fallback,
-            lambda _: (p_a, lin_a),
-            None,
-        )
-        # Use integer code for stats (trace-safe); 0=analytic, 2=dense
+        p_a, lin_a = jax.lax.cond(blocks_finite, _do_banded, _do_fallback, None)
+        use_dense = (~jnp.isfinite(lin_a)) | (lin_a > 1e-4)
+        p, linresid = jax.lax.cond(use_dense, _do_fallback, lambda _: (p_a, lin_a), None)
+        # Use integer code for stats (trace-safe); 0=banded, 2=dense
         backend_code = jnp.where(use_dense, 2, 0)
         dx = logdamp(p)
         x_new = x + dx
