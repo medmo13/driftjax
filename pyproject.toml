@@ -43,11 +43,11 @@ viz = ["matplotlib>=3.8"]
 dev = ["pytest>=8", "pytest-xdist>=3.6", "pytest-cov>=4", "pytest-timeout>=2.2", "hypothesis>=6", "ruff>=0.6", "mypy>=1.10", "mkdocs-material>=9", "build>=1.2"]
 
 [project.urls]
-Homepage = "https://github.com/driftjax/driftjax"
-Repository = "https://github.com/driftjax/driftjax"
+Homepage = "https://github.com/medmo13/driftjax"
+Repository = "https://github.com/medmo13/driftjax"
 Documentation = "https://driftjax.readthedocs.io"
-Changelog = "https://github.com/driftjax/driftjax/blob/main/CHANGELOG.md"
-"Bug Tracker" = "https://github.com/driftjax/driftjax/issues"
+Changelog = "https://github.com/medmo13/driftjax/blob/main/CHANGELOG.md"
+"Bug Tracker" = "https://github.com/medmo13/driftjax/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/driftjax"]

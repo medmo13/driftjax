@@ -21,4 +21,4 @@ example, and validation results.
 - [Performance](literate/performance.md) — O(N) algorithms, fused kernels, memory optimization
 - [API Reference](literate/api.md) — Public interface documentation
 
-The methods paper sources live in [`paper/`](https://github.com/driftjax/driftjax/tree/main/docs/paper).
+The methods paper sources live in [`paper/`](https://github.com/medmo13/driftjax/tree/main/docs/paper).

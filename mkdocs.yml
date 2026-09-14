@@ -1,7 +1,7 @@
 site_name: DriftJax Documentation
 site_description: Differentiable 1-D drift-diffusion solar-cell simulator in JAX
 site_url: https://driftjax.readthedocs.io
-repo_url: https://github.com/driftjax/driftjax
+repo_url: https://github.com/medmo13/driftjax
 repo_name: driftjax/driftjax
 
 theme:

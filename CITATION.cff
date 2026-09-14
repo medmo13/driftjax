@@ -24,8 +24,8 @@ authors:
 version: 0.1.16
 date-released: 2026-09-14
 license: MIT
-repository-code: "https://github.com/driftjax/driftjax"
-url: "https://github.com/driftjax/driftjax"
+repository-code: "https://github.com/medmo13/driftjax"
+url: "https://github.com/medmo13/driftjax"
 keywords:
   - solar-cell
   - drift-diffusion

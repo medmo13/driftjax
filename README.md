@@ -1,6 +1,6 @@
 # DriftJax
 
-[![CI](https://github.com/driftjax/driftjax/actions/workflows/ci.yml/badge.svg)](https://github.com/driftjax/driftjax/actions/workflows/ci.yml)
+[![CI](https://github.com/medmo13/driftjax/actions/workflows/ci.yml/badge.svg)](https://github.com/medmo13/driftjax/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 
@@ -103,6 +103,9 @@ sol = dj.simulate(
   literature, regression, and reproducibility suites.
 
 ```bash
+git clone https://github.com/medmo13/driftjax.git
+cd driftjax
+pip install -e ".[dev,viz]"
 make test            # fast suite (serial)
 make test-par        # fast suite, 4 workers (needs ~8 GB RAM)
 make test-slow       # full suite incl. N=500 parity gates
@@ -134,7 +137,7 @@ MIT — see [LICENSE](LICENSE).
   title   = {DriftJax: A Differentiable 1-D Drift-Diffusion Solar-Cell Simulator in JAX},
   version = {0.1.16},
   year    = {2026},
-  url     = {https://github.com/driftjax/driftjax}
+  url     = {https://github.com/medmo13/driftjax}
 }
 ```
 
