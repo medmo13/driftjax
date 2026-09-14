@@ -21,8 +21,8 @@ steps; near-equilibrium degenerate cases (κ ≫ 1/uₗₒ) are *detected* by a
 non-converging refinement and routed to the FP64 backend.  This converts
 an unconditioned speed/accuracy trade-off into a gated one.
 
-The block-Thomas backend is used because it is pure-jnp and vmappable; the
-same refinement wraps the batched sweep.
+The FP32 dense core is used because it is vmappable and benefits from
+accelerator tensor cores; the same refinement wraps the batched sweep.
 """
 
 from __future__ import annotations
@@ -31,11 +31,6 @@ import jax
 import jax.numpy as jnp
 
 from driftjax._util import is_tracer as _is_tracer_mp  # M8: single shared helper
-from driftjax.numerics.block_thomas import (
-    block_thomas_solve,
-    block_thomas_solve_batched,
-    extract_blocks,
-)
 from driftjax.numerics.linalg import row_equilibrate
 
 MAX_REFINE = 8
@@ -43,19 +38,16 @@ REFINE_TOL = 1e-13  # relative residual target (≈ FP64 floor for κ ~ 1e4)
 COND_ROUGH = 5e6  # rough κ threshold where FP32 refinement becomes dubious
 
 
-def _bt_solve_f32(Je, be):
-    """Block-Thomas solve with FP32 working precision using pre-equilibrated inputs."""
-    A, B, C = extract_blocks(Je)
-    A32 = A.astype(jnp.float32)
-    B32 = B.astype(jnp.float32)
-    C32 = C.astype(jnp.float32)
-    b32 = be.reshape(-1, 3).astype(jnp.float32)
-    x32 = block_thomas_solve(A32, B32, C32, b32).astype(jnp.float64)
-    return x32.reshape(-1)
+def _dense_solve_f32(Je, be):
+    """Dense FP32 solve for iterative refinement core."""
+    J32 = Je.astype(jnp.float32)
+    b32 = be.astype(jnp.float32)
+    x32 = jnp.linalg.solve(J32, b32)
+    return x32.astype(jnp.float64)
 
 
 def solve_refined(J, b, tol: float = REFINE_TOL, max_refine: int = MAX_REFINE):
-    """J·x = b with FP32 Block-Thomas core + FP64 residual refinement.
+    """J·x = b with FP32 dense core + FP64 residual refinement.
 
     Returns (x, rel_resid, n_refine, converged). Trace-safe: the
     refinement loop is a ``lax.while_loop`` so it compiles under
@@ -66,7 +58,7 @@ def solve_refined(J, b, tol: float = REFINE_TOL, max_refine: int = MAX_REFINE):
     Je, be, _ = row_equilibrate(J, b)
     nrm_b = jnp.linalg.norm(be)
     safe_nrm = jnp.where(nrm_b == 0, jnp.asarray(1.0, dtype=nrm_b.dtype), nrm_b)
-    x0 = _bt_solve_f32(Je, be)
+    x0 = _dense_solve_f32(Je, be)
     rel0 = jnp.linalg.norm(be - Je @ x0) / safe_nrm
 
     def _cond(state):
@@ -76,7 +68,7 @@ def solve_refined(J, b, tol: float = REFINE_TOL, max_refine: int = MAX_REFINE):
     def _body(state):
         x, _, i = state
         r = be - Je @ x
-        d = _bt_solve_f32(Je, r)
+        d = _dense_solve_f32(Je, r)
         x_new = x + d
         rel_new = jnp.linalg.norm(be - Je @ x_new) / safe_nrm
         return (x_new, rel_new, i + 1)
@@ -171,20 +163,13 @@ def solve_refined_batched(Jb, bb, tol: float = REFINE_TOL, max_refine: int = MAX
     when traced, else a Python bool.
     """
     Je, be, _ = row_equilibrate(Jb, bb)
-    # batched J is (B, 3N, 3N): vmap the node-major block extraction
-    A, B, C = jax.vmap(extract_blocks)(Je)  # (B,N,3,3) ...
-    A, B, C = A.transpose(1, 0, 2, 3), B.transpose(1, 0, 2, 3), C.transpose(1, 0, 2, 3)
-    be3 = be.reshape(be.shape[0], -1, 3).transpose(1, 0, 2)  # (N, B, 3)
 
-    def bt32(A, B, C, b):
-        return block_thomas_solve_batched(
-            A.astype(jnp.float32),
-            B.astype(jnp.float32),
-            C.astype(jnp.float32),
-            b.astype(jnp.float32),
+    def dense32(Je_b, be_b):
+        return jnp.linalg.solve(Je_b.astype(jnp.float32), be_b.astype(jnp.float32)).astype(
+            jnp.float64
         )
 
-    x0 = bt32(A, B, C, be3).transpose(1, 0, 2).reshape(be.shape).astype(jnp.float64)
+    x0 = jax.vmap(lambda j, b: dense32(j, b))(Je, be)
     nrm_b = jnp.linalg.norm(be, axis=-1, keepdims=True)
     safe_nrm = jnp.where(nrm_b == 0, jnp.asarray(1.0, dtype=nrm_b.dtype), nrm_b)
 
@@ -200,8 +185,7 @@ def solve_refined_batched(Jb, bb, tol: float = REFINE_TOL, max_refine: int = MAX
     def _body(state):
         x, _, i = state
         r = _resid(x)
-        r3 = r.reshape(r.shape[0], -1, 3).transpose(1, 0, 2)
-        d = bt32(A, B, C, r3).transpose(1, 0, 2).reshape(r.shape)
+        d = jax.vmap(lambda j, b: dense32(j, b))(Je, r)
         x_new = x + d
         rel_new = jnp.linalg.norm(_resid(x_new), axis=-1, keepdims=True) / safe_nrm
         return (x_new, rel_new, i + 1)

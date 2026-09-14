@@ -1,10 +1,10 @@
 """Damped Newton solvers for the DDP system (equilibrium + full coupled).
 
 Path (package-validated): jacfwd(comp_F) → block-tridiagonal analytic Jacobian
-→ Block-Thomas O(N) solve — with a residual gate, a globalization fallback
-(line search / PTC), and a dense last resort.  Anti-regressions kept from
-the package: never lax.scan over spsolve on CPU; Python loops for Newton;
-tracer-safe early returns so grad-through-solver stays concrete.
+→ pivoted banded solve (LAPACK dgbsv) — with a residual gate, a globalization
+fallback (line search / PTC), and a dense last resort.  Anti-regressions
+kept from the package: never lax.scan over spsolve on CPU; Python loops
+for Newton; tracer-safe early returns so grad-through-solver stays concrete.
 
 NEW: ``solve_newton(..., refinement="auto")`` routes the linear solve to
 the FP32-Core + FP64-refinement path (mixed_precision.solve_refined) when
@@ -241,7 +241,9 @@ def _step_newton_impl(cell, bound, x, dense, refinement, analytic, fused):
         from driftjax.numerics.block_thomas import banded_solve
 
         # Check for non-finite Jacobian blocks (e.g. NaN from bad init).
-        blocks_finite = jnp.all(jnp.isfinite(A)) & jnp.all(jnp.isfinite(B)) & jnp.all(jnp.isfinite(C))
+        blocks_finite = (
+            jnp.all(jnp.isfinite(A)) & jnp.all(jnp.isfinite(B)) & jnp.all(jnp.isfinite(C))
+        )
 
         def _do_banded(_):
             p_b = banded_solve(A, B, C, (-F).reshape(n, 3)).reshape(-1)
@@ -315,7 +317,7 @@ def step_newton(
 
     analytic=True (default): Jacobian from the pinned fast backend
     (numerics.analytic_jacobian.banded_jacobian, block-tridiagonal, solved
-    exactly in O(N) by Block-Thomas).  The canonical jacfwd Jacobian
+    via pivoted LAPACK banded).  The canonical jacfwd Jacobian
     remains available via dense=True and is the unit-test reference.
     The step body is XLA-compiled once and reused across iterations and
     bias steps (fixes the historical per-op dispatch overhead that made

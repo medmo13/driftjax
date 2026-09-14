@@ -139,7 +139,7 @@ def _forward(
     # the legacy ``Sweep.refinement`` / ``Sweep.fused`` flags act as OR-fallbacks
     # so existing protocols keep working. ``BlockThomas(batched=True)`` (or the
     # opt-in ``Sweep.batched`` flag) routes the sweep through the vmapped
-    # batched Block-Thomas path where admissible.
+    # batched banded-solver path where admissible.
     refinement = bool(solver.refinement or getattr(protocol, "refinement", False))
     fused = bool(solver.fused or getattr(protocol, "fused", False))
     dense = bool(getattr(solver, "dense", False))

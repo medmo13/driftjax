@@ -163,6 +163,7 @@ def solve_block_tridiagonal(J, b):
 # Pivoted banded solver (LAPACK dgbsv via scipy)
 # ---------------------------------------------------------------------------
 
+
 def _blocks_to_lapack_banded(A, B, C):
     """Convert (A, B, C) block-tridiagonal to LAPACK banded storage ab(kl+ku+1, 3N).
 
@@ -220,8 +221,6 @@ def banded_solve(A, B, C, b):
     and fall back to a dense pivoted solve.
     """
     import jax
-    import jax.numpy as _jnp
-    from scipy.linalg import solve_banded as _solve_banded
 
     n = A.shape[0]
     banded, kl, ku = _blocks_to_lapack_banded(A, B, C)
@@ -229,9 +228,11 @@ def banded_solve(A, B, C, b):
 
     def _solve(ab_flat, b_in):
         import numpy as _np
+
         ab_np = ab_flat.reshape(kl + ku + 1, 3 * n)
         try:
             from scipy.linalg import solve_banded as _sb
+
             x_np = _sb((kl, ku), ab_np, b_in)
         except Exception:
             x_np = _np.zeros_like(b_in)
@@ -243,6 +244,7 @@ def banded_solve(A, B, C, b):
             jax.ShapeDtypeStruct(b_flat.shape, b_flat.dtype),
             banded.reshape(-1),
             b_flat,
+            vmap_method="sequential",
         )
 
     def _zeros(_):
@@ -251,3 +253,21 @@ def banded_solve(A, B, C, b):
     has_nan = ~jnp.all(jnp.isfinite(banded))
     x = jax.lax.cond(has_nan, _zeros, _do_solve, None)
     return x.reshape(n, 3)
+
+
+def banded_solve_batched(A, B, C, b):
+    """Batched pivoted banded solve: (N, B, 3, 3) blocks, (N, B, 3) rhs.
+
+    Vmaps banded_solve over the batch axis.  Each batch member is solved
+    independently via LAPACK dgbsv with partial pivoting.
+    """
+    import jax
+
+    # Transpose from (N, B, ...) to (B, N, ...) for vmap
+    A_b = jax.tree.map(lambda x: x.transpose(1, 0, 2, 3), A)
+    B_b = jax.tree.map(lambda x: x.transpose(1, 0, 2, 3), B)
+    C_b = jax.tree.map(lambda x: x.transpose(1, 0, 2, 3), C)
+    b_b = b.transpose(1, 0, 2)  # (N, B, 3) → (B, N, 3)
+
+    x_b = jax.vmap(lambda a, bb, cc, rhs: banded_solve(a, bb, cc, rhs))(A_b, B_b, C_b, b_b)
+    return x_b.transpose(1, 0, 2)  # (B, N, 3) → (N, B, 3)

@@ -14,7 +14,11 @@ class AbstractLinearSolver(eqx.Module):
 
 
 class BlockThomas(AbstractLinearSolver):
-    """Exact O(N) block-tridiagonal solve (DriftJax default)."""
+    """Pivoted banded solve (LAPACK dgbsv) — DriftJax default linear solver.
+
+    Note: the name is historical. The implementation now uses LAPACK's
+    dgbsv (pivoted banded) instead of the original unpivoted Block-Thomas.
+    """
 
     batched: bool = False
 
@@ -24,7 +28,7 @@ class AbstractSolver(eqx.Module):
 
 
 class Newton(AbstractSolver):
-    """Damped Newton solver with analytic banded Jacobian + Block-Thomas."""
+    """Damped Newton solver with analytic banded Jacobian + pivoted LAPACK banded."""
 
     rtol: float = 1e-8
     max_steps: int = 100

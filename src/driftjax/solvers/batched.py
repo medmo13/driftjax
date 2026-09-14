@@ -2,7 +2,7 @@
 
 Why: the serial bias sweep is a Python loop of jitted Newton solves, each
 recompiling/relaunching.  The DDP block-tridiagonal Jacobian lets us solve
-the *entire batch* of linear systems in one vmapped Block-Thomas pass, and
+the *entire batch* of linear systems in one vmapped banded-solver pass, and
 a lax.scan over a continuation schedule carries every bias in parallel
 inside one XLA program.  On GPUs this converts per-point latency into bulk
 tensor-core work (the merge-plan's "queued solver-path PR" item).
@@ -13,8 +13,8 @@ Structure
   shared convergence test is max |Δx| over the whole batch (safe: biases
   are ordered and correlated, they converge together).
 * Shared cell, batched boundary conditions; Jacobians computed by
-  vmapped jacrev; linear solves by node-major batched Block-Thomas
-  (exact, pure-jnp, differentiable).
+  vmapped jacrev; linear solves by vmapped pivoted banded (LAPACK dgbsv,
+  with partial pivoting for numerical stability).
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ from jax import vmap
 
 from driftjax.fields import Potentials, PVCell, vec2pot
 from driftjax.numerics.analytic_jacobian import banded_jacobian
-from driftjax.numerics.block_thomas import block_thomas_solve_batched
+from driftjax.numerics.block_thomas import banded_solve_batched
 from driftjax.numerics.residual import comp_F
 from driftjax.science.contacts import boundary_bias
 
@@ -80,12 +80,12 @@ def _batched_step(cell, bound_b, pot_b, err_prev, f_tol, tol, damping=True, anal
     else:
         J_b = _batched_jacobian(cell, bound_b, pot_b)
         A, Bk, C = vmap(_blocks)(J_b)
-    # batched block-Thomas: node-major block layout
+    # batched banded: transpose to (N, B, 3, 3) for batched solve
     A = A.transpose(1, 0, 2, 3)  # (N, B, 3, 3)
     Bk = Bk.transpose(1, 0, 2, 3)
     C = C.transpose(1, 0, 2, 3)
     rhs3 = (-F_b).reshape(B, -1, 3).transpose(1, 0, 2)  # (N, B, 3)
-    dx3 = block_thomas_solve_batched(A, Bk, C, rhs3)  # (N, B, 3)
+    dx3 = banded_solve_batched(A, Bk, C, rhs3)  # (N, B, 3)
     dx = dx3.transpose(1, 0, 2).reshape(B, -1)  # (B, 3n)
     if damping:
         dx = jnp.where(jnp.abs(dx) > 1, jnp.log(1 + jnp.abs(dx) * 1.72) * jnp.sign(dx), dx)

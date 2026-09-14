@@ -21,7 +21,6 @@ import scipy.sparse.linalg
 from jax import lax, vmap
 
 from driftjax._util import is_tracer as _is_tracer_linalg  # M8: single shared helper
-from driftjax.numerics import block_thomas as _bt
 
 
 def _spsolve_host(data, indices, indptr, b):
@@ -176,10 +175,14 @@ def linsolve(J, rhs, backend: str = "auto", tol: float = 1e-6):
         # residual was 0/0=NaN, poisoning stats and solver-selection gates.
         return x, jnp.linalg.norm(J @ x - rhs) / (jnp.linalg.norm(rhs) + 1e-30), "dense"
     if backend == "banded":
-        x = _bt.solve_block_tridiagonal(J, rhs)
+        from driftjax.numerics.block_thomas import banded_solve, extract_blocks
+
+        A, B, C = extract_blocks(J)
+        x3 = banded_solve(A, B, C, rhs.reshape(-1, 3))
+        x = x3.reshape(-1)
         resid = jnp.linalg.norm(J @ x - rhs) / (jnp.linalg.norm(rhs) + 1e-30)
-        # H4: mirror the auto-path dense fallback — an ill-conditioned
-        # block-Thomas solve previously returned NaN silently.
+        # H4: auto-path dense fallback — a degenerate banded solve may
+        # return NaN or large residual; fall back to pivoted dense.
         if jnp.isnan(resid) or resid > 1e-4:
             x = jnp.linalg.solve(J, rhs)
             resid = jnp.linalg.norm(J @ x - rhs) / (jnp.linalg.norm(rhs) + 1e-30)
