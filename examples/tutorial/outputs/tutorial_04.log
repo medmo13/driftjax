@@ -1,4 +1,0 @@
-EXAMPLE_RESULT tutorial_04 init_eff=0.0733751 opt_eff=0.223062
-EXAMPLE_RESULT tutorial_04 init_eff=7.3375 init_voc=1.0304 init_jsc=8.3748 init_ff=0.7652 init_pmax=0.00660314 opt_eff=22.3062 opt_voc=1.0516 opt_jsc=22.2567 opt_ff=0.8577 opt_pmax=0.0200738
-EXAMPLE_RESULT tutorial_04 init_eff=0.0733751 opt_eff=0.223062
-EXAMPLE_RESULT tutorial_04 init_eff=7.3375 init_voc=1.0304 init_jsc=8.3748 init_ff=0.7652 init_pmax=0.00660314 opt_eff=22.3062 opt_voc=1.0516 opt_jsc=22.2567 opt_ff=0.8577 opt_pmax=0.0200738

@@ -45,12 +45,6 @@ docs/figures/*.png
 !docs/figures/fig*.png
 !docs/figures/supp_*.png
 
-# Agent scratch
-.agent-scratch/
-
-# Lock files (regenerate from pyproject.toml)
-uv.lock
-
 # LaTeX build artifacts
 docs/*.aux
 docs/*.log
@@ -59,3 +53,13 @@ docs/*.bbl
 docs/*.blg
 docs/*.abs
 docs/*.synctex.gz
+docs/*.toc
+
+# Lock files (regenerate from pyproject.toml)
+uv.lock
+
+# Agent scratch
+.agent-scratch/
+
+# Benchmarks
+.benchmarks/

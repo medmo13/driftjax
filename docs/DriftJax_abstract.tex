@@ -1,25 +1,20 @@
 \begin{abstract}
-We present DriftJax, a one-dimensional drift--diffusion--Poisson framework
-for photovoltaic simulation and design sensitivity analysis. The numerical
-method combines Scharfetter--Gummel fluxes with an analytically assembled
-block-tridiagonal Jacobian and a direct Block-Thomas Newton step. For a mesh
-of $N$ nodes, the forward linear solve requires $O(N)$ work and storage.
-Sensitivities of converged steady-state solutions are evaluated using the
-implicit function theorem and a custom reverse-mode rule in JAX. The
-production adjoint uses pivoted dense LU, with $O(N^3)$ factorisation work
-and $O(N^2)$ matrix storage per bias; checkpointing reduces retained
-intermediates without changing this scaling. This separation of forward
-and backward linear algebra makes the computational trade-off explicit.
-The framework combines carrier-statistics, optical-generation, and
-recombination models with a common device interface. Reported verification
-studies compare analytical Jacobians, linear residuals, conservation
-identities, and finite-difference sensitivities. Illustrative applications
-address derivative-based sensitivity analysis, constrained band-gap/thickness
-optimisation, and recovery of a synthetic current--voltage curve.
-The results support the use of structured forward computation within a
-differentiable design workflow, while also identifying the importance of
-conditioning, objective normalisation, and convergence checks. The reported
-timing ratios are specific to the matched configurations and have not been
-isolated by controlled ablation; the available release records do not
-constitute a fully reproducible benchmark archive.
+DriftJax is a one-dimensional drift--diffusion--Poisson solver for
+photovoltaic device simulation and design sensitivity analysis, implemented
+in JAX with exact gradients via the implicit function theorem. The forward
+solver combines Scharfetter--Gummel fluxes, an analytically assembled
+block-tridiagonal Jacobian, and a direct Block-Thomas elimination that
+requires $O(N)$ work per Newton step for $N$ mesh nodes. Reverse-mode
+sensitivities use pivoted dense-LU adjoint factorisation with
+$O(N^3)$ backward cost; row-equilibration diagnosis identifies the
+ conditioning trade-off between structured and dense paths.
+Verification covers analytical--automatic-differentiation Jacobian
+agreement ($5\times10^{-17}$ relative), dark-equilibrium mass-action
+law consistency, current conservation ($<10^{-17}$), mesh convergence
+across five refinement levels, and directional Taylor tests with
+$O(h)$ scaling. Controlled single-architecture benchmarks quantify
+the forward and adjoint cost on a modern CPU. Example applications
+demonstrate derivative-based sensitivity ranking, constrained
+band-gap/thickness optimisation, and synthetic current--voltage
+curve recovery.
 \end{abstract}
