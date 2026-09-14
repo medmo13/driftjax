@@ -28,7 +28,6 @@ Block conventions (match numerics.block_thomas):
 from __future__ import annotations
 
 import jax.numpy as jnp
-from jax import lax
 
 from driftjax.fields import BoundaryConditions, Potentials, PVCell
 from driftjax.numerics.poisson import harmonic_ave_eps
@@ -248,8 +247,9 @@ def _recomb_deriv(cell: PVCell, pot: Potentials, n_v, p_v, ni_v=None):
     return DR_phin[1:-1], DR_phip[1:-1], DR_phi[1:-1]
 
 
-def banded_jacobian(cell: PVCell, bound: BoundaryConditions, pot: Potentials,
-                    n_v=None, p_v=None, ni_v=None) -> tuple:
+def banded_jacobian(
+    cell: PVCell, bound: BoundaryConditions, pot: Potentials, n_v=None, p_v=None, ni_v=None
+) -> tuple:
     """(A, B, C) 3×3 blocks of the DDP Jacobian (Boltzmann statistics).
 
     Fully vectorised (no per-node Python loop): compiles to compact XLA.
@@ -391,6 +391,3 @@ def blockwise_matvec_transpose(A, B, C, x):
 def blockwise_residual(A, B, C, F, p):
     """Compute J @ p + F in O(N) without forming the dense Jacobian."""
     return blockwise_matvec(A, B, C, p) + F
-
-
-

@@ -1,0 +1,42 @@
+name: Bug report
+description: Report a reproducible problem with DriftJax
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. DriftJax solves must run in float64 — please set
+        `JAX_ENABLE_X64=1` before concluding a result is wrong.
+  - type: textarea
+    id: reproducer
+    attributes:
+      label: Minimal reproducer
+      description: Smallest complete script that shows the problem
+      placeholder: |
+        ```python
+        import driftjax as dj
+        ...
+        ```
+    validations:
+      required: true
+  - type: textarea
+    id: behaviour
+    attributes:
+      label: Expected vs actual behaviour
+      description: What did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: Python, JAX/jaxlib, driftjax, OS
+      placeholder: "Python 3.12, JAX 0.10.2, driftjax 0.1.16, Ubuntu 24.04"
+    validations:
+      required: true
+  - type: textarea
+    id: traceback
+    attributes:
+      label: Traceback / logs
+      description: Full error output, if any
+      render: shell

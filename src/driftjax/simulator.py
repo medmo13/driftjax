@@ -191,7 +191,9 @@ class Device(eqx.Module):
         # M8: single canonical normalizer (was a third inline copy here).
         _am = _normalize_alpha_mode(alpha_mode)
         if _am not in ("beer-lambert", "table", "tauc", "tmm", "fresnel"):
-            raise ValueError(f"Device alpha_mode must be beer-lambert/table/tauc/tmm/fresnel, got {alpha_mode!r}")
+            raise ValueError(
+                f"Device alpha_mode must be beer-lambert/table/tauc/tmm/fresnel, got {alpha_mode!r}"
+            )
         if int(n_points) < 3:
             raise ValueError(f"Device requires n_points >= 3, got {n_points}")
         # L2: T <= 0 gives vt = 0 → inf/NaN thermal scales. Concrete check
@@ -243,7 +245,11 @@ class Device(eqx.Module):
         # keep Ls/Ns as lists, but don't force float() on tracer elements.
         Ls_list = list(self.Ls) if getattr(self.Ls, "ndim", 0) == 1 else [self.Ls]
         Ns_list = list(self.Ns) if getattr(self.Ns, "ndim", 0) == 1 else [self.Ns]
-        mats_list = list(self.mats) if hasattr(self, "mats") and self.mats is not None else [self.mat_l, self.mat_r]
+        mats_list = (
+            list(self.mats)
+            if hasattr(self, "mats") and self.mats is not None
+            else [self.mat_l, self.mat_r]
+        )
         new_design = _make_design(
             n_points=self.n_points,
             Ls=Ls_list,
@@ -260,7 +266,13 @@ class Device(eqx.Module):
         out = _eqx.tree_at(
             lambda d: (d._design, d.T, d.mat_l, d.mat_r, d.mats),
             self,
-            (new_design, jnp.asarray(T, dtype=jnp.float64), mats_list[0], mats_list[1] if len(mats_list) > 1 else mats_list[0], tuple(mats_list)),
+            (
+                new_design,
+                jnp.asarray(T, dtype=jnp.float64),
+                mats_list[0],
+                mats_list[1] if len(mats_list) > 1 else mats_list[0],
+                tuple(mats_list),
+            ),
         )
         return out
 
@@ -358,6 +370,7 @@ def _generation_only(design, ls, alpha_mode, statistics, optics, fused):
     """Just the generation profile (no PVCell assembly) — cheap VJP target."""
     if fused:
         from driftjax.numerics.fused_kernels import fused_generation as _fg
+
         if optics is not None:
             return optics.generation(design, ls)
         return _fg(design, ls, alpha_mode=alpha_mode, statistics=statistics)
@@ -367,9 +380,26 @@ def _generation_only(design, ls, alpha_mode, statistics, optics, fused):
 
 
 _DIRECT_FIELDS = (
-    "eps", "Chi", "Eg", "Nc", "Nv", "mn", "mp", "tn", "tp",
-    "Et", "Br", "Cn", "Cp", "Ndop",
-    "Snl", "Snr", "Spl", "Spr", "PhiMl", "PhiMr",
+    "eps",
+    "Chi",
+    "Eg",
+    "Nc",
+    "Nv",
+    "mn",
+    "mp",
+    "tn",
+    "tp",
+    "Et",
+    "Br",
+    "Cn",
+    "Cp",
+    "Ndop",
+    "Snl",
+    "Snr",
+    "Spl",
+    "Spr",
+    "PhiMl",
+    "PhiMr",
 )
 
 
@@ -398,7 +428,7 @@ def _init_cell_bwd(res, g_cell, perturbed, design, ls, *args, **kwargs):
             lambda d: _generation_only(d, saved_ls, alpha_mode, statistics, optics, fused),
             saved_design,
         )
-        g_design_gen, = vjp_gen(g_G)
+        (g_design_gen,) = vjp_gen(g_G)
     else:
         # zeros for array leaves, None elsewhere (same tree structure, so the
         # downstream zip over saved_design paths still aligns leaf-for-leaf)
@@ -409,9 +439,29 @@ def _init_cell_bwd(res, g_cell, perturbed, design, ls, *args, **kwargs):
     # 2) Identity cotangents for directly-copied fields. PVCell mirrors these
     #    from design, so their VJP is identity (d field_i / d field_i = 1).
     _PVCELL_DIRECT = (
-        "dgrid", "x", "eps", "Chi", "Eg", "Nc", "Nv", "mn", "mp", "tn", "tp",
-        "Et", "Br", "Cn", "Cp", "Ndop",
-        "Snl", "Snr", "Spl", "Spr", "PhiMl", "PhiMr", "T",
+        "dgrid",
+        "x",
+        "eps",
+        "Chi",
+        "Eg",
+        "Nc",
+        "Nv",
+        "mn",
+        "mp",
+        "tn",
+        "tp",
+        "Et",
+        "Br",
+        "Cn",
+        "Cp",
+        "Ndop",
+        "Snl",
+        "Snr",
+        "Spl",
+        "Spr",
+        "PhiMl",
+        "PhiMr",
+        "T",
     )
     g_design_leaves = jax.tree_util.tree_leaves(g_design_gen)
     paths_and_leaves = jax.tree_util.tree_flatten_with_path(saved_design)[0]
@@ -688,16 +738,14 @@ def temperature_sweep(
     """
     from driftjax.problems import Sweep
     from driftjax.simulate import simulate
+
     sweep_kw = dict(sim_kw)
     protocol = Sweep(
         vmax=sweep_kw.pop("vmax", 1.1),
         n_steps=sweep_kw.pop("n_steps", 41),
     )
 
-    return {
-        float(T): simulate(design, protocol, ls=ls, T=float(T), **sweep_kw)
-        for T in Ts
-    }
+    return {float(T): simulate(design, protocol, ls=ls, T=float(T), **sweep_kw) for T in Ts}
 
 
 def spectral_sensitivity(

@@ -143,8 +143,6 @@ def test_fresnel_dispatch_simulates():
         PhiMl=-1.0,
         PhiMr=-1.0,
     ).design()
-    r = dj.simulate(
-        des, dj.Sweep(vmax=0.7, n_steps=9), optics=dj.Fresnel(alpha_mode="tauc"), ls=LS
-    )
+    r = dj.simulate(des, dj.Sweep(vmax=0.7, n_steps=9), optics=dj.Fresnel(alpha_mode="tauc"), ls=LS)
     jsc = float(np.asarray(r.current)[0]) * 1000.0
     assert 0.0 < jsc < 45.0, f"fresnel Jsc {jsc:.2f} mA/cm² out of range"

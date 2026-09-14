@@ -123,17 +123,29 @@ def material(**kwargs) -> Material:
     if alpha is not None and Lambda is not None:
         alpha, Lambda = _canonicalize_alpha(alpha, Lambda)
     return Material(
-        Chi=merged["Chi"], Eg=merged["Eg"], eps=merged["eps"],
-        Nc=merged["Nc"], Nv=merged["Nv"], mn=merged["mn"], mp=merged["mp"],
-        tn=merged["tn"], tp=merged["tp"], Et=merged["Et"], Br=merged["Br"],
-        Cn=merged["Cn"], Cp=merged["Cp"], A=merged["A"],
-        alpha=alpha, Lambda=Lambda,
+        Chi=merged["Chi"],
+        Eg=merged["Eg"],
+        eps=merged["eps"],
+        Nc=merged["Nc"],
+        Nv=merged["Nv"],
+        mn=merged["mn"],
+        mp=merged["mp"],
+        tn=merged["tn"],
+        tp=merged["tp"],
+        Et=merged["Et"],
+        Br=merged["Br"],
+        Cn=merged["Cn"],
+        Cp=merged["Cp"],
+        A=merged["A"],
+        alpha=alpha,
+        Lambda=Lambda,
     )
 
 
 # ---------------------------------------------------------------------------
 # Modern consolidated DB — single YAML + binary NPZ, cached
 # ---------------------------------------------------------------------------
+
 
 def _db_path() -> Path | Traversable:
     # importlib.resources is package-data safe (works for pip zip)
@@ -192,6 +204,7 @@ def _load_optics_from_db(name: str):
         npz_path = files("driftjax.resources") / "optics" / f"{name}.npz"
         if hasattr(npz_path, "is_file") and npz_path.is_file():
             import numpy as np
+
             # files() Traversable may not be Path — read via open
             with npz_path.open("rb") as fb:
                 data = np.load(fb, allow_pickle=False)
@@ -246,7 +259,8 @@ def _load_alpha_table(name: str):
                     float(row[0])
                 except ValueError:
                     continue
-                lam_k = float(row[2]); k_val = float(row[3])
+                lam_k = float(row[2])
+                k_val = float(row[3])
                 if lam_k not in seen:
                     seen.add(lam_k)
                     lam_list.append(lam_k)
@@ -265,7 +279,13 @@ def _resample_alpha(lam_nm, alpha):
     order = jnp.argsort(lam_nm)
     # Extrapolate to 0 outside measured range (IR/UV) instead of flat boundary
     alpha_rs = jnp.exp(
-        jnp.interp(grid_nm, lam_nm[order], jnp.log(jnp.maximum(alpha[order], 1e-30)), left=jnp.log(1e-30), right=jnp.log(1e-30))
+        jnp.interp(
+            grid_nm,
+            lam_nm[order],
+            jnp.log(jnp.maximum(alpha[order], 1e-30)),
+            left=jnp.log(1e-30),
+            right=jnp.log(1e-30),
+        )
     )
     return grid_nm * 1e-9, alpha_rs
 
@@ -276,9 +296,11 @@ def load_material(name: str) -> Material:
     db = _load_db()
     if db and name in db:
         props = db[name].get("properties", {})
+
         def _get(k, d):
             v = props.get(k)
             return d if v is None else float(v)
+
         m = {k: _get(k, v) for k, v in _DEFAULTS.items()}
         # Optics: modern DB first
         optics = _load_optics_from_db(name)
@@ -287,40 +309,69 @@ def load_material(name: str) -> Material:
             if alpha.size:
                 lam_m, alpha_rs = _resample_alpha(lam_nm, alpha)
             else:
-                lam_m = jnp.array([], dtype=jnp.float64); alpha_rs = jnp.array([], dtype=jnp.float64)
+                lam_m = jnp.array([], dtype=jnp.float64)
+                alpha_rs = jnp.array([], dtype=jnp.float64)
         else:
             # Legacy fallback: try CSV
             lam_nm, alpha = _load_alpha_table(name)
             if alpha.size:
                 lam_m, alpha_rs = _resample_alpha(lam_nm, alpha)
             else:
-                lam_m = jnp.array([], dtype=jnp.float64); alpha_rs = jnp.array([], dtype=jnp.float64)
+                lam_m = jnp.array([], dtype=jnp.float64)
+                alpha_rs = jnp.array([], dtype=jnp.float64)
         return Material(
-            Chi=m["Chi"], Eg=m["Eg"], eps=m["eps"], Nc=m["Nc"], Nv=m["Nv"],
-            mn=m["mn"], mp=m["mp"], tn=m["tn"], tp=m["tp"], Et=m["Et"],
-            Br=m["Br"], Cn=m["Cn"], Cp=m["Cp"], A=m["A"],
+            Chi=m["Chi"],
+            Eg=m["Eg"],
+            eps=m["eps"],
+            Nc=m["Nc"],
+            Nv=m["Nv"],
+            mn=m["mn"],
+            mp=m["mp"],
+            tn=m["tn"],
+            tp=m["tp"],
+            Et=m["Et"],
+            Br=m["Br"],
+            Cn=m["Cn"],
+            Cp=m["Cp"],
+            A=m["A"],
             alpha=alpha_rs if alpha_rs.size else jnp.array([], dtype=jnp.float64),
             Lambda=lam_m,
         )
     # No consolidated entry — legacy per-file path (v0.1.5 compat)
     path = _RESOURCE_DIR / f"{name}.yaml"
     if not path.exists():
-        raise FileNotFoundError(f"Material {name!r} not found in {path.parent} (modern DB has {sorted(db.keys()) if db else []})")
+        raise FileNotFoundError(
+            f"Material {name!r} not found in {path.parent} (modern DB has {sorted(db.keys()) if db else []})"
+        )
     with open(path) as f:
         props = yaml.safe_load(f).get("properties", {})
+
     def _get2(k, d):
         v = props.get(k)
         return d if v is None else float(v)
+
     m = {k: _get2(k, v) for k, v in _DEFAULTS.items()}
     lam_nm, alpha = _load_alpha_table(name)
     if alpha.size:
         lam_m, alpha_rs = _resample_alpha(lam_nm, alpha)
     else:
-        lam_m = jnp.array([], dtype=jnp.float64); alpha_rs = jnp.array([], dtype=jnp.float64)
+        lam_m = jnp.array([], dtype=jnp.float64)
+        alpha_rs = jnp.array([], dtype=jnp.float64)
     return Material(
-        Chi=m["Chi"], Eg=m["Eg"], eps=m["eps"], Nc=m["Nc"], Nv=m["Nv"],
-        mn=m["mn"], mp=m["mp"], tn=m["tn"], tp=m["tp"], Et=m["Et"],
-        Br=m["Br"], Cn=m["Cn"], Cp=m["Cp"], A=m["A"],
+        Chi=m["Chi"],
+        Eg=m["Eg"],
+        eps=m["eps"],
+        Nc=m["Nc"],
+        Nv=m["Nv"],
+        mn=m["mn"],
+        mp=m["mp"],
+        tn=m["tn"],
+        tp=m["tp"],
+        Et=m["Et"],
+        Br=m["Br"],
+        Cn=m["Cn"],
+        Cp=m["Cp"],
+        A=m["A"],
         alpha=alpha_rs if alpha_rs.size else jnp.array([], dtype=jnp.float64),
         Lambda=lam_m,
     )

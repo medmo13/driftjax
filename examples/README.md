@@ -1,4 +1,4 @@
-# DriftJax v0.1.3 example gallery
+# DriftJax example gallery
 
 The active gallery is organized around scientific questions and API contracts.
 Each script writes one publication-style PNG (300 dpi, shared

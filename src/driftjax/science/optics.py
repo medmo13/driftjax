@@ -222,6 +222,7 @@ def _tmm_core(n_layer, k_layer, d_m, lam_m, flux):
     # over-shot ∫G·dx vs 1−R−T by up to 3.5×.
     r_eff = (n_tilde[L - 1] - n_air) / (n_tilde[L - 1] + n_air)
     t_eff = 2.0 * n_tilde[L - 1] / (n_tilde[L - 1] + n_air)
+
     def _airy_body(i, carry):
         r_eff_, t_eff_ = carry
         j = L - 1 - i
@@ -237,6 +238,7 @@ def _tmm_core(n_layer, k_layer, d_m, lam_m, flux):
         r_eff_n = (r_j + r_eff_ * e2) / denom
         t_eff_n = t_eff_ * t_j * jnp.exp(1j * k_j * d_j) / denom
         return (r_eff_n, t_eff_n)
+
     if L > 1:
         r_eff, t_eff = lax.fori_loop(0, L - 1, _airy_body, (r_eff, t_eff))
     r0 = (n_air - n_tilde[0]) / (n_air + n_tilde[0])

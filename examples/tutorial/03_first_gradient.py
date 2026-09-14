@@ -33,10 +33,14 @@ def main():
         return dj.simulate(d, dj.Sweep(vmax=1.1, n_steps=21)).efficiency
 
     g = jax.grad(eff)(design)
-    leaves = [(p[0].name if hasattr(p[0], "name") else str(p[0]), a)
-              for p, a in jax.tree_util.tree_flatten_with_path(g)[0] if a.size]
-    ranked = sorted(((n, float(jnp.max(jnp.abs(a)))) for n, a in leaves),
-                    key=lambda kv: kv[1], reverse=True)[:5]
+    leaves = [
+        (p[0].name if hasattr(p[0], "name") else str(p[0]), a)
+        for p, a in jax.tree_util.tree_flatten_with_path(g)[0]
+        if a.size
+    ]
+    ranked = sorted(
+        ((n, float(jnp.max(jnp.abs(a)))) for n, a in leaves), key=lambda kv: kv[1], reverse=True
+    )[:5]
     print("top sensitivities:", [(n, f"{v:.3e}") for n, v in ranked], flush=True)
 
     # Finite-difference spot check on the band gap at mid-device.
@@ -53,18 +57,22 @@ def main():
 
     sol = dj.simulate(design, dj.Sweep(vmax=1.1, n_steps=61))
     fig_path = plot_dossier(
-        sol, path=str(support.OUTPUT_ROOT / "tutorial_03_dossier.png"),
+        sol,
+        path=str(support.OUTPUT_ROOT / "tutorial_03_dossier.png"),
         title=f"Si p-n gradient device, N={points}",
     )
     save_json(
         "tutorial_03_first_gradient",
-        {"metadata": execution_metadata(), 
-         "n_points": points, "top_sensitivities": dict(ranked),
-         "fd_check": {"name": name, "index": idx, "adjoint": an, "fd": fd},
-         "figure": str(fig_path), **solution_metrics(sol)},
+        {
+            "metadata": execution_metadata(),
+            "n_points": points,
+            "top_sensitivities": dict(ranked),
+            "fd_check": {"name": name, "index": idx, "adjoint": an, "fd": fd},
+            "figure": str(fig_path),
+            **solution_metrics(sol),
+        },
     )
-    report("tutorial_03", fd_rel_diff=abs(an - fd) / max(1e-12, abs(fd)),
-           **solution_metrics(sol))
+    report("tutorial_03", fd_rel_diff=abs(an - fd) / max(1e-12, abs(fd)), **solution_metrics(sol))
 
 
 if __name__ == "__main__":

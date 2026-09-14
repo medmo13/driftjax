@@ -53,8 +53,7 @@ def test_identical_cells_half_voltage_identity(identical_pair):
     cur = np.asarray(t["current"])
     m = np.isfinite(cur)
     assert m.any(), "entire tandem curve is NaN"
-    half = np.interp(np.asarray(t["voltages"])[m] / 2.0,
-                     np.asarray(v_grid), np.asarray(single_j))
+    half = np.interp(np.asarray(t["voltages"])[m] / 2.0, np.asarray(v_grid), np.asarray(single_j))
     err = float(np.max(np.abs(cur[m] - half)))
     assert err < 5e-3, f"max |dJ| = {err:.2e} mA/cm^2"
 
@@ -76,6 +75,7 @@ def test_differentiable_in_both_curves():
     Objective is a smooth functional of the series current (the voc
     LOCATOR is discrete by design — exact value, no gradient across node
     jumps)."""
+
     def objective(scale_top, scale_bot):
         top = (V_GRID, diode_iv(31.0, VOC_T * scale_top, V_GRID))
         bot = (V_GRID, diode_iv(20.0, VOC_B * scale_bot, V_GRID))

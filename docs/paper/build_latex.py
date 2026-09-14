@@ -3,13 +3,13 @@ import re
 import shutil
 import subprocess
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DOCS = os.path.join(ROOT, "docs")
-MD   = os.path.join(DOCS, "DriftJax_paper.md")
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+PAPER = os.path.join(ROOT, "docs", "paper")
+MD   = os.path.join(PAPER, "DriftJax_paper.md")
 PRE  = "/tmp/driftjax_paper_pre.md"
-TEX  = os.path.join(DOCS, "DriftJax_paper.tex")
-TEMPL= os.path.join(DOCS, "paper.template.tex")
-FIGDIR = os.path.join(DOCS, "figures")
+TEX  = os.path.join(PAPER, "DriftJax_paper.tex")
+TEMPL= os.path.join(PAPER, "paper.template.tex")
+FIGDIR = os.path.join(PAPER, "figures")
 
 TEMPLATE = r"""\documentclass[11pt,a4paper]{article}
 \usepackage[utf8]{inputenc}
@@ -84,7 +84,7 @@ cmd = ["pandoc", PRE, "-o", TEX, "--from", "markdown", "--to", "latex",
         "--standalone", "--template", TEMPL, "--listings",
         "--shift-heading-level-by=-1",
         "-V", "title=DriftJax: A Differentiable One-Dimensional Drift-Diffusion Solver for Photovoltaic Device Design",
-        "-V", "author=The DriftJax Authors", "-V", "date=v0.1.14"]
+        "-V", "author=The DriftJax Authors", "-V", "date=v0.1.16"]
 r = subprocess.run(cmd, capture_output=True, text=True)
 print("pandoc rc:", r.returncode, r.stderr[:400])
 

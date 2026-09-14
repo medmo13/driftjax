@@ -8,7 +8,9 @@ from pathlib import Path
 # every later test process (pytest workers and `python -m driftjax`
 # subprocesses alike) instead of recompiling float64 programs each run.
 # Must be set before JAX is first imported.
-os.environ.setdefault("JAX_COMPILATION_CACHE_DIR", os.path.expanduser("~/.cache/driftjax-xla-cache"))
+os.environ.setdefault(
+    "JAX_COMPILATION_CACHE_DIR", os.path.expanduser("~/.cache/driftjax-xla-cache")
+)
 os.environ.setdefault("JAX_PERSISTENT_CACHE_MIN_COMPILE_TIME_SECS", "0.2")
 os.environ.setdefault("JAX_PERSISTENT_CACHE_MIN_ENTRY_SIZE_BYTES", "0")
 
@@ -63,6 +65,7 @@ def small_eq(small_cell):
     from driftjax.solvers.newton import solve_eq
 
     return solve_eq(small_cell, boundary_eq(small_cell), equilibrium_guess(small_cell).phi)
+
 
 @pytest.fixture(scope="session")
 def pn80_cell(si_canon):

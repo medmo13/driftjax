@@ -163,7 +163,9 @@ def _forward(
         fused=fused,
         globalization=globalization,
     )
-    cell = init_cell(design, ls, alpha_mode=optics.alpha_mode, statistics=statistics, optics=optics, fused=fused)
+    cell = init_cell(
+        design, ls, alpha_mode=optics.alpha_mode, statistics=statistics, optics=optics, fused=fused
+    )
     sc = thermal_scales(design.T)
     _eq_iter = (
         _iter_cb_for(progress, "equilibrium")
@@ -314,10 +316,20 @@ def _forward(
 
 
 @partial(custom_vjp, nondiff_argnums=(1, 2, 3, 4, 5, 6, 7, 8))
-def _simulate_sweep(design, solver, optics, protocol, progress, ls, statistics, init=None, fused=False):
-    if fused and progress is None and init is None and not _is_tracer(design) and not getattr(protocol, "batched", False):
+def _simulate_sweep(
+    design, solver, optics, protocol, progress, ls, statistics, init=None, fused=False
+):
+    if (
+        fused
+        and progress is None
+        and init is None
+        and not _is_tracer(design)
+        and not getattr(protocol, "batched", False)
+    ):
         try:
-            pot_eq, cell, ls2, sc, vd, cd, pa = _forward_fused_scan(design, solver, optics, protocol, ls, statistics)
+            pot_eq, cell, ls2, sc, vd, cd, pa = _forward_fused_scan(
+                design, solver, optics, protocol, ls, statistics
+            )
             # The whole-sweep scan compiles to one XLA program whose Newton
             # trajectory can diverge (non-finite currents) where the serial
             # sweep converges (rounding-level path differences amplified at
@@ -334,7 +346,9 @@ def _simulate_sweep(design, solver, optics, protocol, progress, ls, statistics, 
             j_phys = cd * sc["current"]
             pmax_phys_wm2 = pmax_dim * sc["energy"] * sc["current"] * 1e4
             eff = pmax_phys_wm2 / jnp.sum(ls2.P_in)
-            pots_list = [jax.tree_util.tree_map(lambda a, i=i: a[i], pa) for i in range(pa.phi.shape[0])]
+            pots_list = [
+                jax.tree_util.tree_map(lambda a, i=i: a[i], pa) for i in range(pa.phi.shape[0])
+            ]
             return Solution(
                 voltages=v_volts,
                 current=j_phys,
@@ -434,17 +448,32 @@ def _forward_fused_scan(design, solver, optics, protocol, ls, statistics):
 
         @jax.jit
         def fn(d):
-            cell = init_cell(d, ls, alpha_mode=alpha_mode, statistics=statistics, optics=optics, fused=fused)
+            cell = init_cell(
+                d, ls, alpha_mode=alpha_mode, statistics=statistics, optics=optics, fused=fused
+            )
             sc = thermal_scales(d.T)
-            pot_eq0 = _solve_eq_fused(cell, boundary_eq(cell), _eg(cell).phi, allow_trace=True, loop="while")
-            pot_eq, _ = _solve_newton_fused(cell, boundary_eq(cell), pot_eq0, allow_trace=True, loop="while", fused=fused)
+            pot_eq0 = _solve_eq_fused(
+                cell, boundary_eq(cell), _eg(cell).phi, allow_trace=True, loop="while"
+            )
+            pot_eq, _ = _solve_newton_fused(
+                cell, boundary_eq(cell), pot_eq0, allow_trace=True, loop="while", fused=fused
+            )
             vmax_dim = vmax / sc["energy"]
             vs = jnp.linspace(0.0, vmax_dim, n_steps)
 
             def scan_body(pot_prev, v):
                 bound = boundary_bias(cell, v)
                 # f_tol=rtol: residual gate (see _forward newton_kw note).
-                pot_new, _ = _solve_newton_fused(cell, bound, pot_prev, allow_trace=True, loop="while", fused=fused, tol=rtol, max_steps=max_steps)
+                pot_new, _ = _solve_newton_fused(
+                    cell,
+                    bound,
+                    pot_prev,
+                    allow_trace=True,
+                    loop="while",
+                    fused=fused,
+                    tol=rtol,
+                    max_steps=max_steps,
+                )
                 cur = _tc(cell, pot_new)
                 return pot_new, (v, cur, pot_new)
 
@@ -460,9 +489,17 @@ def _forward_fused_scan(design, solver, optics, protocol, ls, statistics):
 
 def _sweep_fwd(design, solver, optics, protocol, progress, ls, statistics, init=None, fused=False):
     # Fused-everything fast path: only for concrete forward (not grad) — keeps grad at 2.1s vs 41s
-    if fused and progress is None and init is None and not getattr(protocol, "batched", False) and not _is_tracer(design):
+    if (
+        fused
+        and progress is None
+        and init is None
+        and not getattr(protocol, "batched", False)
+        and not _is_tracer(design)
+    ):
         try:
-            pot_eq, cell, ls2, sc, vd, cd, pa = _forward_fused_scan(design, solver, optics, protocol, ls, statistics)
+            pot_eq, cell, ls2, sc, vd, cd, pa = _forward_fused_scan(
+                design, solver, optics, protocol, ls, statistics
+            )
             # Same divergence guard as _simulate_sweep: validate the compiled
             # scan before trusting it; fall back to the serial sweep on NaN.
             fast_ok = bool(jnp.isfinite(vd).all()) and bool(jnp.isfinite(cd).all())
@@ -477,16 +514,29 @@ def _sweep_fwd(design, solver, optics, protocol, progress, ls, statistics, init=
             # AUDIT: NaN-safe ff (matches the serial _forward guard) — beyond
             # the sweep range voc_dim is NaN and must propagate as NaN, not
             # as NaN/eps noise.
-            ff = jnp.where(
-                jnp.isfinite(voc_dim), pmax_dim / (voc_dim * jsc_dim + 1e-30), jnp.nan
-            )
+            ff = jnp.where(jnp.isfinite(voc_dim), pmax_dim / (voc_dim * jsc_dim + 1e-30), jnp.nan)
             v_volts = vd * sc["energy"]
             j_phys = cd * sc["current"]
             pmax_phys_wm2 = pmax_dim * sc["energy"] * sc["current"] * 1e4
             eff = pmax_phys_wm2 / jnp.sum(ls2.P_in)
             # potentials as list for Solution compat (keep tracers)
-            pots_list = [jax.tree_util.tree_map(lambda a, i=i: a[i], pa) for i in range(pa.phi.shape[0])]
-            sol = Solution(voltages=v_volts, current=j_phys, potentials=pots_list, cell=cell, eff=eff, voc=voc_dim*sc["energy"], ff=ff, jsc=jsc_dim*sc["current"], pmax=pmax_dim, eq_pot=pot_eq, protocol="sweep", P_in=ls2.P_in)
+            pots_list = [
+                jax.tree_util.tree_map(lambda a, i=i: a[i], pa) for i in range(pa.phi.shape[0])
+            ]
+            sol = Solution(
+                voltages=v_volts,
+                current=j_phys,
+                potentials=pots_list,
+                cell=cell,
+                eff=eff,
+                voc=voc_dim * sc["energy"],
+                ff=ff,
+                jsc=jsc_dim * sc["current"],
+                pmax=pmax_dim,
+                eq_pot=pot_eq,
+                protocol="sweep",
+                P_in=ls2.P_in,
+            )
             residuals = (design, cell, pot_arr, vd, cd, ls2.P_in, fused)
             return sol, residuals
         warnings.warn(
@@ -558,7 +608,10 @@ def _sweep_bwd(solver, optics, protocol, progress, ls, statistics, init, fused, 
     # worst case.)
 
     cell_of_d, vjp_cell = jax.vjp(
-        lambda d: init_cell(d, ls, alpha_mode=alpha_mode, statistics=statistics, optics=optics, fused=fused), design
+        lambda d: init_cell(
+            d, ls, alpha_mode=alpha_mode, statistics=statistics, optics=optics, fused=fused
+        ),
+        design,
     )
 
     _analytic_ok = fused and getattr(cell_of_d, "statistics", "boltzmann") == "boltzmann"
@@ -697,38 +750,38 @@ def simulate(
 ):
     """Simulate a ``Device`` and return a :class:`~driftjax.solution.Solution`.
 
-        Parameters
-        ----------
-        device : Device
-        protocol : Equilibrium | Sweep
-            What to solve. Defaults to ``Sweep()``.
-        solver : Newton
-            Nonlinear solver configuration. Defaults to ``Newton()``.
-        optics : BeerLambert | TMM
-            Optical generation model. Defaults to ``BeerLambert(device.alpha_mode)``.
-        adjoint : ImplicitAdjoint | DirectAdjoint
-            Differentiation mode. Defaults to ``ImplicitAdjoint`` (so
-            ``jax.grad(simulate)`` is correct and fast).
-            ``DirectAdjoint`` is an explicit alias for ``ImplicitAdjoint``
-            (a ``UserWarning`` is emitted when it is selected); unrolled
-            Newton differentiation is not supported.
-        progress : None | True | "live" | object | callable
-            Opt-in progress reporting (see module docstring).  When ``True``/``"live"``,
-            every calculation prints per-bias / per-Newton-step progress so long
-            runs are inspectable.
-        statistics : str
-            Carrier-statistics model for the cell ("boltzmann" | "fd" | "blakemore").
-        T : float
-            Override the device temperature (K); ``None`` uses ``device.T``.
-        ls : LightSource
-            Optional incident-light source; ``None`` uses the built-in AM1.5G spectrum.
+    Parameters
+    ----------
+    device : Device
+    protocol : Equilibrium | Sweep
+        What to solve. Defaults to ``Sweep()``.
+    solver : Newton
+        Nonlinear solver configuration. Defaults to ``Newton()``.
+    optics : BeerLambert | TMM
+        Optical generation model. Defaults to ``BeerLambert(device.alpha_mode)``.
+    adjoint : ImplicitAdjoint | DirectAdjoint
+        Differentiation mode. Defaults to ``ImplicitAdjoint`` (so
+        ``jax.grad(simulate)`` is correct and fast).
+        ``DirectAdjoint`` is an explicit alias for ``ImplicitAdjoint``
+        (a ``UserWarning`` is emitted when it is selected); unrolled
+        Newton differentiation is not supported.
+    progress : None | True | "live" | object | callable
+        Opt-in progress reporting (see module docstring).  When ``True``/``"live"``,
+        every calculation prints per-bias / per-Newton-step progress so long
+        runs are inspectable.
+    statistics : str
+        Carrier-statistics model for the cell ("boltzmann" | "fd" | "blakemore").
+    T : float
+        Override the device temperature (K); ``None`` uses ``device.T``.
+    ls : LightSource
+        Optional incident-light source; ``None`` uses the built-in AM1.5G spectrum.
 
-        Examples
-        --------
-        >>> sol = simulate(dev)                          # Sweep + Newton + Beer-Lambert + IFT
-        >>> float(sol.efficiency)                        # power conversion efficiency
-        >>> sol = simulate(dev, progress=True)           # show sweep progress live
-        >>> grad = jax.grad(lambda d: simulate(d).efficiency)(dev)   # transparent IFT gradient
+    Examples
+    --------
+    >>> sol = simulate(dev)                          # Sweep + Newton + Beer-Lambert + IFT
+    >>> float(sol.efficiency)                        # power conversion efficiency
+    >>> sol = simulate(dev, progress=True)           # show sweep progress live
+    >>> grad = jax.grad(lambda d: simulate(d).efficiency)(dev)   # transparent IFT gradient
     """
     protocol = protocol if protocol is not None else Sweep()
     if not isinstance(protocol, (Equilibrium, Sweep)):
@@ -778,9 +831,13 @@ def simulate(
     res = None
     try:
         if isinstance(protocol, Equilibrium):
-            res = _simulate_eq(design, solver, optics, protocol, progress, ls, statistics, init=init)
+            res = _simulate_eq(
+                design, solver, optics, protocol, progress, ls, statistics, init=init
+            )
         else:
-            res = _simulate_sweep(design, solver, optics, protocol, progress, ls, statistics, init=init, fused=fused)
+            res = _simulate_sweep(
+                design, solver, optics, protocol, progress, ls, statistics, init=init, fused=fused
+            )
         return res
     finally:
         if progress is not None and hasattr(progress, "close"):

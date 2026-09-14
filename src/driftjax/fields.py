@@ -77,7 +77,9 @@ class Material(eqx.Module):
     mp: Float[Array, ""]  # hole mobility
     tn: Float[Array, ""]  # electron lifetime (s)
     tp: Float[Array, ""]  # hole lifetime
-    Et: Float[Array, ""]  # SRH trap level relative to the intrinsic level Ei, in eV (0 = midgap; AUDIT: was documented as "above Ev", which is inconsistent with the n1/p1 = ni·e^{±Et} implementation — see science/recombination.py)
+    Et: Float[
+        Array, ""
+    ]  # SRH trap level relative to the intrinsic level Ei, in eV (0 = midgap; AUDIT: was documented as "above Ev", which is inconsistent with the n1/p1 = ni·e^{±Et} implementation — see science/recombination.py)
     Br: Float[Array, ""]  # radiative coefficient (cm³/s)
     Cn: Float[Array, ""]  # electron Auger coefficient (cm⁶/s)
     Cp: Float[Array, ""]  # hole Auger coefficient

@@ -5,11 +5,15 @@ shared ``driftjax.viz`` presentation style. Use them after an optimization
 loop that has recorded the objective (and, optionally, the design vector) each
 step.
 """
+
 import matplotlib
 
 # Do not force Agg globally if caller already selected a backend (e.g. notebook).
 # Only set Agg when no backend has been chosen (matplotlib default is Agg anyway).
-if matplotlib.get_backend().lower() == "agg" or "matplotlib_inline" not in str(matplotlib.get_backend()).lower():
+if (
+    matplotlib.get_backend().lower() == "agg"
+    or "matplotlib_inline" not in str(matplotlib.get_backend()).lower()
+):
     try:
         # Use Agg only if no explicit non-Agg backend is active; safe to call early.
         if matplotlib.rcParams.get("backend", "Agg") == "Agg":
@@ -22,8 +26,15 @@ import numpy as np
 from driftjax.viz import style
 
 
-def convergence(values, path, ylabel="objective", title=None,
-               xlabel="optimizer iteration", final_line=True, yscale=None):
+def convergence(
+    values,
+    path,
+    ylabel="objective",
+    title=None,
+    xlabel="optimizer iteration",
+    final_line=True,
+    yscale=None,
+):
     """Plot the scalar objective across optimizer evaluations.
 
     ``values`` may be a 1-D sequence (single curve) or a dict mapping labels
@@ -53,8 +64,15 @@ def convergence(values, path, ylabel="objective", title=None,
     return path
 
 
-def parameters(traj, path, labels=None, targets=None, title=None,
-               ylabel="design variable", xlabel="optimizer iteration"):
+def parameters(
+    traj,
+    path,
+    labels=None,
+    targets=None,
+    title=None,
+    ylabel="design variable",
+    xlabel="optimizer iteration",
+):
     """Plot each design coordinate vs optimizer iteration (with target markers)."""
     traj = np.asarray(traj, float)
     if traj.ndim == 1:
@@ -63,8 +81,12 @@ def parameters(traj, path, labels=None, targets=None, title=None,
     fig, ax = plt.subplots(figsize=(8, 5))
     n = traj.shape[1]
     for i in range(n):
-        ax.plot(np.arange(1, len(traj) + 1), traj[:, i], lw=1.5,
-                label=(labels[i] if labels else f"x{i}"))
+        ax.plot(
+            np.arange(1, len(traj) + 1),
+            traj[:, i],
+            lw=1.5,
+            label=(labels[i] if labels else f"x{i}"),
+        )
         if targets is not None and i < len(targets):
             ax.axhline(float(targets[i]), color="k", ls=":", lw=1)
     ax.set_xlabel(xlabel)

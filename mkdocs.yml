@@ -31,13 +31,13 @@ theme:
 
 nav:
   - Home: index.md
-  - Physics: physics.md
-  - Numerics: numerics.md
-  - Solvers: solvers.md
-  - Autodiff: autodiff.md
-  - Optics: optics.md
-  - Performance: performance.md
-  - API Reference: api.md
+  - Physics: literate/physics.md
+  - Numerics: literate/numerics.md
+  - Solvers: literate/solvers.md
+  - Autodiff: literate/autodiff.md
+  - Optics: literate/optics.md
+  - Performance: literate/performance.md
+  - API Reference: literate/api.md
 
 markdown_extensions:
   - pymdownx.highlight:

@@ -215,8 +215,11 @@ def test_grad_vs_fd():
         # the test's own noise floor — not adjoint error (verified: worst
         # drops 1.45e-6 -> 5.6e-7 when tightening rtol 1e-8 -> 1e-12).
         s = simulate(
-            build_device(x), Sweep(n_steps=5), optics=BeerLambert("tauc"),
-            solver=Newton(rtol=1e-12), progress=False,
+            build_device(x),
+            Sweep(n_steps=5),
+            optics=BeerLambert("tauc"),
+            solver=Newton(rtol=1e-12),
+            progress=False,
         )
         return s.efficiency
 
@@ -287,10 +290,14 @@ def test_psc_convergence():
 
 
 @pytest.mark.slow
-@pytest.mark.xfail(reason="optimizer diverged at N=120 smoke; holistic covers gate — quarantine until SLSQP iv_distance interpolation fix")
+@pytest.mark.xfail(
+    reason="optimizer diverged at N=120 smoke; holistic covers gate — quarantine until SLSQP iv_distance interpolation fix"
+)
 def test_multi_convergence():
     J0 = _get_iv(160.0, 1.0, n_points=120, n_steps=20)
-    vg = jax.jit(jax.value_and_grad(lambda xx: iv_distance_jax(_get_iv(10 ** xx[0], xx[1], 120, 20), J0)))
+    vg = jax.jit(
+        jax.value_and_grad(lambda xx: iv_distance_jax(_get_iv(10 ** xx[0], xx[1], 120, 20), J0))
+    )
     start_x = np.array([2.0, 1.2])
     start_R = float(iv_distance(_get_iv(10 ** start_x[0], start_x[1], 120, 20), J0))
     xs, ys = [], []

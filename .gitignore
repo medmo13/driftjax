@@ -38,22 +38,30 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
-# Documentation figure cache
-.figcache/
-docs/.figcache/
-docs/figures/*.png
-!docs/figures/fig*.png
-!docs/figures/supp_*.png
+# Generated example / validation outputs (reproduce via make examples-quick)
+examples/*/outputs/
+validation/results/
+*.png
+!docs/literate/*.png
 
-# LaTeX build artifacts
-docs/*.aux
-docs/*.log
-docs/*.out
-docs/*.bbl
-docs/*.blg
-docs/*.abs
-docs/*.synctex.gz
-docs/*.toc
+# Paper build artifacts (build in docs/paper/, see docs/paper/README.md)
+docs/paper/*.pdf
+docs/paper/*.aux
+docs/paper/*.log
+docs/paper/*.out
+docs/paper/*.bbl
+docs/paper/*.blg
+docs/paper/*.abs
+docs/paper/*.synctex.gz
+docs/paper/*.toc
+docs/paper/*.fdb_latexmk
+docs/paper/*.fls
+docs/paper/figures/
+docs/.figcache/
+.figcache/
+
+# MkDocs site output
+site/
 
 # Lock files (regenerate from pyproject.toml)
 uv.lock

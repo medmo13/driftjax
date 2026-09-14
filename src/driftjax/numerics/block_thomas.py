@@ -39,9 +39,7 @@ def _inv3(A):
     # old guard mapped e.g. det=-1e-31 to +1e-30, inverting the block).
     # The caller is responsible for detecting ill-conditioning
     # (e.g. via the linear residual) and selecting a different solver.
-    det_safe = jnp.where(
-        jnp.abs(det) < DET_TOL, jnp.where(det < 0.0, -DET_TOL, DET_TOL), det
-    )
+    det_safe = jnp.where(jnp.abs(det) < DET_TOL, jnp.where(det < 0.0, -DET_TOL, DET_TOL), det)
     invdet = 1.0 / det_safe
     return (
         jnp.stack(
@@ -146,6 +144,7 @@ def block_thomas_with_residual(A, B, C, b_flat):
     import jax.numpy as _jnp
 
     from driftjax.numerics.analytic_jacobian import dense_from_blocks as _dense_from_blocks
+
     n = A.shape[0]
     x3 = block_thomas_solve(A, B, C, b_flat.reshape(n, 3))
     x = x3.reshape(-1)

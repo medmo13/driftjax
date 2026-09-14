@@ -1,6 +1,7 @@
 """Shared utilities for validation scripts — solver comparisons and diagnostics."""
-import numpy as np
+
 import jax.numpy as jnp
+import numpy as np
 import scipy.sparse
 import scipy.sparse.linalg
 
@@ -24,7 +25,7 @@ def solve_sparse_lu(JT, g):
         r = np.linalg.norm(JT_sp @ x - np.array(g)) / (np.linalg.norm(g) + 1e-30)
         return jnp.array(x), float(r)
     except Exception:
-        return None, float('inf')
+        return None, float("inf")
 
 
 def equilibrate(J):

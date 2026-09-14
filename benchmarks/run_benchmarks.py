@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 import time
 from dataclasses import asdict, dataclass, field
@@ -60,6 +59,7 @@ class BenchmarkSuite:
 
 def get_system_info() -> dict:
     import platform
+
     return {
         "python": sys.version.split()[0],
         "jax": jax.__version__,
@@ -69,13 +69,24 @@ def get_system_info() -> dict:
 
 def make_device(N: int) -> dj.Device:
     mat = dj.material(
-        Chi=3.9, Eg=1.5, eps=9.4, Nc=8e17, Nv=1.8e19,
-        mn=100, mp=100, tn=1e-8, tp=1e-8, A=1e4,
+        Chi=3.9,
+        Eg=1.5,
+        eps=9.4,
+        Nc=8e17,
+        Nv=1.8e19,
+        mn=100,
+        mp=100,
+        tn=1e-8,
+        tp=1e-8,
+        A=1e4,
     )
     return dj.Device(
         n_points=N,
         layers=[(1e-4, mat, 1e17), (1e-4, mat, -1e17)],
-        Snl=1e7, Snr=0, Spl=0, Spr=1e7,
+        Snl=1e7,
+        Snr=0,
+        Spl=0,
+        Spr=1e7,
     )
 
 
@@ -107,16 +118,28 @@ def bench_newton_warm(N: int, n_warmup: int = 1, n_measure: int = 10) -> Benchma
     )
 
 
-def bench_simulate_warm(N: int, n_steps: int, n_warmup: int = 1, n_measure: int = 5) -> BenchmarkResult:
+def bench_simulate_warm(
+    N: int, n_steps: int, n_warmup: int = 1, n_measure: int = 5
+) -> BenchmarkResult:
     dev = make_device(N)
     ls = spectrum(normalize=False)
     # Warm up
     for _ in range(n_warmup):
-        dj.simulate(dev, dj.Sweep(vmax=0.8, n_steps=n_steps), optics=dj.BeerLambert(alpha_mode="beer-lambert"), ls=ls)
+        dj.simulate(
+            dev,
+            dj.Sweep(vmax=0.8, n_steps=n_steps),
+            optics=dj.BeerLambert(alpha_mode="beer-lambert"),
+            ls=ls,
+        )
     # Measure
     t0 = time.perf_counter()
     for _ in range(n_measure):
-        dj.simulate(dev, dj.Sweep(vmax=0.8, n_steps=n_steps), optics=dj.BeerLambert(alpha_mode="beer-lambert"), ls=ls)
+        dj.simulate(
+            dev,
+            dj.Sweep(vmax=0.8, n_steps=n_steps),
+            optics=dj.BeerLambert(alpha_mode="beer-lambert"),
+            ls=ls,
+        )
     dt = (time.perf_counter() - t0) / n_measure
     return BenchmarkResult(
         name=f"simulate_warm_n{N}_steps{n_steps}",
@@ -126,23 +149,34 @@ def bench_simulate_warm(N: int, n_steps: int, n_warmup: int = 1, n_measure: int 
     )
 
 
-def bench_gradient_warm(N: int, n_steps: int, n_warmup: int = 1, n_measure: int = 3) -> BenchmarkResult:
+def bench_gradient_warm(
+    N: int, n_steps: int, n_warmup: int = 1, n_measure: int = 3
+) -> BenchmarkResult:
     dev = make_device(N)
     ls = spectrum(normalize=False)
 
     def eff_scalar(d):
-        r = dj.simulate(d, dj.Sweep(vmax=0.8, n_steps=n_steps), optics=dj.BeerLambert(alpha_mode="beer-lambert"), ls=ls)
+        r = dj.simulate(
+            d,
+            dj.Sweep(vmax=0.8, n_steps=n_steps),
+            optics=dj.BeerLambert(alpha_mode="beer-lambert"),
+            ls=ls,
+        )
         return jnp.asarray(r.efficiency)
 
     # Warm up
     for _ in range(n_warmup):
         g = jax.grad(eff_scalar)(dev)
-        jax.tree_util.tree_map(lambda x: x.block_until_ready() if hasattr(x, 'block_until_ready') else None, g)
+        jax.tree_util.tree_map(
+            lambda x: x.block_until_ready() if hasattr(x, "block_until_ready") else None, g
+        )
     # Measure
     t0 = time.perf_counter()
     for _ in range(n_measure):
         g = jax.grad(eff_scalar)(dev)
-        jax.tree_util.tree_map(lambda x: x.block_until_ready() if hasattr(x, 'block_until_ready') else None, g)
+        jax.tree_util.tree_map(
+            lambda x: x.block_until_ready() if hasattr(x, "block_until_ready") else None, g
+        )
     dt = (time.perf_counter() - t0) / n_measure
     return BenchmarkResult(
         name=f"gradient_warm_n{N}_steps{n_steps}",
@@ -155,8 +189,8 @@ def bench_gradient_warm(N: int, n_steps: int, n_warmup: int = 1, n_measure: int 
 def bench_residual_jacobian(N: int, n_warmup: int = 3, n_measure: int = 20) -> dict:
     dev = make_device(N)
     cell, bound, pot0, ls = prepare_cell(dev)
-    from driftjax.numerics.residual import comp_F, comp_F_precomputed
     from driftjax.numerics.analytic_jacobian import banded_jacobian
+    from driftjax.numerics.residual import comp_F, comp_F_precomputed
 
     pot, _ = solve_newton(cell, bound, pot0, tol=1e-10, max_steps=30)
 
@@ -169,21 +203,25 @@ def bench_residual_jacobian(N: int, n_warmup: int = 3, n_measure: int = 20) -> d
     t0 = time.perf_counter()
     for _ in range(n_measure):
         F = comp_F(cell, bound, pot)
-        if hasattr(F, 'block_until_ready'): F.block_until_ready()
+        if hasattr(F, "block_until_ready"):
+            F.block_until_ready()
     dt_comp_f = (time.perf_counter() - t0) / n_measure
 
     # comp_F_precomputed timing
     t0 = time.perf_counter()
     for _ in range(n_measure):
         F2, n_v, p_v, ni_v = comp_F_precomputed(cell, bound, pot)
-        if hasattr(F2, 'block_until_ready'): F2.block_until_ready()
+        if hasattr(F2, "block_until_ready"):
+            F2.block_until_ready()
     dt_pre = (time.perf_counter() - t0) / n_measure
 
     # banded_jacobian timing
     t0 = time.perf_counter()
     for _ in range(n_measure):
         A, B, C = banded_jacobian(cell, bound, pot)
-        A.block_until_ready(); B.block_until_ready(); C.block_until_ready()
+        A.block_until_ready()
+        B.block_until_ready()
+        C.block_until_ready()
     dt_bj = (time.perf_counter() - t0) / n_measure
 
     # Fused pair timing
@@ -191,20 +229,31 @@ def bench_residual_jacobian(N: int, n_warmup: int = 3, n_measure: int = 20) -> d
     for _ in range(n_measure):
         F2, n_v, p_v, ni_v = comp_F_precomputed(cell, bound, pot)
         A, B, C = banded_jacobian(cell, bound, pot, n_v=n_v, p_v=p_v, ni_v=ni_v)
-        A.block_until_ready(); B.block_until_ready(); C.block_until_ready()
+        A.block_until_ready()
+        B.block_until_ready()
+        C.block_until_ready()
     dt_fused = (time.perf_counter() - t0) / n_measure
 
     return {
-        "comp_F": BenchmarkResult(name=f"comp_F_n{N}", value=round(dt_comp_f * 1000, 3), unit="ms", meta={"N": N}),
-        "comp_F_precomputed": BenchmarkResult(name=f"comp_F_precomputed_n{N}", value=round(dt_pre * 1000, 3), unit="ms", meta={"N": N}),
-        "banded_jacobian": BenchmarkResult(name=f"banded_jacobian_n{N}", value=round(dt_bj * 1000, 1), unit="ms", meta={"N": N}),
-        "fused_pair": BenchmarkResult(name=f"fused_pair_n{N}", value=round(dt_fused * 1000, 1), unit="ms", meta={"N": N}),
+        "comp_F": BenchmarkResult(
+            name=f"comp_F_n{N}", value=round(dt_comp_f * 1000, 3), unit="ms", meta={"N": N}
+        ),
+        "comp_F_precomputed": BenchmarkResult(
+            name=f"comp_F_precomputed_n{N}", value=round(dt_pre * 1000, 3), unit="ms", meta={"N": N}
+        ),
+        "banded_jacobian": BenchmarkResult(
+            name=f"banded_jacobian_n{N}", value=round(dt_bj * 1000, 1), unit="ms", meta={"N": N}
+        ),
+        "fused_pair": BenchmarkResult(
+            name=f"fused_pair_n{N}", value=round(dt_fused * 1000, 1), unit="ms", meta={"N": N}
+        ),
     }
 
 
 def bench_memory() -> BenchmarkResult:
-    proc_status = open("/proc/self/status").read()
-    rss_line = [l for l in proc_status.split("\n") if l.startswith("VmRSS")]
+    with open("/proc/self/status") as f:
+        proc_status = f.read()
+    rss_line = [line for line in proc_status.split("\n") if line.startswith("VmRSS")]
     rss_kb = int(rss_line[0].split()[1]) if rss_line else 0
     return BenchmarkResult(name="peak_rss", value=rss_kb, unit="KB")
 
@@ -260,13 +309,15 @@ def compare_benchmarks(current: BenchmarkSuite, previous: BenchmarkSuite) -> lis
             prev = prev_map[r.name]
             if prev.value > 0:
                 pct_change = (r.value - prev.value) / prev.value * 100
-                report.append({
-                    "name": r.name,
-                    "current": r.value,
-                    "previous": prev.value,
-                    "change_pct": round(pct_change, 1),
-                    "regression": pct_change > 5,
-                })
+                report.append(
+                    {
+                        "name": r.name,
+                        "current": r.value,
+                        "previous": prev.value,
+                        "change_pct": round(pct_change, 1),
+                        "regression": pct_change > 5,
+                    }
+                )
     return report
 
 
@@ -287,7 +338,9 @@ def main():
         if regressions:
             print(f"\n⚠ {len(regressions)} regressions detected:")
             for r in regressions:
-                print(f"  {r['name']}: {r['previous']:.1f} → {r['current']:.1f} ({r['change_pct']:+.1f}%)")
+                print(
+                    f"  {r['name']}: {r['previous']:.1f} → {r['current']:.1f} ({r['change_pct']:+.1f}%)"
+                )
         else:
             print("\n✓ No regressions detected.")
 

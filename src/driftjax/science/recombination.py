@@ -61,4 +61,8 @@ def _auger_precomputed(cell, n_v, p_v, ni_v):
 
 def total_precomputed(cell, n_v, p_v, ni_v):
     """Total recombination with pre-computed carrier stats (avoids redundant n/p/ni)."""
-    return _srh_precomputed(cell, n_v, p_v, ni_v) + _radiative_precomputed(cell, n_v, p_v, ni_v) + _auger_precomputed(cell, n_v, p_v, ni_v)
+    return (
+        _srh_precomputed(cell, n_v, p_v, ni_v)
+        + _radiative_precomputed(cell, n_v, p_v, ni_v)
+        + _auger_precomputed(cell, n_v, p_v, ni_v)
+    )

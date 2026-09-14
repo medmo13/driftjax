@@ -29,8 +29,9 @@ def measure_forward_scaling(
         mesh_sizes = [125, 250, 500, 1000, 2000]
 
     ls = spectrum()
-    mat = dj.material(Chi=3.9, Eg=1.5, eps=9.4, Nc=8e17, Nv=1.8e19,
-                       mn=100, mp=100, tn=1e-8, tp=1e-8, A=1e4)
+    mat = dj.material(
+        Chi=3.9, Eg=1.5, eps=9.4, Nc=8e17, Nv=1.8e19, mn=100, mp=100, tn=1e-8, tp=1e-8, A=1e4
+    )
 
     measurements: list[dict[str, Any]] = []
     for N in mesh_sizes:
@@ -38,7 +39,10 @@ def measure_forward_scaling(
             dev = dj.Device(
                 n_points=N,
                 layers=[(4e-5, mat, 1e17), (1e-4, mat, -1e15)],
-                Snl=1e7, Snr=0, Spl=0, Spr=1e7,
+                Snl=1e7,
+                Snr=0,
+                Spl=0,
+                Spr=1e7,
             )
             cell = init_cell(dev.design(), ls)
             bound = boundary_bias(cell, bias_voltage / energy)
@@ -65,13 +69,22 @@ def measure_forward_scaling(
         coeffs = np.polyfit(log_N, log_T, 1)
         p = float(coeffs[0])
         a = float(np.exp(coeffs[1]))
-        ss_res = np.sum((log_T - np.polyval(coeffs, log_N))**2)
-        ss_tot = np.sum((log_T - np.mean(log_T))**2)
+        ss_res = np.sum((log_T - np.polyval(coeffs, log_N)) ** 2)
+        ss_tot = np.sum((log_T - np.mean(log_T)) ** 2)
         r2 = 1 - ss_res / ss_tot if ss_tot > 0 else 0.0
     else:
         p, a, r2 = None, None, None
 
-    return {"measurements": measurements, "fit": {"model": "T = a * N^p", "a_s": a, "p": p, "r_squared": r2, "n_points_used": len(valid)}}
+    return {
+        "measurements": measurements,
+        "fit": {
+            "model": "T = a * N^p",
+            "a_s": a,
+            "p": p,
+            "r_squared": r2,
+            "n_points_used": len(valid),
+        },
+    }
 
 
 def save_record(result: dict, path: str | Path) -> None:
@@ -83,9 +96,9 @@ def save_record(result: dict, path: str | Path) -> None:
 
 def print_summary(result: dict) -> None:
     fit = result["fit"]
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("FORWARD SOLVER SCALING")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     if fit["p"] is not None:
         print(f"  T = {fit['a_s']:.4e} * N^{fit['p']:.3f}  (R²={fit['r_squared']:.4f})")
     print(f"\n{'N':>8s} {'T (s)':>10s}")

@@ -9,8 +9,7 @@ The public entry point is:
 ```python
 from driftjax import BeerLambert, Newton, Sweep, simulate
 
-solution = simulate(device, Sweep(vmax=1.1, n_steps=25),
-                    solver=Newton(), optics=BeerLambert())
+solution = simulate(device, Sweep(vmax=1.1, n_steps=25), solver=Newton(), optics=BeerLambert())
 print(solution.efficiency, solution.voc, solution.ff)
 ```
 

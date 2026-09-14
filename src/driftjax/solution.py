@@ -59,7 +59,9 @@ class Solution(eqx.Module):
             isinstance(leaf, jax.core.Tracer)
             for leaf in jax.tree_util.tree_leaves((self.voltages, v))
         ):
-            raise ValueError("at_bias is concrete-path only; index sol.potentials directly under jit/grad/vmap")
+            raise ValueError(
+                "at_bias is concrete-path only; index sol.potentials directly under jit/grad/vmap"
+            )
         idx = int(jnp.argmin(jnp.abs(self.voltages - float(v))))
         return self.potentials[idx]
 

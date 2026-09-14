@@ -41,8 +41,7 @@ def main():
     cell, pot_eq = sol.cell, sol.eq_pot
 
     # Time-domain: 0 -> 0.3 V ramp-hold step response.
-    times, currents, _ = solve_transient(cell, 0.3 / 0.02585, pot_eq,
-                                         t_final=1e-3, n_steps=n_steps)
+    times, currents, _ = solve_transient(cell, 0.3 / 0.02585, pot_eq, t_final=1e-3, n_steps=n_steps)
     times = np.asarray(times)
     currents = np.asarray(currents)
 
@@ -52,8 +51,7 @@ def main():
     from driftjax.numerics.scharfetter_gummel import Jn, Jp
 
     v_dc = 0.3 / 0.02585
-    pot_dc = solve_eq(cell, boundary_bias(cell, v_dc),
-                      equilibrium_guess(cell).phi)
+    pot_dc = solve_eq(cell, boundary_bias(cell, v_dc), equilibrium_guess(cell).phi)
     pot_dc, _ = solve_newton(cell, boundary_bias(cell, v_dc), pot_dc)
     omegas = np.logspace(-12, -6, n_omega)
     y = np.asarray(ac_small_signal(cell, v_dc, pot_dc, omegas))
@@ -75,22 +73,28 @@ def main():
     ax0.set(xlabel="time / µs", ylabel="current (dimensionless)")
     ax0.grid(alpha=0.2, linestyle="--")
     ax1.loglog(omegas, np.abs(y), "o-", ms=4, lw=1.4, color=style.SERIES[1])
-    ax1.axhline(abs(float(didv_dc)), color="black", ls="--", lw=1.0,
-                label=f"DC dI/dV (rel diff {rel:.1e})")
+    ax1.axhline(
+        abs(float(didv_dc)), color="black", ls="--", lw=1.0, label=f"DC dI/dV (rel diff {rel:.1e})"
+    )
     ax1.set(xlabel="angular frequency (dimensionless)", ylabel="|Y| (dimensionless)")
     ax1.legend(frameon=False, fontsize=8)
     ax1.grid(alpha=0.2, which="both", linestyle="--")
     tag_panels(axes.ravel())
     fp = save_figure(fig, "research_11_transient_small_signal")
-    save_json("research_11_transient_small_signal", {
-        "metadata": execution_metadata(),
-        "n_points": points, "y0_vs_didv_rel": float(rel),
-        "t_settle_us": float(times[int(np.argmax(currents > 0.9 * currents[-1]))] * 1e6)
-        if currents[-1] > 0 else 0.0,
-        "figure": fp.name, **solution_metrics(sol),
-    })
-    report("research_11", y0_vs_didv_rel=float(rel),
-           **solution_metrics(sol))
+    save_json(
+        "research_11_transient_small_signal",
+        {
+            "metadata": execution_metadata(),
+            "n_points": points,
+            "y0_vs_didv_rel": float(rel),
+            "t_settle_us": float(times[int(np.argmax(currents > 0.9 * currents[-1]))] * 1e6)
+            if currents[-1] > 0
+            else 0.0,
+            "figure": fp.name,
+            **solution_metrics(sol),
+        },
+    )
+    report("research_11", y0_vs_didv_rel=float(rel), **solution_metrics(sol))
 
 
 if __name__ == "__main__":

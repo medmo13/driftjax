@@ -20,18 +20,17 @@ import pytest
 
 from driftjax.units import energy
 from driftjax.validation.analytic import (
-    _bb_photon_emittance,
-    _H,
     _C,
+    _DILUTION,
+    _H,
     _KB,
     _SB,
     _T_SUN,
-    _DILUTION,
+    _bb_photon_emittance,
     ideal_diode_current,
     sq_efficiency_limit,
     sq_ultimate_efficiency,
 )
-
 
 # ---------------------------------------------------------------------------
 # Shockley–Queisser vs published anchors
@@ -144,7 +143,7 @@ def test_blackbody_tail_asymptotic_identity():
 
 def test_blackbody_sun_irradiance():
     """Diluted 6000 K sun: P_in = σT⁴(R_s/d)² ≈ 1.59 kW/m² (SQ-61 setup)."""
-    from driftjax.validation.analytic import _SB, _T_SUN, _DILUTION
+    from driftjax.validation.analytic import _SB
 
     p_in = _SB * _T_SUN**4 * _DILUTION
     assert p_in == pytest.approx(1590.0, rel=1e-3)

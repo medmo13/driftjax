@@ -95,7 +95,9 @@ def _states(cell):
 def test_fused_residual_equals_comp_F(pn_cell):
     for bound, pot in _states(pn_cell):
         assert (
-            float(jnp.max(jnp.abs(fused_residual(pn_cell, bound, pot) - comp_F(pn_cell, bound, pot))))
+            float(
+                jnp.max(jnp.abs(fused_residual(pn_cell, bound, pot) - comp_F(pn_cell, bound, pot)))
+            )
             < 1e-12
         )
 

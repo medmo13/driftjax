@@ -33,16 +33,21 @@ def main():
     )
     pot_bias = sol.at_bias(0.5)
     p_qfl = plot_dossier(
-        sol, pot_bias, show_qfl=True,
+        sol,
+        pot_bias,
+        show_qfl=True,
         path=str(support.OUTPUT_ROOT / "tutorial_02_qfl.png"),
         title="Si p-n at V = 0.5 V — quasi-Fermi level splitting",
     )
     save_json(
         "tutorial_02_bands_and_charge",
-        {"metadata": execution_metadata(), 
-         "n_points": points, "bias_V": 0.5,
-         "figures": [str(p_eq), str(p_qfl)],
-         **solution_metrics(sol)},
+        {
+            "metadata": execution_metadata(),
+            "n_points": points,
+            "bias_V": 0.5,
+            "figures": [str(p_eq), str(p_qfl)],
+            **solution_metrics(sol),
+        },
     )
     report("tutorial_02", **solution_metrics(sol))
 

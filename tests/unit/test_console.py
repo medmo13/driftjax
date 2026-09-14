@@ -172,11 +172,14 @@ class TestNumericsUntouched:
             # quiet runs take the compiled-scan fast path while reporting runs
             # take the serial sweep; the two valid paths differ at ~1e-14
             # (op-ordering only). NaN==NaN still required on both sides.
-            assert (a == b or (a != a and b != b)
-                    or abs(a - b) <= 1e-9 * max(1.0, abs(a), abs(b))), f"{attribute}: {a} != {b}"
+            assert a == b or (a != a and b != b) or abs(a - b) <= 1e-9 * max(1.0, abs(a), abs(b)), (
+                f"{attribute}: {a} != {b}"
+            )
         np.testing.assert_array_equal(np.asarray(r_silent.voltages), np.asarray(r_live.voltages))
         # same rounding-level allowance as above (two valid execution paths)
-        np.testing.assert_allclose(np.asarray(r_silent.current), np.asarray(r_live.current), rtol=1e-9, atol=0)
+        np.testing.assert_allclose(
+            np.asarray(r_silent.current), np.asarray(r_live.current), rtol=1e-9, atol=0
+        )
 
     def test_callable_progress_receives_steps(self):
         seen = []
@@ -263,9 +266,12 @@ class TestDebugLog:
             # quiet runs take the compiled-scan fast path while reporting runs
             # take the serial sweep; the two valid paths differ at ~1e-14
             # (op-ordering only). NaN==NaN still required on both sides.
-            assert (a == b or (a != a and b != b)
-                    or abs(a - b) <= 1e-9 * max(1.0, abs(a), abs(b))), f"{attribute}: {a} != {b}"
-        np.testing.assert_allclose(np.asarray(r_silent.current), np.asarray(r_log.current), rtol=1e-9, atol=0)
+            assert a == b or (a != a and b != b) or abs(a - b) <= 1e-9 * max(1.0, abs(a), abs(b)), (
+                f"{attribute}: {a} != {b}"
+            )
+        np.testing.assert_allclose(
+            np.asarray(r_silent.current), np.asarray(r_log.current), rtol=1e-9, atol=0
+        )
 
     @pytest.mark.slow  # fresh interpreter + JAX import + solve per subprocess
     def test_cli_debug_log_writes_file(self, tmp_path):

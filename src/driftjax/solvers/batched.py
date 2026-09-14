@@ -173,8 +173,14 @@ def sweep_batched(
     def body_fn(state):
         it, pot_b, err_b, _ = state
         pot_b_next, err_next, resid_next = _batched_step(
-            cell, bounds, pot_b, err_prev=err_b, f_tol=f_tol, tol=tol,
-            damping=damping, analytic=analytic,
+            cell,
+            bounds,
+            pot_b,
+            err_prev=err_b,
+            f_tol=f_tol,
+            tol=tol,
+            damping=damping,
+            analytic=analytic,
         )
         return (it + 1, pot_b_next, err_next, resid_next)
 

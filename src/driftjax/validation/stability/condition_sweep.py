@@ -18,10 +18,10 @@ def _build_dense_jacobian(A, B, C, n):
     """Build dense Jacobian from block-tridiagonal (A, B, C)."""
     J = jnp.zeros((3 * n, 3 * n))
     for i in range(n):
-        J = J.at[3*i:3*i+3, 3*i:3*i+3].set(A[i])
+        J = J.at[3 * i : 3 * i + 3, 3 * i : 3 * i + 3].set(A[i])
     for i in range(n - 1):
-        J = J.at[3*i:3*i+3, 3*(i+1):3*(i+1)+3].set(B[i])
-        J = J.at[3*(i+1):3*(i+1)+3, 3*i:3*i+3].set(C[i+1])
+        J = J.at[3 * i : 3 * i + 3, 3 * (i + 1) : 3 * (i + 1) + 3].set(B[i])
+        J = J.at[3 * (i + 1) : 3 * (i + 1) + 3, 3 * i : 3 * i + 3].set(C[i + 1])
     return J
 
 
@@ -88,10 +88,16 @@ def run_condition_sweep(devices=None) -> dict:
             else:
                 status = "dense_failed"
 
-            cases.append({
-                "name": name, "status": status, "n_points": n, "kappa": kappa,
-                "r_dense": r_dense, "t_dense_s": t_dense,
-            })
+            cases.append(
+                {
+                    "name": name,
+                    "status": status,
+                    "n_points": n,
+                    "kappa": kappa,
+                    "r_dense": r_dense,
+                    "t_dense_s": t_dense,
+                }
+            )
 
         except Exception as e:
             cases.append({"name": name, "status": f"error: {e}", "kappa": None})
@@ -108,21 +114,32 @@ def run_condition_sweep(devices=None) -> dict:
 def _default_device_spectrum():
     """Use material objects (not dict layers)."""
     import driftjax as dj
-    mat_si = dj.material(Chi=3.9, Eg=1.5, eps=9.4, Nc=8e17, Nv=1.8e19, mn=100, mp=100, tn=1e-8, tp=1e-8, A=1e4)
-    mat_psc = dj.material(Chi=3.9, Eg=1.59, eps=9.4, Nc=2.2e18, Nv=1e19, mn=100, mp=100, tn=1e-7, tp=1e-7, A=1e4)
+
+    mat_si = dj.material(
+        Chi=3.9, Eg=1.5, eps=9.4, Nc=8e17, Nv=1.8e19, mn=100, mp=100, tn=1e-8, tp=1e-8, A=1e4
+    )
+    mat_psc = dj.material(
+        Chi=3.9, Eg=1.59, eps=9.4, Nc=2.2e18, Nv=1e19, mn=100, mp=100, tn=1e-7, tp=1e-7, A=1e4
+    )
     return [
         {"name": "Si_N50", "n_points": 50, "layers": [(4e-5, mat_si, 1e17), (1e-4, mat_si, -1e15)]},
-        {"name": "PSC_N50", "n_points": 50, "layers": [
-            (3e-5, mat_psc, 1e16), (4e-5, mat_psc, 0), (5e-5, mat_psc, -1e16),
-        ]},
+        {
+            "name": "PSC_N50",
+            "n_points": 50,
+            "layers": [
+                (3e-5, mat_psc, 1e16),
+                (4e-5, mat_psc, 0),
+                (5e-5, mat_psc, -1e16),
+            ],
+        },
     ]
 
 
 def print_summary(result):
     s = result["summary"]
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print("ADJOINT ERROR vs JACOBIAN CONDITIONING")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
     print(f"  Cases: {s['total']}  Dense OK: {s['dense_ok']}  Dense failed: {s['dense_failed']}")
     print(f"\n{'Case':<25s} {'κ(J)':>10s} {'r_dense':>10s} {'Status':<15s}")
     print("-" * 65)
@@ -130,7 +147,9 @@ def print_summary(result):
         if c.get("kappa") is None:
             print(f"  {c['name']:<23s} {'N/A':>10s} {'N/A':>10s} {c['status']:<15s}")
         else:
-            print(f"  {c['name']:<23s} {c['kappa']:>10.2e} {c['r_dense']:>10.2e} {c['status']:<15s}")
+            print(
+                f"  {c['name']:<23s} {c['kappa']:>10.2e} {c['r_dense']:>10.2e} {c['status']:<15s}"
+            )
     print()
 
 

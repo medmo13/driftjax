@@ -52,7 +52,9 @@ class Mode:
         checkpoint=False,
     ):
         # normalize hyphen/underscore
-        optics_norm = optics.strip().lower().replace("_", "-") if isinstance(optics, str) else optics
+        optics_norm = (
+            optics.strip().lower().replace("_", "-") if isinstance(optics, str) else optics
+        )
         if optics_norm in ("beerlambert", "bl"):
             optics_norm = "beer-lambert"
         if statistics not in ("boltzmann", "nilsson", "exact"):
@@ -79,7 +81,13 @@ DEFAULT_MODE = Mode()
 
 # mapping to the simulate()/init_cell() keyword values
 STATISTICS_ALIAS = {"boltzmann": "boltzmann", "nilsson": "nilsson", "exact": "exact"}
-OPTICS_ALIAS = {"beer-lambert": "beer-lambert", "table": "table", "tmm": "tmm", "tauc": "tauc", "fresnel": "fresnel"}
+OPTICS_ALIAS = {
+    "beer-lambert": "beer-lambert",
+    "table": "table",
+    "tmm": "tmm",
+    "tauc": "tauc",
+    "fresnel": "fresnel",
+}
 
 
 def mode_info() -> dict:

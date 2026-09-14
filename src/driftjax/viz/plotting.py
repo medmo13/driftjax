@@ -24,8 +24,8 @@ _COLORS = style.MAT_COLORS
 # presentation ("gallery") palette — the classic device-physics hues used by
 # the reference ∂PV figures: lightcoral for electrons/conduction band,
 # cornflower blue for holes/valence band (single source of truth in style).
-EC_SOFT = style.EC        # lightcoral
-EV_SOFT = style.EV        # cornflowerblue
+EC_SOFT = style.EC  # lightcoral
+EV_SOFT = style.EV  # cornflowerblue
 FERMI_SOFT = style.FERMI  # light gray Fermi level
 BAR_PALETTE = style.BAR_PALETTE
 
@@ -197,6 +197,7 @@ def _smooth_iv(v, j, n: int = 800):
         vd = _np.linspace(v[0], v[-1], int(n))
         return vd, _np.interp(vd, v, j)
 
+
 def plot_iv_curve(
     v,
     j,
@@ -287,7 +288,9 @@ def plot_iv_curve(
     return path
 
 
-def plot_bars(design, path: str = "bars.png", title: str | None = None, mode: str = "presentation") -> str:
+def plot_bars(
+    design, path: str = "bars.png", title: str | None = None, mode: str = "presentation"
+) -> str:
     """Material-bar band diagram from a design alone (material-bar diagram).
 
     Ec = −χ, Ev = −χ − Eg (eV), EF from doping (intrinsic level + band-filling
@@ -452,7 +455,9 @@ def plot_band_diagram(
     return path
 
 
-def plot_charge(cell, pot, path: str = "charge.png", title: str | None = None, mode: str = "presentation") -> str:
+def plot_charge(
+    cell, pot, path: str = "charge.png", title: str | None = None, mode: str = "presentation"
+) -> str:
     """Physical carrier densities n(x), p(x) in cm⁻³, x in µm (log scale)."""
     if mode == "presentation":
         return _charge_presentation(cell, pot, path=path, title=title)
@@ -515,28 +520,44 @@ def _iv_presentation(v, j, *, path, title, flip, p_in=None) -> str:
     ax.plot(vv, jj, "o", color="black", ms=5, zorder=4)
     if ff is not None:
         rect = Rectangle(
-            (0, 0), vmax, jmax_a, fill=False, edgecolor="0.72",
-            hatch="/", ls="--", lw=1.6, zorder=1,
+            (0, 0),
+            vmax,
+            jmax_a,
+            fill=False,
+            edgecolor="0.72",
+            hatch="/",
+            ls="--",
+            lw=1.6,
+            zorder=1,
         )
         ax.add_patch(rect)
         ax.text(
-            vmax / 2, jmax_a / 2,
+            vmax / 2,
+            jmax_a / 2,
             f"FF = {ff * 100:.2f}%\nMPP = {pmax:.1f} W/m$^2$\n$\\eta$ = {eff * 100:.2f}%",
-            ha="center", va="center", zorder=5,
+            ha="center",
+            va="center",
+            zorder=5,
         )
         ax.plot([vmax], [jmax_a], "o", ms=7, mfc="white", mec="black", mew=1.6, zorder=5)
     ax.set_xlabel("bias / V")
     ax.set_ylabel("current density / mA/cm$^2$")
     # photovoltaic quadrant only (never negative axes), nice round top
-    ax.set_xlim(0, _nice_top(max(float(vv[-1]), float(voc) if voc is not None else 0.0),
-                             step=0.25, margin=1.0))
+    ax.set_xlim(
+        0,
+        _nice_top(
+            max(float(vv[-1]), float(voc) if voc is not None else 0.0), step=0.25, margin=1.0
+        ),
+    )
     ax.set_ylim(0, _nice_top(max(float(jj[0]), float(jmax_a))))
     if voc is not None:
         ax.annotate(
             f"$V_{{oc}}={voc:.2f}\\,\\mathrm{{V}}$",
             (voc, 0.0),
-            xytext=(4, 10), textcoords="offset points",
-            fontsize=13, color="0.35",
+            xytext=(4, 10),
+            textcoords="offset points",
+            fontsize=13,
+            color="0.35",
         )
     if title:
         ax.set_title(title)
@@ -559,12 +580,20 @@ def _band_presentation(cell, pot, *, path, title, eq) -> str:
         ax.axhline(0.0, color=FERMI_SOFT, lw=2, label="Fermi level", zorder=2)
     else:
         ax.plot(
-            x_um, jnp.asarray(pot.phi_n) * float(energy), color=EC_SOFT, lw=2,
-            label="$e^-$ quasi-Fermi energy", zorder=2,
+            x_um,
+            jnp.asarray(pot.phi_n) * float(energy),
+            color=EC_SOFT,
+            lw=2,
+            label="$e^-$ quasi-Fermi energy",
+            zorder=2,
         )
         ax.plot(
-            x_um, jnp.asarray(pot.phi_p) * float(energy), color=EV_SOFT, lw=2,
-            label="$h^+$ quasi-Fermi energy", zorder=2,
+            x_um,
+            jnp.asarray(pot.phi_p) * float(energy),
+            color=EV_SOFT,
+            lw=2,
+            label="$h^+$ quasi-Fermi energy",
+            zorder=2,
         )
     ax.set_xlabel("position / µm")
     ax.set_ylabel("energy / eV")
@@ -611,8 +640,15 @@ def _bars_presentation(design, *, path, title) -> str:
         x, y = float(startx[i]), float(uv[i])
         w, h = float(width[i]), float(uc[i] - uv[i])
         ax1.add_patch(
-            Rectangle((x, y), w, h, facecolor=BAR_PALETTE[i % len(BAR_PALETTE)],
-                      linewidth=0, alpha=0.25, zorder=0)
+            Rectangle(
+                (x, y),
+                w,
+                h,
+                facecolor=BAR_PALETTE[i % len(BAR_PALETTE)],
+                linewidth=0,
+                alpha=0.25,
+                zorder=0,
+            )
         )
         ax1.text(x + w / 2, y + h + 0.10, f"{y + h:.1f}", ha="center", va="bottom", fontsize=12)
         ax1.text(x + w / 2, y - 0.10, f"{y:.1f}", ha="center", va="top", fontsize=12)
@@ -630,8 +666,9 @@ def _bars_presentation(design, *, path, title) -> str:
             _, xend = ax1.get_xlim()
             w = xend - xstart
         ystart = phim - 0.1
-        ax1.add_patch(Rectangle((xstart, ystart), w, 0.2, facecolor=col,
-                                linewidth=0, alpha=0.25, zorder=1))
+        ax1.add_patch(
+            Rectangle((xstart, ystart), w, 0.2, facecolor=col, linewidth=0, alpha=0.25, zorder=1)
+        )
         ax1.text(xstart + w / 2, ystart + 0.32, f"{phim:.1f}", ha="center", fontsize=12)
         ax1.text(xstart + w / 2, ystart - 0.30, "contact", ha="center", va="top", fontsize=12)
         if side == "l":
@@ -731,8 +768,12 @@ def plot_dossier(
     _fom = None
     if hasattr(source, "eff"):
         try:
-            _fom = (float(source.voc), float(source.ff), float(source.efficiency),
-                    float(source.jsc) * 1e3)
+            _fom = (
+                float(source.voc),
+                float(source.ff),
+                float(source.efficiency),
+                float(source.jsc) * 1e3,
+            )
         except Exception:
             _fom = None
     if iv is not None:
@@ -757,27 +798,58 @@ def plot_dossier(
         ax_iv.plot(vd, jd, color="black", lw=2, zorder=3)
         ax_iv.plot(vv, jj * 1e3, "o", color="black", ms=4, zorder=4)
         if ff is not None and _np.isfinite(ff):
-            ax_iv.add_patch(Rectangle((0, 0), vmpp, jmpp_ma, fill=False,
-                                      edgecolor="lightgray", hatch="/",
-                                      ls="--", lw=1.6, zorder=1))
-            ax_iv.text(vmpp / 2, jmpp_ma / 2,
-                       f"FF = {ff * 100:.2f}%\nMPP = {pmax_wm2:.1f} W/m$^2$\n"
-                       f"$\\eta$ = {eff * 100:.2f}%",
-                       ha="center", va="center", fontsize=fs, zorder=5)
-            ax_iv.plot([vmpp], [jmpp_ma], "o", ms=7, mfc="white",
-                       mec="black", mew=1.6, zorder=5)
+            ax_iv.add_patch(
+                Rectangle(
+                    (0, 0),
+                    vmpp,
+                    jmpp_ma,
+                    fill=False,
+                    edgecolor="lightgray",
+                    hatch="/",
+                    ls="--",
+                    lw=1.6,
+                    zorder=1,
+                )
+            )
+            ax_iv.text(
+                vmpp / 2,
+                jmpp_ma / 2,
+                f"FF = {ff * 100:.2f}%\nMPP = {pmax_wm2:.1f} W/m$^2$\n$\\eta$ = {eff * 100:.2f}%",
+                ha="center",
+                va="center",
+                fontsize=fs,
+                zorder=5,
+            )
+            ax_iv.plot([vmpp], [jmpp_ma], "o", ms=7, mfc="white", mec="black", mew=1.6, zorder=5)
             if voc is not None and _np.isfinite(voc):
-                ax_iv.annotate(f"$V_{{oc}}={voc:.2f}$ V", (voc, 0.0),
-                               xytext=(4, 10), textcoords="offset points",
-                               fontsize=fs - 1, color="0.35")
-        ax_iv.set_xlim(0, _nice_top(max(float(vv[-1]), float(voc) if voc is not None else 0.0),
-                                    step=0.25, margin=1.0))
+                ax_iv.annotate(
+                    f"$V_{{oc}}={voc:.2f}$ V",
+                    (voc, 0.0),
+                    xytext=(4, 10),
+                    textcoords="offset points",
+                    fontsize=fs - 1,
+                    color="0.35",
+                )
+        ax_iv.set_xlim(
+            0,
+            _nice_top(
+                max(float(vv[-1]), float(voc) if voc is not None else 0.0), step=0.25, margin=1.0
+            ),
+        )
         ax_iv.set_ylim(0, _nice_top(max(float(jj[0]) * 1e3, jmpp_ma)))
         ax_iv.set_xlabel("bias / V", fontsize=fs)
         ax_iv.set_ylabel("current density / mA cm$^{-2}$", fontsize=fs)
         ax_iv.tick_params(labelsize=fs - 1)
-    ax_iv.text(0.02, 0.90, "(a) J–V", transform=ax_iv.transAxes,
-               fontsize=fs + 1, fontweight="bold", va="top", ha="left")
+    ax_iv.text(
+        0.02,
+        0.90,
+        "(a) J–V",
+        transform=ax_iv.transAxes,
+        fontsize=fs + 1,
+        fontweight="bold",
+        va="top",
+        ha="left",
+    )
 
     # ---- shared spatial grid ----
     x_um = jnp.asarray(cell.x) * float(length) * 1e4
@@ -793,8 +865,14 @@ def plot_dossier(
             return
         for k, (i0, i1) in enumerate(spans):
             if k % 2 == 1:
-                ax.axvspan(float(x_um[i0]), float(x_um[min(i1, len(x_um) - 1)]),
-                           color="0.5", alpha=0.06, zorder=0, lw=0)
+                ax.axvspan(
+                    float(x_um[i0]),
+                    float(x_um[min(i1, len(x_um) - 1)]),
+                    color="0.5",
+                    alpha=0.06,
+                    zorder=0,
+                    lw=0,
+                )
 
     # ---- Panel B: layer bars ----
     ec_b = -jnp.asarray(cell.Chi) * float(energy)
@@ -804,21 +882,33 @@ def plot_dossier(
     efi = ec_b / float(energy) - jnp.asarray(cell.Eg) / 2.0 + 0.5 * jnp.log(nc / nv)
     ndop = getattr(cell, "Ndop", jnp.zeros_like(nc))
     ndop_nz = jnp.where(ndop != 0.0, ndop, ni_d)
-    ef_b = (efi + jnp.where(ndop_nz > 0, jnp.log(jnp.abs(ndop_nz) / ni_d),
-                            -jnp.log(jnp.abs(ndop_nz) / ni_d))) * float(energy)
+    ef_b = (
+        efi
+        + jnp.where(
+            ndop_nz > 0, jnp.log(jnp.abs(ndop_nz) / ni_d), -jnp.log(jnp.abs(ndop_nz) / ni_d)
+        )
+    ) * float(energy)
     idx = jnp.concatenate([jnp.array([0]), jnp.argwhere(ec_b[:-1] != ec_b[1:]).flatten() + 1])
     for i, j_ in enumerate(range(int(idx.size))):
         xs = float(x_um[int(idx[j_])])
         xe = float(x_um[-1]) if j_ == int(idx.size) - 1 else float(x_um[int(idx[j_ + 1])])
         yb, yt = float(ev_b[int(idx[j_])]), float(ec_b[int(idx[j_])])
-        ax_bars.add_patch(Rectangle((xs, yb), xe - xs, yt - yb,
-                                    facecolor=BAR_PALETTE[i % len(BAR_PALETTE)],
-                                    linewidth=0, alpha=0.25, zorder=0))
+        ax_bars.add_patch(
+            Rectangle(
+                (xs, yb),
+                xe - xs,
+                yt - yb,
+                facecolor=BAR_PALETTE[i % len(BAR_PALETTE)],
+                linewidth=0,
+                alpha=0.25,
+                zorder=0,
+            )
+        )
         # deltapv-style band-edge value labels per layer
-        ax_bars.text((xs + xe) / 2, yt + 0.05, f"{yt:.2f}",
-                     ha="center", va="bottom", fontsize=fs - 2)
-        ax_bars.text((xs + xe) / 2, yb - 0.05, f"{yb:.2f}",
-                     ha="center", va="top", fontsize=fs - 2)
+        ax_bars.text(
+            (xs + xe) / 2, yt + 0.05, f"{yt:.2f}", ha="center", va="bottom", fontsize=fs - 2
+        )
+        ax_bars.text((xs + xe) / 2, yb - 0.05, f"{yb:.2f}", ha="center", va="top", fontsize=fs - 2)
     ax_bars.plot(x_um, ef_b, ls="--", color="black", lw=2, label="$E_F$", zorder=3)
     ax_bars.legend(frameon=False, fontsize=fs - 1)
     ax_bars.set_xlim(x0, x1)
@@ -826,22 +916,43 @@ def plot_dossier(
     ax_bars.set_xlabel("position / µm", fontsize=fs)
     ax_bars.set_ylabel("energy / eV", fontsize=fs)
     ax_bars.tick_params(labelsize=fs - 1)
-    ax_bars.text(0.02, 0.95, "(b) layers", transform=ax_bars.transAxes,
-                 fontsize=fs + 1, fontweight="bold", va="top")
+    ax_bars.text(
+        0.02,
+        0.95,
+        "(b) layers",
+        transform=ax_bars.transAxes,
+        fontsize=fs + 1,
+        fontweight="bold",
+        va="top",
+    )
 
     # ---- Panel C: band diagram ----
     if pot is not None:
         ec = (-jnp.asarray(cell.Chi) - jnp.asarray(pot.phi)) * float(energy)
         ev = (-jnp.asarray(cell.Chi) - jnp.asarray(cell.Eg) - jnp.asarray(pot.phi)) * float(energy)
         _shade(ax_band)
-        ax_band.fill_between(x_um, jnp.asarray(ev), jnp.asarray(ec), color="0.4", alpha=0.06, zorder=0)
+        ax_band.fill_between(
+            x_um, jnp.asarray(ev), jnp.asarray(ec), color="0.4", alpha=0.06, zorder=0
+        )
         ax_band.plot(x_um, ec, ls="--", lw=2, color=EC_SOFT, label="$E_c$", zorder=3)
         ax_band.plot(x_um, ev, ls="--", lw=2, color=EV_SOFT, label="$E_v$", zorder=3)
         if show_qfl and user_pot:
-            ax_band.plot(x_um, jnp.asarray(pot.phi_n) * float(energy), color=EC_SOFT, lw=2,
-                         label="$E_{Fn}$", zorder=2)
-            ax_band.plot(x_um, jnp.asarray(pot.phi_p) * float(energy), color=EV_SOFT, lw=2,
-                         label="$E_{Fp}$", zorder=2)
+            ax_band.plot(
+                x_um,
+                jnp.asarray(pot.phi_n) * float(energy),
+                color=EC_SOFT,
+                lw=2,
+                label="$E_{Fn}$",
+                zorder=2,
+            )
+            ax_band.plot(
+                x_um,
+                jnp.asarray(pot.phi_p) * float(energy),
+                color=EV_SOFT,
+                lw=2,
+                label="$E_{Fp}$",
+                zorder=2,
+            )
         else:
             ax_band.axhline(0.0, color=FERMI_SOFT, lw=2, label="$E_F$", zorder=2)
         ax_band.set_xlim(x0, x1)
@@ -849,8 +960,15 @@ def plot_dossier(
         ax_band.set_ylabel("energy / eV", fontsize=fs)
         ax_band.tick_params(labelsize=fs - 1)
         ax_band.legend(frameon=False, fontsize=fs - 1)
-    ax_band.text(0.02, 0.95, "(c) bands", transform=ax_band.transAxes,
-                 fontsize=fs + 1, fontweight="bold", va="top")
+    ax_band.text(
+        0.02,
+        0.95,
+        "(c) bands",
+        transform=ax_band.transAxes,
+        fontsize=fs + 1,
+        fontweight="bold",
+        va="top",
+    )
 
     # ---- Panel D: charge ----
     if pot is not None:
@@ -866,8 +984,15 @@ def plot_dossier(
         ax_chg.set_ylabel("density / cm$^{-3}$", fontsize=fs)
         ax_chg.tick_params(labelsize=fs - 1)
         ax_chg.legend(frameon=False, fontsize=fs - 1)
-    ax_chg.text(0.02, 0.95, "(d) charge", transform=ax_chg.transAxes,
-                fontsize=fs + 1, fontweight="bold", va="top")
+    ax_chg.text(
+        0.02,
+        0.95,
+        "(d) charge",
+        transform=ax_chg.transAxes,
+        fontsize=fs + 1,
+        fontweight="bold",
+        va="top",
+    )
 
     if title:
         fig.suptitle(title, fontsize=fs + 2)
@@ -906,9 +1031,7 @@ def plot_all(
     out: dict = {}
     out["bars"] = plot_bars(cell, f"{outdir}/bars.png", mode=mode)
     if pot is not None:
-        out["band"] = plot_band_diagram(
-            cell, pot, f"{outdir}/band.png", eq=not user_pot, mode=mode
-        )
+        out["band"] = plot_band_diagram(cell, pot, f"{outdir}/band.png", eq=not user_pot, mode=mode)
         out["charge"] = plot_charge(cell, pot, f"{outdir}/charge.png", mode=mode)
     if iv is not None:
         try:

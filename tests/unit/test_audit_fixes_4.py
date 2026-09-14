@@ -263,7 +263,12 @@ def test_iter_cb_receives_max_resid_and_stagnated_present(_stiff_eq_shared):
     bound = boundary_bias(cell, 0.1)
     calls = []
     pot, st = solve_newton(
-        cell, bound, pot0, tol=1e-10, max_steps=30, loop="python",
+        cell,
+        bound,
+        pot0,
+        tol=1e-10,
+        max_steps=30,
+        loop="python",
         iter_cb=lambda it, err, r: calls.append((it, err, r)),
     )
     assert calls, "iter_cb never fired"

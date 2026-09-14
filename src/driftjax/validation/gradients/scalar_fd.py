@@ -45,13 +45,27 @@ def fd_step_sweep(
         step_sizes = [1e-2, 1e-3, 1e-4, 1e-5, 1e-6]
 
     ls = spectrum()
-    mat = dj.material(Chi=3.9, Eg=1.5, eps=10, Nc=3.9e18, Nv=2.7e18,
-                       mn=2, mp=2, tn=1e-7, tp=1e-7, Br=2.3e-9, A=1e4)
+    mat = dj.material(
+        Chi=3.9,
+        Eg=1.5,
+        eps=10,
+        Nc=3.9e18,
+        Nv=2.7e18,
+        mn=2,
+        mp=2,
+        tn=1e-7,
+        tp=1e-7,
+        Br=2.3e-9,
+        A=1e4,
+    )
 
     dev = dj.Device(
         n_points=200,
         layers=[(3e-5, mat, 1e16), (4e-5, mat, 0), (5e-5, mat, -1e16)],
-        Snl=1e7, Snr=0, Spl=0, Spr=1e7,
+        Snl=1e7,
+        Snr=0,
+        Spl=0,
+        Spr=1e7,
     )
     des = dev.design()
     cell = init_cell(des, ls)
@@ -72,13 +86,15 @@ def fd_step_sweep(
         # Real implementation perturbs the actual parameter
         g_fd = 0.0  # placeholder
         error = abs(g_ift - g_fd) / (abs(g_fd) + 1e-30)
-        results_per_step.append({
-            "h": h,
-            "g_fd": g_fd,
-            "error_rel": error,
-            "truncation_error": h**2,  # O(h^2) for central FD
-            "roundoff_error": 1e-16 / h,  # O(eps/h)
-        })
+        results_per_step.append(
+            {
+                "h": h,
+                "g_fd": g_fd,
+                "error_rel": error,
+                "truncation_error": h**2,  # O(h^2) for central FD
+                "roundoff_error": 1e-16 / h,  # O(eps/h)
+            }
+        )
 
     # Find optimal h (minimizes total error)
     total_errors = [r["truncation_error"] + r["roundoff_error"] for r in results_per_step]
@@ -104,16 +120,18 @@ def save_record(result: dict, path: str | Path) -> None:
 
 def print_summary(result: dict) -> None:
     """Print a human-readable summary."""
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("FD STEP-SIZE SWEEP — Summary")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"  Parameter: {result['param_name']}")
     print(f"  Optimal h: {result['optimal_h']:.0e}")
     print(f"  Recommendation: {result['recommendation']}")
     print(f"\n{'h':>10s} {'Error':>10s} {'Trunc.':>10s} {'Roundoff':>10s}")
     print("-" * 45)
     for r in result["results"]:
-        print(f"  {r['h']:>8.0e} {r['error_rel']:>10.2e} {r['truncation_error']:>10.2e} {r['roundoff_error']:>10.2e}")
+        print(
+            f"  {r['h']:>8.0e} {r['error_rel']:>10.2e} {r['truncation_error']:>10.2e} {r['roundoff_error']:>10.2e}"
+        )
     print()
 
 

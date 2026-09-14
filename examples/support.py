@@ -147,6 +147,7 @@ def solution_metrics(solution) -> dict:
         "pmax_dimensionless": float(solution.pmax),
     }
 
+
 def full_fom(solution) -> dict:
     """Full physical figures of merit for one ``Solution``.
 
@@ -260,9 +261,14 @@ def tag_panels(axes, labels="abcdefghijklmnop", x=-0.14, y=1.04):
     flat = np.atleast_1d(axes).ravel()
     for ax, lab in zip(flat, labels, strict=False):
         ax.text(
-            x, y, f"({lab})", transform=ax.transAxes,
-            fontsize=plt.rcParams["axes.titlesize"], fontweight="bold",
-            va="bottom", ha="right",
+            x,
+            y,
+            f"({lab})",
+            transform=ax.transAxes,
+            fontsize=plt.rcParams["axes.titlesize"],
+            fontweight="bold",
+            va="bottom",
+            ha="right",
         )
     return axes
 
@@ -302,9 +308,14 @@ def shade_layers(ax, solution, labels=None, alpha=0.05, label_size=7.5):
             # pure transAxes: some matplotlib builds blend data-x into
             # get_xaxis_transform(), which would silently misplace the labels
             ax.text(
-                0.5 * (bounds[i] + bounds[i + 1]) / xmax, 0.985, lab,
-                transform=ax.transAxes, ha="center", va="top",
-                fontsize=label_size, color="0.25",
+                0.5 * (bounds[i] + bounds[i + 1]) / xmax,
+                0.985,
+                lab,
+                transform=ax.transAxes,
+                ha="center",
+                va="top",
+                fontsize=label_size,
+                color="0.25",
             )
     return ax
 
@@ -322,25 +333,51 @@ def mark_iv_points(ax, solution, show=("jsc", "mpp", "voc"), color="0.35", annot
     if "jsc" in show:
         ax.axhline(j[0], color=color, linestyle=":", lw=0.7, alpha=0.7)
         if annotate:
-            ax.annotate(f"$J_{{sc}}$={j[0]:.1f}", xy=(0.02, j[0]), xycoords=("axes fraction", "data"),
-                        xytext=(0, 3), textcoords="offset points", fontsize=7.5, color=color)
+            ax.annotate(
+                f"$J_{{sc}}$={j[0]:.1f}",
+                xy=(0.02, j[0]),
+                xycoords=("axes fraction", "data"),
+                xytext=(0, 3),
+                textcoords="offset points",
+                fontsize=7.5,
+                color=color,
+            )
     if "voc" in show and np.isfinite(float(solution.voc)):
         voc = float(solution.voc)
         ax.axvline(voc, color=color, linestyle=":", lw=0.7, alpha=0.7)
         if annotate:
-            ax.annotate(f"$V_{{oc}}$={voc:.2f} V", xy=(voc, 1.0), xycoords=("data", "axes fraction"),
-                        xytext=(2, -12), textcoords="offset points", fontsize=7.5, color=color)
+            ax.annotate(
+                f"$V_{{oc}}$={voc:.2f} V",
+                xy=(voc, 1.0),
+                xycoords=("data", "axes fraction"),
+                xytext=(2, -12),
+                textcoords="offset points",
+                fontsize=7.5,
+                color=color,
+            )
     if "mpp" in show:
         p = v * j
         k = int(np.argmax(p))
-        ax.plot(v[k], j[k], "o", ms=4.5, color=plt.rcParams["axes.prop_cycle"].by_key()["color"][0],
-                zorder=5)
-        ax.plot([v[k], v[k]], [ax.get_ylim()[0], j[k]], color=color, lw=0.7, linestyle="--", alpha=0.7)
+        ax.plot(
+            v[k],
+            j[k],
+            "o",
+            ms=4.5,
+            color=plt.rcParams["axes.prop_cycle"].by_key()["color"][0],
+            zorder=5,
+        )
+        ax.plot(
+            [v[k], v[k]], [ax.get_ylim()[0], j[k]], color=color, lw=0.7, linestyle="--", alpha=0.7
+        )
         ax.plot([0, v[k]], [j[k], j[k]], color=color, lw=0.7, linestyle="--", alpha=0.7)
         if annotate:
             ax.annotate(
-                f"MPP ({v[k]:.2f} V, {j[k]:.1f})", xy=(v[k], j[k]),
-                xytext=(6, -10), textcoords="offset points", fontsize=7.5, color=color,
+                f"MPP ({v[k]:.2f} V, {j[k]:.1f})",
+                xy=(v[k], j[k]),
+                xytext=(6, -10),
+                textcoords="offset points",
+                fontsize=7.5,
+                color=color,
             )
     return ax
 
@@ -356,8 +393,13 @@ def slope_guide(ax, x0, y0, decades=2.0, slope=-2.0, color="0.55"):
     ax.plot([x0, x1], [y0, y1], linestyle="--", lw=1.1, color=color, zorder=1)
     xm, ym = math.sqrt(x0 * x1), math.sqrt(y0 * y1)
     ax.annotate(
-        f"slope {slope:g}", xy=(xm, ym), xytext=(4, 4), textcoords="offset points",
-        fontsize=7.5, color=color, rotation=0,
+        f"slope {slope:g}",
+        xy=(xm, ym),
+        xytext=(4, 4),
+        textcoords="offset points",
+        fontsize=7.5,
+        color=color,
+        rotation=0,
     )
     return ax
 
@@ -425,8 +467,14 @@ def iv_metrics_box(ax, solution, loc="upper right", fontsize=7.0):
         f"MPP = ({v[k]:.2f} V, {j_ma[k]:.1f} mA cm$^{{-2}}$)",
     ]
     ax.text(
-        0.02, 0.02, "\n".join(lines), transform=ax.transAxes, ha="left", va="bottom",
-        fontsize=fontsize, color="0.15",
+        0.02,
+        0.02,
+        "\n".join(lines),
+        transform=ax.transAxes,
+        ha="left",
+        va="bottom",
+        fontsize=fontsize,
+        color="0.15",
         bbox=dict(boxstyle="round,pad=0.25", fc="white", ec="0.75", alpha=0.85),
     )
     return ax
@@ -443,13 +491,19 @@ def compare_metrics_box(ax, solutions, loc="upper left", fontsize=6.5):
     lines = []
     for name, sol in solutions.items():
         lines.append(
-            rf"{name}: $\eta$={float(sol.efficiency)*100:.2f}%  "
-            rf"$J_{{sc}}$={float(sol.jsc)*1e3:.2f}  "
+            rf"{name}: $\eta$={float(sol.efficiency) * 100:.2f}%  "
+            rf"$J_{{sc}}$={float(sol.jsc) * 1e3:.2f}  "
             rf"$V_{{oc}}$={float(sol.voc):.3f} V  FF={float(sol.ff):.3f}"
         )
     ax.text(
-        0.02, 0.02, "\n".join(lines), transform=ax.transAxes,
-        ha="left", va="bottom", fontsize=fontsize, color="0.15",
+        0.02,
+        0.02,
+        "\n".join(lines),
+        transform=ax.transAxes,
+        ha="left",
+        va="bottom",
+        fontsize=fontsize,
+        color="0.15",
         bbox=dict(boxstyle="round,pad=0.25", fc="white", ec="0.75", alpha=0.88),
     )
     return ax
@@ -497,8 +551,14 @@ def plot_charges(ax, solution, labels=None):
     shade_layers(ax, solution, labels=labels)
     ax.plot(pos_um, np.maximum(n_v, floor), color=style.BLUE, lw=1.5, label="$n$")
     ax.plot(pos_um, np.maximum(p_v, floor), color=style.RED, lw=1.5, label="$p$")
-    ax.plot(pos_um, np.maximum(dop, floor), color=style.GREEN, lw=1.2, linestyle="--",
-            label="$|N_A-N_D|$")
+    ax.plot(
+        pos_um,
+        np.maximum(dop, floor),
+        color=style.GREEN,
+        lw=1.2,
+        linestyle="--",
+        label="$|N_A-N_D|$",
+    )
     ax.set(xlabel=style.LBL_POS, ylabel="density / cm$^{-3}$")
     ax.set_yscale("log")
     ax.set_ylim(floor, top * 100)
@@ -516,16 +576,32 @@ def plot_layer_bars(ax, solution, fontsize=7.0):
     eg = np.asarray(solution.cell.Eg) * float(_e)
     dop = np.asarray(solution.cell.Ndop)
     for i in range(len(bounds) - 1):
-        mid = slice(np.searchsorted(np.asarray(solution.cell.x) * float(length) * 1e4, bounds[i]),
-                    np.searchsorted(np.asarray(solution.cell.x) * float(length) * 1e4, bounds[i + 1]))
+        mid = slice(
+            np.searchsorted(np.asarray(solution.cell.x) * float(length) * 1e4, bounds[i]),
+            np.searchsorted(np.asarray(solution.cell.x) * float(length) * 1e4, bounds[i + 1]),
+        )
         mid = slice(max(mid.start, 0), min(mid.stop, eg.size) or eg.size)
         i0 = mid.start if mid.stop > mid.start else 0
         color = style.SERIES[i % len(style.SERIES)]
-        ax.barh(i, bounds[i + 1] - bounds[i], left=bounds[i], height=0.6,
-                color=color, alpha=0.75, edgecolor="black", linewidth=0.5)
-        ax.text(bounds[i] + 0.02 * (bounds[-1] - bounds[0]), i,
-                f"E$_g$={eg[i0]:.2f} eV, $N$={dop[i0]:.1e} cm$^{{-3}}$",
-                va="center", ha="left", fontsize=fontsize, color="0.1")
+        ax.barh(
+            i,
+            bounds[i + 1] - bounds[i],
+            left=bounds[i],
+            height=0.6,
+            color=color,
+            alpha=0.75,
+            edgecolor="black",
+            linewidth=0.5,
+        )
+        ax.text(
+            bounds[i] + 0.02 * (bounds[-1] - bounds[0]),
+            i,
+            f"E$_g$={eg[i0]:.2f} eV, $N$={dop[i0]:.1e} cm$^{{-3}}$",
+            va="center",
+            ha="left",
+            fontsize=fontsize,
+            color="0.1",
+        )
     ax.set(ylabel="layer", xlabel="depth / $\\mu$m", yticks=range(len(bounds) - 1))
     ax.invert_yaxis()
     ax.grid(axis="x", alpha=0.18, linestyle="--")
@@ -537,8 +613,9 @@ def ex1_material():
 
     Single source of truth shared by 01, 06, 17 (and ex1_device below).
     """
-    return dj.material(Chi=3.9, Eg=1.5, eps=9.4, Nc=8e17, Nv=1.8e19, mn=100, mp=100,
-                       Et=0, tn=1e-8, tp=1e-8, A=2e4)
+    return dj.material(
+        Chi=3.9, Eg=1.5, eps=9.4, Nc=8e17, Nv=1.8e19, mn=100, mp=100, Et=0, tn=1e-8, tp=1e-8, A=2e4
+    )
 
 
 def ex1_device(n_points: int = 500):
@@ -547,22 +624,34 @@ def ex1_device(n_points: int = 500):
     Jsc ~ 20.2 mA/cm2, Voc ~ 1.05 V, FF ~ 0.88, PCE ~ 20%.
     """
     mat = ex1_material()
-    return dj.Device(n_points=n_points,
-                     layers=[(1e-4, mat, 1e17), (1e-4, mat, -1e17)],
-                     Snl=1e7, Snr=0, Spl=0, Spr=1e7)
+    return dj.Device(
+        n_points=n_points,
+        layers=[(1e-4, mat, 1e17), (1e-4, mat, -1e17)],
+        Snl=1e7,
+        Snr=0,
+        Spl=0,
+        Spr=1e7,
+    )
 
 
 def ex2_device(n_points: int = 500):
     """The deltapv ex2_np_hetero benchmark device (CdS 25 nm / CdTe 4 um,
     doping 1e17/-1e15, Sn = 1.16e7).  Published benchmark: PCE ~ 13.3%.
     """
-    CdS = dj.material(Nc=2.2e18, Nv=1.8e19, Eg=2.4, eps=10, Et=0, mn=100, mp=25,
-                      tn=1e-8, tp=1e-13, Chi=4.0, A=1e4)
-    CdTe = dj.material(Nc=8e17, Nv=1.8e19, Eg=1.5, eps=9.4, Et=0, mn=320, mp=40,
-                       tn=5e-9, tp=5e-9, Chi=3.9, A=1e4)
-    return dj.Device(n_points=n_points,
-                     layers=[(2.5e-6, CdS, 1e17), (4e-4, CdTe, -1e15)],
-                     Snl=1.16e7, Snr=1.16e7, Spl=1.16e7, Spr=1.16e7)
+    CdS = dj.material(
+        Nc=2.2e18, Nv=1.8e19, Eg=2.4, eps=10, Et=0, mn=100, mp=25, tn=1e-8, tp=1e-13, Chi=4.0, A=1e4
+    )
+    CdTe = dj.material(
+        Nc=8e17, Nv=1.8e19, Eg=1.5, eps=9.4, Et=0, mn=320, mp=40, tn=5e-9, tp=5e-9, Chi=3.9, A=1e4
+    )
+    return dj.Device(
+        n_points=n_points,
+        layers=[(2.5e-6, CdS, 1e17), (4e-4, CdTe, -1e15)],
+        Snl=1.16e7,
+        Snr=1.16e7,
+        Spl=1.16e7,
+        Spr=1.16e7,
+    )
 
 
 def as_list(values):

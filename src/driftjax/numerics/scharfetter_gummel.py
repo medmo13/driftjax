@@ -85,7 +85,12 @@ def _Jn_jvp(primals, tangents):
         from driftjax.numerics.analytic_jacobian import _Jn_deriv as _Jn_deriv_analytic
 
         DJnDphi_n0, DJnDphi_n1, DJnDphi0, DJnDphi1 = _Jn_deriv_analytic(cell, pot)
-        dJn_pot = DJnDphi_n0 * dpot.phi_n[:-1] + DJnDphi_n1 * dpot.phi_n[1:] + DJnDphi0 * dpot.phi[:-1] + DJnDphi1 * dpot.phi[1:]
+        dJn_pot = (
+            DJnDphi_n0 * dpot.phi_n[:-1]
+            + DJnDphi_n1 * dpot.phi_n[1:]
+            + DJnDphi0 * dpot.phi[:-1]
+            + DJnDphi1 * dpot.phi[1:]
+        )
     except Exception:
         # Fallback to autodiff for pot if analytic not available
         _, dJn_pot = jax.jvp(lambda p: _Jn_impl(cell, p), (pot,), (dpot,))
@@ -129,7 +134,12 @@ def _Jp_jvp(primals, tangents):
         from driftjax.numerics.analytic_jacobian import _Jp_deriv as _Jp_deriv_analytic
 
         DJpDphi_p0, DJpDphi_p1, DJpDphi0, DJpDphi1 = _Jp_deriv_analytic(cell, pot)
-        dJp_pot = DJpDphi_p0 * dpot.phi_p[:-1] + DJpDphi_p1 * dpot.phi_p[1:] + DJpDphi0 * dpot.phi[:-1] + DJpDphi1 * dpot.phi[1:]
+        dJp_pot = (
+            DJpDphi_p0 * dpot.phi_p[:-1]
+            + DJpDphi_p1 * dpot.phi_p[1:]
+            + DJpDphi0 * dpot.phi[:-1]
+            + DJpDphi1 * dpot.phi[1:]
+        )
     except Exception:
         _, dJp_pot = jax.jvp(lambda p: _Jp_impl(cell, p), (pot,), (dpot,))
         _, dJp_cell = jax.jvp(lambda c: _Jp_impl(c, pot), (cell,), (dcell,))

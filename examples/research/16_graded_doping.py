@@ -36,11 +36,16 @@ def main():
     mat = si_material()
     abrupt = dj.Device(
         layers=[(1e-4, mat, 1e17), (1e-4, mat, -1e17)],
-        n_points=points, Snl=1e7, Snr=1e7, Spl=1e7, Spr=1e7)
+        n_points=points,
+        Snl=1e7,
+        Snr=1e7,
+        Spl=1e7,
+        Spr=1e7,
+    )
     ramp = [1e17, 5e16, 0.0, -5e16, -1e17]
     graded = dj.Device(
-        layers=[(4e-5, mat, d) for d in ramp],
-        n_points=points, Snl=1e7, Snr=1e7, Spl=1e7, Spr=1e7)
+        layers=[(4e-5, mat, d) for d in ramp], n_points=points, Snl=1e7, Snr=1e7, Spl=1e7, Spr=1e7
+    )
 
     sols = {}
     for name, dev in (("abrupt", abrupt), ("graded", graded)):
@@ -50,13 +55,17 @@ def main():
     fig, axes = new_figure(nrows=1, ncols=2, width=9.0, height=3.8)
     ax0, ax1 = axes.ravel()
     for (name, (sol, _)), color in zip(sols.items(), style.SERIES, strict=False):
-        plot_smooth_iv(ax0, np.asarray(sol.voltages), np.asarray(sol.current),
-                       color=color, label=f"{name} ({float(sol.efficiency)*100:.2f}%)")
+        plot_smooth_iv(
+            ax0,
+            np.asarray(sol.voltages),
+            np.asarray(sol.current),
+            color=color,
+            label=f"{name} ({float(sol.efficiency) * 100:.2f}%)",
+        )
         phi = np.asarray(sol.eq_pot.phi)
         fld = np.abs(np.diff(phi))
         x = np.linspace(0, 2.0, len(fld))
-        ax1.semilogy(x, fld / max(float(jnp.max(fld)), 1e-30), lw=1.6,
-                     color=color, label=name)
+        ax1.semilogy(x, fld / max(float(jnp.max(fld)), 1e-30), lw=1.6, color=color, label=name)
     # photovoltaic quadrant only: the ideal-diode forward tail (no series
     # resistance in the model) would otherwise compress the PV quadrant flat
     j_top = max(float(np.asarray(sol.current)[0]) * 1e3 for sol, _ in sols.values())
@@ -71,16 +80,20 @@ def main():
     ax1.grid(alpha=0.2, which="both", linestyle="--")
     tag_panels(axes.ravel())
     fp = save_figure(fig, "research_16_graded_doping")
-    save_json("research_16_graded_doping", {
-        "metadata": execution_metadata(), 
-        "n_points": points,
-        **{f"{n}_{k}": v for n, (s, _) in sols.items()
-           for k, v in solution_metrics(s).items()},
-        "figure": fp.name,
-    })
-    report("research_16",
-           abrupt_eff=float(sols["abrupt"][0].efficiency),
-           graded_eff=float(sols["graded"][0].efficiency))
+    save_json(
+        "research_16_graded_doping",
+        {
+            "metadata": execution_metadata(),
+            "n_points": points,
+            **{f"{n}_{k}": v for n, (s, _) in sols.items() for k, v in solution_metrics(s).items()},
+            "figure": fp.name,
+        },
+    )
+    report(
+        "research_16",
+        abrupt_eff=float(sols["abrupt"][0].efficiency),
+        graded_eff=float(sols["graded"][0].efficiency),
+    )
     report_fom("research_16", abrupt=sols["abrupt"][0], graded=sols["graded"][0])
 
 

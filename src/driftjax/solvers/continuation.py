@@ -63,8 +63,18 @@ def _total_current_jvp(primals, tangents):
         DJn_n0, DJn_n1, DJn_0, DJn_1 = _Jn_deriv(cell, pot)
         DJp_p0, DJp_p1, DJp_0, DJp_1 = _Jp_deriv(cell, pot)
         # dpot leaves: phi_n, phi_p, phi
-        dJn_pot = DJn_n0 * dpot.phi_n[:-1] + DJn_n1 * dpot.phi_n[1:] + DJn_0 * dpot.phi[:-1] + DJn_1 * dpot.phi[1:]
-        dJp_pot = DJp_p0 * dpot.phi_p[:-1] + DJp_p1 * dpot.phi_p[1:] + DJp_0 * dpot.phi[:-1] + DJp_1 * dpot.phi[1:]
+        dJn_pot = (
+            DJn_n0 * dpot.phi_n[:-1]
+            + DJn_n1 * dpot.phi_n[1:]
+            + DJn_0 * dpot.phi[:-1]
+            + DJn_1 * dpot.phi[1:]
+        )
+        dJp_pot = (
+            DJp_p0 * dpot.phi_p[:-1]
+            + DJp_p1 * dpot.phi_p[1:]
+            + DJp_0 * dpot.phi[:-1]
+            + DJp_1 * dpot.phi[1:]
+        )
         dI_pot = jnp.mean(dJn_pot + dJp_pot)
     except Exception:
         # Fallback to autodiff for pot if analytic unavailable
@@ -245,15 +255,18 @@ def sweep(
                         _res = _comp_F(cell, boundary_bias(cell, v), pot_cur)
                         _n2 = float(jnp.linalg.norm(_res))
                         _nf = float(jnp.max(jnp.abs(_res)))
-                        pot, stats = pot_cur, _ns(
-                            converged=True,
-                            fallback="step-halving",
-                            iters=None,
-                            resid=_n2,
-                            resid_f=_nf,
-                            error=_n2,
-                            stagnated=False,
-                            backend=None,
+                        pot, stats = (
+                            pot_cur,
+                            _ns(
+                                converged=True,
+                                fallback="step-halving",
+                                iters=None,
+                                resid=_n2,
+                                resid_f=_nf,
+                                error=_n2,
+                                stagnated=False,
+                                backend=None,
+                            ),
                         )
                         break
         pots.append(pot)

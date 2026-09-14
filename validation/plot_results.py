@@ -6,6 +6,7 @@ optimize_material_recovery.py / optimize_holistic.py
 
 Run:  PYTHONPATH=src python validation/plot_results.py
 """
+
 import json
 
 import matplotlib
@@ -13,7 +14,9 @@ import numpy as np
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+
 from driftjax.viz import style
+
 style.apply("presentation")
 
 
@@ -25,8 +28,11 @@ def load(name):
         return None
 
 
-for name, ylabel in [("perovskite", "PCE / %"), ("holistic", "PCE / %"),
-                    ("material_recovery", "R (lower=better)")]:
+for name, ylabel in [
+    ("perovskite", "PCE / %"),
+    ("holistic", "PCE / %"),
+    ("material_recovery", "R (lower=better)"),
+]:
     d = load(name)
     if d is None:
         continue

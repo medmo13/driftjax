@@ -21,10 +21,10 @@ from jax import jacfwd, jacrev
 from driftjax.fields import BoundaryConditions, Potentials, PVCell, pot2vec, vec2pot
 from driftjax.numerics.drift_diffusion import ddn, ddn_precomputed, ddp, ddp_precomputed
 from driftjax.numerics.poisson import poisson
-from driftjax.science.contacts import contact_phi, contact_phin, contact_phip
 from driftjax.science.carrier_statistics import n as _n
 from driftjax.science.carrier_statistics import ni as _ni
 from driftjax.science.carrier_statistics import p as _p
+from driftjax.science.contacts import contact_phi, contact_phin, contact_phip
 from driftjax.science.recombination import total_precomputed
 
 

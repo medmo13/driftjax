@@ -53,6 +53,7 @@ def _solve_adjoint(J, g_x, tol=1e-8):
     Use ``driftjax.simulate(..., adjoint=...)`` for production gradients.
     """
     from driftjax.solvers.newton import _linear_solve
+
     return _linear_solve(J.T, g_x)[0]
 
 
@@ -95,7 +96,9 @@ def manual_adjoint_grad(
     def loss_flat(d, xv):
         return loss_fn(_cell_of(d, ls, alpha_mode_resolved, optics=optics), vec2pot(xv))
 
-    pot = forward_solve(des, ls, v_applied, pot_ini, tol=tol, alpha_mode=alpha_mode_resolved, optics=optics)
+    pot = forward_solve(
+        des, ls, v_applied, pot_ini, tol=tol, alpha_mode=alpha_mode_resolved, optics=optics
+    )
     x = pot2vec(pot)
 
     L = loss_fn(cell, pot)

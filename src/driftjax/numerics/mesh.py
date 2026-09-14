@@ -8,7 +8,9 @@ import jax.numpy as jnp
 from driftjax.units import thermal_scales
 
 
-def make_uniform_mesh(total_thickness_cm: float, n_points: int, T: float = 300.0) -> tuple[jax.Array, jax.Array]:
+def make_uniform_mesh(
+    total_thickness_cm: float, n_points: int, T: float = 300.0
+) -> tuple[jax.Array, jax.Array]:
     """Uniform 1-D mesh: returns (x_dimless, dgrid_dimless) for given total thickness."""
     if n_points < 3:
         raise ValueError(f"n_points must be >=3, got {n_points}")

@@ -34,9 +34,7 @@ def main():
         return pn_device(material, points=points)
 
     def objective(eg):
-        return dj.simulate(
-            make_device(eg), dj.Sweep(vmax=0.75, n_steps= 9)
-        ).efficiency
+        return dj.simulate(make_device(eg), dj.Sweep(vmax=0.75, n_steps=9)).efficiency
 
     eg = jnp.asarray(1.12)
     gradient = float(jax.grad(objective)(eg))
@@ -50,14 +48,17 @@ def main():
     print(f"  central FD         = {finite_difference: .6e}")
     print(f"  relative error     = {relative_error:.2e}  (gate < 1e-4)")
     print()
-    save_json("developer_adjoint_check", {
-        "metadata": execution_metadata(),
-        "bandgap_eV": float(eg),
-        "implicit_gradient": gradient,
-        "finite_difference": finite_difference,
-        "relative_error": relative_error,
-        "figure": None,  # verification result is reported as text, not plotted
-    })
+    save_json(
+        "developer_adjoint_check",
+        {
+            "metadata": execution_metadata(),
+            "bandgap_eV": float(eg),
+            "implicit_gradient": gradient,
+            "finite_difference": finite_difference,
+            "relative_error": relative_error,
+            "figure": None,  # verification result is reported as text, not plotted
+        },
+    )
     report("developer_adjoint_check", grad_fd_relative_error=float(relative_error))
 
 

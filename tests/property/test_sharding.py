@@ -64,7 +64,9 @@ def _full_generation(design, ls, alpha_mode):
 
 
 @pytest.mark.parametrize("alpha_mode", ["beer-lambert", "tmm"])
-@pytest.mark.parametrize("n_shards", [1, 4])  # trimmed from 3x3=9 to 2x2=4: tauc redundant, n=2 covered by 1->4
+@pytest.mark.parametrize(
+    "n_shards", [1, 4]
+)  # trimmed from 3x3=9 to 2x2=4: tauc redundant, n=2 covered by 1->4
 def test_sharded_generation_equals_unsharded(shard_design, shard_ls, alpha_mode, n_shards):
     G_full = _full_generation(shard_design, shard_ls, alpha_mode)
     G_sh, meta = sharded_generation(

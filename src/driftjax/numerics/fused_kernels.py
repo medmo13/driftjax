@@ -100,8 +100,8 @@ def fused_residual_and_jacobian(
     Computes carrier stats (n, p, ni) once and passes them to both the
     residual and Jacobian paths — no reliance on XLA CSE for sharing.
     """
-    from driftjax.numerics.residual import comp_F_precomputed
     from driftjax.numerics.analytic_jacobian import banded_jacobian
+    from driftjax.numerics.residual import comp_F_precomputed
 
     F, n_v, p_v, ni_v = comp_F_precomputed(cell, bound, pot)
     A, B, C = banded_jacobian(cell, bound, pot, n_v=n_v, p_v=p_v, ni_v=ni_v)

@@ -8,7 +8,7 @@ import jax.numpy as jnp
 import pytest
 
 import driftjax as dj
-from driftjax import simulate, Sweep
+from driftjax import Sweep, simulate
 from driftjax.io import load_material
 
 
@@ -41,13 +41,15 @@ def test_blocks_to_csr_on_matches_dense():
     """O(N) blocks_to_csr equals dense_to_csr to machine precision."""
     from driftjax.numerics.analytic_jacobian import banded_jacobian, dense_from_blocks
     from driftjax.numerics.linalg import blocks_to_csr, dense_to_csr
-    from driftjax.simulator import init_cell
-    from driftjax.science.spectrum import spectrum
     from driftjax.science.contacts import boundary_bias, boundary_eq
+    from driftjax.science.spectrum import spectrum
+    from driftjax.simulator import init_cell
     from driftjax.solvers.continuation import equilibrium_guess
     from driftjax.solvers.newton import solve_eq
 
-    dev = dj.Device(n_points=20, layers=[(1e-4, load_material("Si"), 1e16), (1e-4, load_material("Si"), -1e16)])
+    dev = dj.Device(
+        n_points=20, layers=[(1e-4, load_material("Si"), 1e16), (1e-4, load_material("Si"), -1e16)]
+    )
     cell = init_cell(dev.design(), spectrum(normalize=False))
     pot = solve_eq(cell, boundary_eq(cell), equilibrium_guess(cell).phi)
     A, B, C = banded_jacobian(cell, boundary_bias(cell, 0.2), pot)
@@ -58,7 +60,9 @@ def test_blocks_to_csr_on_matches_dense():
     assert jnp.array_equal(i1, i2)
     assert jnp.array_equal(p1, p2)
     # larger N still O(N) without dense alloc
-    dev2 = dj.Device(n_points=60, layers=[(1e-4, load_material("Si"), 1e16), (1e-4, load_material("Si"), -1e16)])
+    dev2 = dj.Device(
+        n_points=60, layers=[(1e-4, load_material("Si"), 1e16), (1e-4, load_material("Si"), -1e16)]
+    )
     cell2 = init_cell(dev2.design(), spectrum(normalize=False))
     pot2 = solve_eq(cell2, boundary_eq(cell2), equilibrium_guess(cell2).phi)
     A2, B2, C2 = banded_jacobian(cell2, boundary_bias(cell2, 0.1), pot2)
@@ -69,10 +73,12 @@ def test_blocks_to_csr_on_matches_dense():
 def test_fused_vs_unfused_generation():
     """fused_generation == init_cell.G to 1e-12."""
     from driftjax.numerics.fused_kernels import fused_generation
-    from driftjax.simulator import init_cell
     from driftjax.science.spectrum import spectrum
+    from driftjax.simulator import init_cell
 
-    dev = dj.Device(n_points=40, layers=[(1e-4, load_material("Si"), 1e16), (1e-4, load_material("Si"), -1e16)])
+    dev = dj.Device(
+        n_points=40, layers=[(1e-4, load_material("Si"), 1e16), (1e-4, load_material("Si"), -1e16)]
+    )
     ls = spectrum(normalize=False)
     G_f = fused_generation(dev.design(), ls, alpha_mode="beer-lambert", statistics="boltzmann")
     G_u = init_cell(dev.design(), ls, alpha_mode="beer-lambert", statistics="boltzmann").G
@@ -81,12 +87,14 @@ def test_fused_vs_unfused_generation():
 
 def test_batched_equals_serial_and_jit():
     """Batched forward equals serial and is jit-cacheable."""
-    from driftjax.simulator import init_cell
     from driftjax.science.spectrum import spectrum
+    from driftjax.simulator import init_cell
     from driftjax.solvers.continuation import sweep
     from driftjax.units import energy
 
-    dev = dj.Device(n_points=30, layers=[(1e-4, load_material("Si"), 1e16), (1e-4, load_material("Si"), -1e16)])
+    dev = dj.Device(
+        n_points=30, layers=[(1e-4, load_material("Si"), 1e16), (1e-4, load_material("Si"), -1e16)]
+    )
     cell = init_cell(dev.design(), spectrum(normalize=False))
     v_s, j_s, _ = sweep(cell, 0.6 / energy, n_steps=5, tol=1e-8, batched=False)
     v_b, j_b, _ = sweep(cell, 0.6 / energy, n_steps=5, tol=1e-8, batched=True)
@@ -111,8 +119,27 @@ def test_batched_jit_grad_matches_serial():
         dev = ex1_device(n_points=30)
     except Exception:
         # fallback: inline ex1 material
-        mat = dj.material(Chi=3.9, Eg=1.5, eps=9.4, Nc=8e17, Nv=1.8e19, mn=100, mp=100, Et=0, tn=1e-8, tp=1e-8, A=2e4)
-        dev = dj.Device(n_points=30, layers=[(1e-4, mat, 1e17), (1e-4, mat, -1e17)], Snl=1e7, Snr=0, Spl=0, Spr=1e7)
+        mat = dj.material(
+            Chi=3.9,
+            Eg=1.5,
+            eps=9.4,
+            Nc=8e17,
+            Nv=1.8e19,
+            mn=100,
+            mp=100,
+            Et=0,
+            tn=1e-8,
+            tp=1e-8,
+            A=2e4,
+        )
+        dev = dj.Device(
+            n_points=30,
+            layers=[(1e-4, mat, 1e17), (1e-4, mat, -1e17)],
+            Snl=1e7,
+            Snr=0,
+            Spl=0,
+            Spr=1e7,
+        )
     prot_s = Sweep(vmax=0.6, n_steps=4, fused=True, batched=False)
     prot_b = Sweep(vmax=0.6, n_steps=4, fused=True, batched=True)
 
@@ -131,7 +158,7 @@ def test_batched_jit_grad_matches_serial():
     leaves_s = jax.tree_util.tree_leaves(g_s)
     leaves_b = jax.tree_util.tree_leaves(g_b)
     # find first array leaf with size >1 (thickness or doping)
-    for a, b in zip(leaves_s, leaves_b):
+    for a, b in zip(leaves_s, leaves_b, strict=False):
         if hasattr(a, "shape") and a.size > 1 and jnp.max(jnp.abs(a)) > 1e-12:
             rel = float(jnp.max(jnp.abs(a - b)) / (jnp.max(jnp.abs(a)) + 1e-30))
             assert rel < 1e-3, rel

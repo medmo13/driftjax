@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "driftjax"
-version = "0.1.15"
+version = "0.1.16"
 description = "driftjax — modern 1-D drift-diffusion–Poisson solar-cell simulator in JAX"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -40,7 +40,7 @@ dependencies = [
 [project.optional-dependencies]
 optimistix = ["optimistix>=0.1", "lineax>=0.1"]
 viz = ["matplotlib>=3.8"]
-dev = ["pytest>=8", "pytest-xdist>=3.6", "pytest-cov>=4", "hypothesis>=6", "ruff>=0.6", "mypy>=1.10", "mkdocs-material>=9", "build>=1.2"]
+dev = ["pytest>=8", "pytest-xdist>=3.6", "pytest-cov>=4", "pytest-timeout>=2.2", "hypothesis>=6", "ruff>=0.6", "mypy>=1.10", "mkdocs-material>=9", "build>=1.2"]
 
 [project.urls]
 Homepage = "https://github.com/driftjax/driftjax"
@@ -90,6 +90,8 @@ ignore = ["B008", "SIM108", "SIM105", "C401", "C408"]
 # name-resolution flags as F821/F722; they are intentional and runtime-valid.
 [tool.ruff.lint.per-file-ignores]
 "src/driftjax/__init__.py" = ["E402"]  # x64 must be enabled before submodule imports
+"src/driftjax/simulator.py" = ["E402"]  # deferred equinox import feeds the filter_custom_vjp decorator below
+"benchmarks/run_benchmarks.py" = ["E402"]  # sys.path bootstrap precedes package imports in this script
 "src/driftjax/fields.py" = ["F722", "F821"]
 "src/driftjax/numerics/drift_diffusion.py" = ["F821"]
 "src/driftjax/numerics/mesh.py" = ["F821"]
@@ -98,7 +100,7 @@ ignore = ["B008", "SIM108", "SIM105", "C401", "C408"]
 "src/driftjax/science/contacts.py" = ["F821"]
 "src/driftjax/science/optics.py" = ["F821"]
 "src/driftjax/science/recombination.py" = ["F821"]
-"src/driftjax/solvers/continuation.py" = ["F821"]
+"src/driftjax/solvers/continuation.py" = ["E402", "F821"]  # deferred jax import keeps module import order cycle-free
 "src/driftjax/solvers/transient.py" = ["F821"]
 "src/driftjax/console.py" = ["SIM115"]  # DebugLog keeps a long-lived file handle (closed in .close())
 "tests/**" = ["E402"]  # test modules sometimes import after fixtures/setup

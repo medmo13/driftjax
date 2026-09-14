@@ -20,7 +20,7 @@ import pytest
 
 import driftjax as dj
 from driftjax.science.optics import photonflux
-from driftjax.science.spectrum import monochromatic, spectrum
+from driftjax.science.spectrum import monochromatic
 from driftjax.units import hc as _hc_J_m
 
 # ---------------------------------------------------------------------------
@@ -62,18 +62,23 @@ def test_monochromatic_illuminates_above_bandgap():
     des = dj.Device(
         layers=[(1e-4, mat, 1e17), (1e-4, mat, -1e17)],
         n_points=60,
-        Snl=1e7, Snr=1e7, Spl=1e7, Spr=1e7,
+        Snl=1e7,
+        Snr=1e7,
+        Spl=1e7,
+        Spr=1e7,
     )
-    jsc_500 = float(jnp.abs(dj.simulate(des, dj.Sweep(vmax=0.6, n_steps=4),
-                                        ls=monochromatic(5e-07)).current[0]))
+    jsc_500 = float(
+        jnp.abs(dj.simulate(des, dj.Sweep(vmax=0.6, n_steps=4), ls=monochromatic(5e-07)).current[0])
+    )
     # hard physical bound: photocurrent ≤ incident photon flux × q
     phi_q = float(photonflux(monochromatic(5e-07))[0]) * 1.602176634e-19
     assert 1e-3 < jsc_500 < phi_q * 1.0001, (
         f"Jsc(500nm)={jsc_500:.3e} outside (1e-3, phi·q={phi_q:.1f}) — "
         "dark-cell signature below 1e-3, unphysical above phi·q"
     )
-    jsc_900 = float(jnp.abs(dj.simulate(des, dj.Sweep(vmax=0.6, n_steps=4),
-                                        ls=monochromatic(9e-07)).current[0]))
+    jsc_900 = float(
+        jnp.abs(dj.simulate(des, dj.Sweep(vmax=0.6, n_steps=4), ls=monochromatic(9e-07)).current[0])
+    )
     assert jsc_900 < 1e-4 * jsc_500, (
         f"below-bandgap 900 nm generated Jsc={jsc_900:.3e} — not transparent"
     )
@@ -143,7 +148,10 @@ def test_simulate_closes_progress_on_failure(tmp_path, monkeypatch):
     des = dj.Device(
         layers=[(1e-4, ls, 1e17)],
         n_points=20,
-        Snl=1e7, Snr=1e7, Spl=1e7, Spr=1e7,
+        Snl=1e7,
+        Snr=1e7,
+        Spl=1e7,
+        Spr=1e7,
     )
 
     import importlib
@@ -159,8 +167,11 @@ def test_simulate_closes_progress_on_failure(tmp_path, monkeypatch):
 
     monkeypatch.setattr(_sim_mod, "_simulate_sweep", _boom)
     with pytest.raises(RuntimeError, match="boom"):
-        sim_func(des, dj.Sweep(vmax=0.6, n_steps=4),
-                 progress=console.DebugLog(str(log_path), n_steps=4, vmax_v=0.6))
+        sim_func(
+            des,
+            dj.Sweep(vmax=0.6, n_steps=4),
+            progress=console.DebugLog(str(log_path), n_steps=4, vmax_v=0.6),
+        )
     lines = [json.loads(x) for x in log_path.read_text().strip().splitlines()]
     assert lines[0]["event"] == "sweep"
     assert lines[-1]["event"] == "done"
@@ -168,20 +179,27 @@ def test_simulate_closes_progress_on_failure(tmp_path, monkeypatch):
 
 def test_simulate_progress_close_success_contract_unchanged():
     """Success path still emits sweep → step… → done (behaviour preserved)."""
-    import tempfile, os
+    import os
+    import tempfile
+
     from driftjax import console
 
     mat = dj.material(Eg=1.5, Chi=3.9, eps=9.4, A=2e4)
     des = dj.Device(
         layers=[(1e-4, mat, 1e17)],
         n_points=20,
-        Snl=1e7, Snr=1e7, Spl=1e7, Spr=1e7,
+        Snl=1e7,
+        Snr=1e7,
+        Spl=1e7,
+        Spr=1e7,
     )
     with tempfile.TemporaryDirectory() as td:
         p = os.path.join(td, "ok.jsonl")
-        dj.simulate(des, dj.Sweep(vmax=0.6, n_steps=4),
-                    progress=console.DebugLog(p, n_steps=4, vmax_v=0.6))
-        lines = [json.loads(x) for x in open(p).read().strip().splitlines()]
+        dj.simulate(
+            des, dj.Sweep(vmax=0.6, n_steps=4), progress=console.DebugLog(p, n_steps=4, vmax_v=0.6)
+        )
+        with open(p) as f:
+            lines = [json.loads(x) for x in f.read().strip().splitlines()]
         assert lines[0]["event"] == "sweep"
         assert lines[-1]["event"] == "done"
         assert sum(1 for x in lines if x["event"] == "step") == 4

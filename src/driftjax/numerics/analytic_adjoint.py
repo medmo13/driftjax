@@ -86,9 +86,30 @@ def _zero_cell(cell: PVCell) -> dict:
     """Zero accumulator dict keyed by PVCell array-field name."""
     z = {}
     for k in (
-        "dgrid", "x", "G", "eps", "Chi", "Eg", "Nc", "Nv", "mn", "mp",
-        "tn", "tp", "Et", "Br", "Cn", "Cp", "Ndop",
-        "Snl", "Snr", "Spl", "Spr", "PhiMl", "PhiMr", "T",
+        "dgrid",
+        "x",
+        "G",
+        "eps",
+        "Chi",
+        "Eg",
+        "Nc",
+        "Nv",
+        "mn",
+        "mp",
+        "tn",
+        "tp",
+        "Et",
+        "Br",
+        "Cn",
+        "Cp",
+        "Ndop",
+        "Snl",
+        "Snr",
+        "Spl",
+        "Spr",
+        "PhiMl",
+        "PhiMr",
+        "T",
     ):
         v = getattr(cell, k)
         z[k] = jnp.zeros_like(v)
@@ -97,12 +118,31 @@ def _zero_cell(cell: PVCell) -> dict:
 
 def _finish_cell(cell: PVCell, z: dict) -> PVCell:
     return PVCell(
-        dgrid=z["dgrid"], x=z["x"], G=z["G"], eps=z["eps"], Chi=z["Chi"],
-        Eg=z["Eg"], Nc=z["Nc"], Nv=z["Nv"], mn=z["mn"], mp=z["mp"],
-        tn=z["tn"], tp=z["tp"], Et=z["Et"], Br=z["Br"], Cn=z["Cn"],
-        Cp=z["Cp"], Ndop=z["Ndop"], Snl=z["Snl"], Snr=z["Snr"],
-        Spl=z["Spl"], Spr=z["Spr"], PhiMl=z["PhiMl"], PhiMr=z["PhiMr"],
-        statistics=cell.statistics, T=z["T"],
+        dgrid=z["dgrid"],
+        x=z["x"],
+        G=z["G"],
+        eps=z["eps"],
+        Chi=z["Chi"],
+        Eg=z["Eg"],
+        Nc=z["Nc"],
+        Nv=z["Nv"],
+        mn=z["mn"],
+        mp=z["mp"],
+        tn=z["tn"],
+        tp=z["tp"],
+        Et=z["Et"],
+        Br=z["Br"],
+        Cn=z["Cn"],
+        Cp=z["Cp"],
+        Ndop=z["Ndop"],
+        Snl=z["Snl"],
+        Snr=z["Snr"],
+        Spl=z["Spl"],
+        Spr=z["Spr"],
+        PhiMl=z["PhiMl"],
+        PhiMr=z["PhiMr"],
+        statistics=cell.statistics,
+        T=z["T"],
     )
 
 
@@ -212,8 +252,7 @@ def analytic_lamF_c(cell: PVCell, pot: Potentials, vb: jax.Array, lam: jax.Array
     # dR/dn, dR/dp, dR/dni
     Rn = (pc * den - num * tpc) / den2 + Brc * pc + (Cnc * num + Cnp * pc)
     Rp = (nc * den - num * tnc) / den2 + Brc * nc + (Cpc * num + Cnp * nc)
-    Ri = ((-2 * nic * den - num * (tpc * eEt + tnc * eMet)) / den2
-          - 2 * Brc * nic - 2 * Cnp * nic)
+    Ri = (-2 * nic * den - num * (tpc * eEt + tnc * eMet)) / den2 - 2 * Brc * nic - 2 * Cnp * nic
     aR = -ln + lp  # dF-weight of R[k]
 
     # --- Poisson shared ---
@@ -270,8 +309,9 @@ def analytic_lamF_c(cell: PVCell, pot: Potentials, vb: jax.Array, lam: jax.Array
     # ave-denominator terms
     dJn_d = Jn[1:] - Jn[:-1]
     dJp_d = Jp[1:] - Jp[:-1]
-    t_ave = (ln * (-dJn_d / ave**2) + lp * (-dJp_d / ave**2)
-             + lf * (-((flux[:-1] - flux[1:]) / ave**2)))
+    t_ave = (
+        ln * (-dJn_d / ave**2) + lp * (-dJp_d / ave**2) + lf * (-((flux[:-1] - flux[1:]) / ave**2))
+    )
     # mn / mp via Q-form
     z["mn"] = z["mn"].at[:-1].add(WJn * Qn * fm_n / dgrid)
     z["mp"] = z["mp"].at[:-1].add(WJp * Qp * fm_p / dgrid)
@@ -308,31 +348,61 @@ def analytic_lamF_c(cell: PVCell, pot: Potentials, vb: jax.Array, lam: jax.Array
     p0, pL = p_v[0], p_v[-1]
     # left phi0b derivs
     dPm0, dN0, dC0, dE0, dNc0, dNv0 = _bound_phi_derivs(
-        cell.PhiMl, cell.Ndop[0], cell.Nc[0], cell.Nv[0])
+        cell.PhiMl, cell.Ndop[0], cell.Nc[0], cell.Nv[0]
+    )
     dPmL, dNL, dCL, dEL, dNcL, dNvL = _bound_phi_derivs(
-        cell.PhiMr, cell.Ndop[-1], cell.Nc[-1], cell.Nv[-1])
+        cell.PhiMr, cell.Ndop[-1], cell.Nc[-1], cell.Nv[-1]
+    )
     neq0, neqL = bound.neq0, bound.neqL
     peq0, peqL = bound.peq0, bound.peqL
     # neq/peq derivs
-    dneq0 = {"Nc": neq0 / sNc[0] + neq0 * dNc0, "Chi": neq0 * (1 + dC0),
-             "Eg": neq0 * dE0, "Nv": neq0 * dNv0,
-             "Ndop": neq0 * dN0, "PhiM": neq0 * dPm0}
-    dneqL = {"Nc": neqL / sNc[-1] + neqL * dNcL, "Chi": neqL * (1 + dCL),
-             "Eg": neqL * dEL, "Nv": neqL * dNvL,
-             "Ndop": neqL * dNL, "PhiM": neqL * dPmL}
-    dpeq0 = {"Nv": peq0 / sNv[0] - peq0 * dNv0, "Chi": peq0 * (-1 - dC0),
-             "Eg": peq0 * (-1 - dE0), "Nc": peq0 * (-dNc0),
-             "Ndop": peq0 * (-dN0), "PhiM": peq0 * (-dPm0)}
-    dpeqL = {"Nv": peqL / sNv[-1] - peqL * dNvL, "Chi": peqL * (-1 - dCL),
-             "Eg": peqL * (-1 - dEL), "Nc": peqL * (-dNcL),
-             "Ndop": peqL * (-dNL), "PhiM": peqL * (-dPmL)}
+    dneq0 = {
+        "Nc": neq0 / sNc[0] + neq0 * dNc0,
+        "Chi": neq0 * (1 + dC0),
+        "Eg": neq0 * dE0,
+        "Nv": neq0 * dNv0,
+        "Ndop": neq0 * dN0,
+        "PhiM": neq0 * dPm0,
+    }
+    dneqL = {
+        "Nc": neqL / sNc[-1] + neqL * dNcL,
+        "Chi": neqL * (1 + dCL),
+        "Eg": neqL * dEL,
+        "Nv": neqL * dNvL,
+        "Ndop": neqL * dNL,
+        "PhiM": neqL * dPmL,
+    }
+    dpeq0 = {
+        "Nv": peq0 / sNv[0] - peq0 * dNv0,
+        "Chi": peq0 * (-1 - dC0),
+        "Eg": peq0 * (-1 - dE0),
+        "Nc": peq0 * (-dNc0),
+        "Ndop": peq0 * (-dN0),
+        "PhiM": peq0 * (-dPm0),
+    }
+    dpeqL = {
+        "Nv": peqL / sNv[-1] - peqL * dNvL,
+        "Chi": peqL * (-1 - dCL),
+        "Eg": peqL * (-1 - dEL),
+        "Nc": peqL * (-dNcL),
+        "Ndop": peqL * (-dNL),
+        "PhiM": peqL * (-dPmL),
+    }
 
     # ct_phin0 = Jn0 - Snl*(n0-neq0), weight ln0
     z["Snl"] = z["Snl"] + ln0 * (-(n0 - neq0))
     z["mn"] = z["mn"].at[0].add(ln0 * Qn[0] * fm_n[0] / dgrid[0])
-    z["Chi"] = z["Chi"].at[0].add(ln0 * DJn_0[0] + ln0 * (-cell.Snl) * n0 + ln0 * cell.Snl * dneq0["Chi"])
+    z["Chi"] = (
+        z["Chi"].at[0].add(ln0 * DJn_0[0] + ln0 * (-cell.Snl) * n0 + ln0 * cell.Snl * dneq0["Chi"])
+    )
     z["Chi"] = z["Chi"].at[1].add(ln0 * DJn_1[0])
-    z["Nc"] = z["Nc"].at[0].add(ln0 * DJn_0[0] / sNc[0] + ln0 * (-cell.Snl) * n0 / sNc[0] + ln0 * cell.Snl * dneq0["Nc"])
+    z["Nc"] = (
+        z["Nc"]
+        .at[0]
+        .add(
+            ln0 * DJn_0[0] / sNc[0] + ln0 * (-cell.Snl) * n0 / sNc[0] + ln0 * cell.Snl * dneq0["Nc"]
+        )
+    )
     z["Nc"] = z["Nc"].at[1].add(ln0 * DJn_1[0] / sNc[1])
     z["dgrid"] = z["dgrid"].at[0].add(ln0 * (-Jn[0] / dgrid[0]))
     z["Eg"] = z["Eg"].at[0].add(ln0 * cell.Snl * dneq0["Eg"])
@@ -343,9 +413,17 @@ def analytic_lamF_c(cell: PVCell, pot: Potentials, vb: jax.Array, lam: jax.Array
     z["Snr"] = z["Snr"] + lnL * (nL - neqL)
     z["mn"] = z["mn"].at[-1].add(lnL * Qn[-1] * fm_n[-1] / dgrid[-1])
     z["Chi"] = z["Chi"].at[-2].add(lnL * DJn_0[-1])
-    z["Chi"] = z["Chi"].at[-1].add(lnL * DJn_1[-1] + lnL * cell.Snr * nL - lnL * cell.Snr * dneqL["Chi"])
+    z["Chi"] = (
+        z["Chi"].at[-1].add(lnL * DJn_1[-1] + lnL * cell.Snr * nL - lnL * cell.Snr * dneqL["Chi"])
+    )
     z["Nc"] = z["Nc"].at[-2].add(lnL * DJn_0[-1] / sNc[-2])
-    z["Nc"] = z["Nc"].at[-1].add(lnL * DJn_1[-1] / sNc[-1] + lnL * cell.Snr * nL / sNc[-1] - lnL * cell.Snr * dneqL["Nc"])
+    z["Nc"] = (
+        z["Nc"]
+        .at[-1]
+        .add(
+            lnL * DJn_1[-1] / sNc[-1] + lnL * cell.Snr * nL / sNc[-1] - lnL * cell.Snr * dneqL["Nc"]
+        )
+    )
     z["dgrid"] = z["dgrid"].at[-1].add(lnL * (-Jn[-1] / dgrid[-1]))
     z["Eg"] = z["Eg"].at[-1].add(-lnL * cell.Snr * dneqL["Eg"])
     z["Nv"] = z["Nv"].at[-1].add(-lnL * cell.Snr * dneqL["Nv"])
@@ -354,11 +432,21 @@ def analytic_lamF_c(cell: PVCell, pot: Potentials, vb: jax.Array, lam: jax.Array
     # ct_phip0 = Jp0 + Spl*(p0-peq0), weight lp0
     z["Spl"] = z["Spl"] + lp0 * (p0 - peq0)
     z["mp"] = z["mp"].at[0].add(lp0 * Qp[0] * fm_p[0] / dgrid[0])
-    z["Chi"] = z["Chi"].at[0].add(lp0 * DJp_0[0] + lp0 * cell.Spl * (-p0) - lp0 * cell.Spl * dpeq0["Chi"])
+    z["Chi"] = (
+        z["Chi"].at[0].add(lp0 * DJp_0[0] + lp0 * cell.Spl * (-p0) - lp0 * cell.Spl * dpeq0["Chi"])
+    )
     z["Chi"] = z["Chi"].at[1].add(lp0 * DJp_1[0])
-    z["Eg"] = z["Eg"].at[0].add(lp0 * DJp_0[0] + lp0 * cell.Spl * (-p0) - lp0 * cell.Spl * dpeq0["Eg"])
+    z["Eg"] = (
+        z["Eg"].at[0].add(lp0 * DJp_0[0] + lp0 * cell.Spl * (-p0) - lp0 * cell.Spl * dpeq0["Eg"])
+    )
     z["Eg"] = z["Eg"].at[1].add(lp0 * DJp_1[0])
-    z["Nv"] = z["Nv"].at[0].add(lp0 * (-DJp_0[0]) / sNv[0] + lp0 * cell.Spl * p0 / sNv[0] - lp0 * cell.Spl * dpeq0["Nv"])
+    z["Nv"] = (
+        z["Nv"]
+        .at[0]
+        .add(
+            lp0 * (-DJp_0[0]) / sNv[0] + lp0 * cell.Spl * p0 / sNv[0] - lp0 * cell.Spl * dpeq0["Nv"]
+        )
+    )
     z["Nv"] = z["Nv"].at[1].add(lp0 * (-DJp_1[0]) / sNv[1])
     z["Nc"] = z["Nc"].at[0].add(-lp0 * cell.Spl * dpeq0["Nc"])
     z["Ndop"] = z["Ndop"].at[0].add(-lp0 * cell.Spl * dpeq0["Ndop"])
@@ -368,11 +456,27 @@ def analytic_lamF_c(cell: PVCell, pot: Potentials, vb: jax.Array, lam: jax.Array
     z["Spr"] = z["Spr"] + lpL * (-(pL - peqL))
     z["mp"] = z["mp"].at[-1].add(lpL * Qp[-1] * fm_p[-1] / dgrid[-1])
     z["Chi"] = z["Chi"].at[-2].add(lpL * DJp_0[-1])
-    z["Chi"] = z["Chi"].at[-1].add(lpL * DJp_1[-1] + lpL * (-cell.Spr) * (-pL) + lpL * cell.Spr * dpeqL["Chi"])
+    z["Chi"] = (
+        z["Chi"]
+        .at[-1]
+        .add(lpL * DJp_1[-1] + lpL * (-cell.Spr) * (-pL) + lpL * cell.Spr * dpeqL["Chi"])
+    )
     z["Eg"] = z["Eg"].at[-2].add(lpL * DJp_0[-1])
-    z["Eg"] = z["Eg"].at[-1].add(lpL * DJp_1[-1] + lpL * (-cell.Spr) * (-pL) + lpL * cell.Spr * dpeqL["Eg"])
+    z["Eg"] = (
+        z["Eg"]
+        .at[-1]
+        .add(lpL * DJp_1[-1] + lpL * (-cell.Spr) * (-pL) + lpL * cell.Spr * dpeqL["Eg"])
+    )
     z["Nv"] = z["Nv"].at[-2].add(lpL * (-DJp_0[-1]) / sNv[-2])
-    z["Nv"] = z["Nv"].at[-1].add(lpL * (-DJp_1[-1]) / sNv[-1] + lpL * (-cell.Spr) * pL / sNv[-1] + lpL * cell.Spr * dpeqL["Nv"])
+    z["Nv"] = (
+        z["Nv"]
+        .at[-1]
+        .add(
+            lpL * (-DJp_1[-1]) / sNv[-1]
+            + lpL * (-cell.Spr) * pL / sNv[-1]
+            + lpL * cell.Spr * dpeqL["Nv"]
+        )
+    )
     z["Nc"] = z["Nc"].at[-1].add(lpL * cell.Spr * dpeqL["Nc"])
     z["Ndop"] = z["Ndop"].at[-1].add(lpL * cell.Spr * dpeqL["Ndop"])
     z["PhiMr"] = z["PhiMr"] + lpL * cell.Spr * dpeqL["PhiM"]

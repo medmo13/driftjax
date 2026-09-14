@@ -50,9 +50,7 @@ def test_si_homojunction_experimental_band(si_result):
     assert 33.0 < si_result["jsc"] < 40.0, (
         f"Jsc={si_result['jsc']:.2f} mA/cm2 outside experimental band"
     )
-    assert 0.6 < si_result["voc"] < 0.75, (
-        f"Voc={si_result['voc']:.3f} V outside experimental band"
-    )
+    assert 0.6 < si_result["voc"] < 0.75, f"Voc={si_result['voc']:.3f} V outside experimental band"
     assert 0.72 < si_result["ff"] < 0.84, f"FF={si_result['ff']:.3f} outside experimental band"
     assert 0.15 < si_result["eta"] < 0.24, f"eta={si_result['eta']:.2%} outside experimental band"
 

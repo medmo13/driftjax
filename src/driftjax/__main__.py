@@ -57,9 +57,12 @@ def main(argv=None) -> int:
     p_validate.add_argument("--json", type=str, default=None, help="save JSON records to directory")
 
     p_benchmark = sub.add_parser("benchmark", help="Tier VI: performance scaling")
-    p_benchmark.add_argument("--json", type=str, default=None, help="save JSON records to directory")
-    p_benchmark.add_argument("--mesh", type=str, default="125,250,500,1000,2000",
-                              help="comma-separated mesh sizes")
+    p_benchmark.add_argument(
+        "--json", type=str, default=None, help="save JSON records to directory"
+    )
+    p_benchmark.add_argument(
+        "--mesh", type=str, default="125,250,500,1000,2000", help="comma-separated mesh sizes"
+    )
 
     p_release = sub.add_parser("release", help="full publication-quality validation suite")
     p_release.add_argument("--json", type=str, default=None, help="save JSON records to directory")
@@ -109,11 +112,13 @@ def main(argv=None) -> int:
         return 0 if all(res.values()) else 1
     if args.cmd == "verify":
         from driftjax import console
+
         console.hr()
         print(console.accent(" driftjax verify"), "(Tier I-III: algebraic + physics verification)")
         console.thin()
         t0 = _time.monotonic()
         from driftjax.validation.pyramid import run
+
         res = run(fast=True)
         dt = _time.monotonic() - t0
         console.thin()
@@ -121,22 +126,30 @@ def main(argv=None) -> int:
         if nfail == 0:
             print(console.ok(f" verify result: {npass}/{len(res)} gates passed") + f"  ({dt:.0f}s)")
         else:
-            print(console.err(f" verify result: {npass}/{len(res)} passed, {nfail} FAILED") + f"  ({dt:.0f}s)")
+            print(
+                console.err(f" verify result: {npass}/{len(res)} passed, {nfail} FAILED")
+                + f"  ({dt:.0f}s)"
+            )
         console.hr()
         return 0 if all(res.values()) else 1
     if args.cmd == "validate":
         from driftjax import console
+
         console.hr()
-        print(console.accent(" driftjax validate"), "(Tier IV-VII: gradient + stability + cross-code)")
+        print(
+            console.accent(" driftjax validate"), "(Tier IV-VII: gradient + stability + cross-code)"
+        )
         console.thin()
         t0 = _time.monotonic()
         # Run gradient verification
         from driftjax.validation.gradients import scalar_fd
+
         print("\n[IV] FD step-size sweep")
         fd_result = scalar_fd.fd_step_sweep()
         scalar_fd.print_summary(fd_result)
         # Run condition sweep
         from driftjax.validation.stability import condition_sweep
+
         print("[V] Condition-number sweep")
         cs_result = condition_sweep.run_condition_sweep()
         condition_sweep.print_summary(cs_result)
@@ -146,6 +159,7 @@ def main(argv=None) -> int:
         console.hr()
         if args.json:
             from pathlib import Path
+
             outdir = Path(args.json)
             outdir.mkdir(parents=True, exist_ok=True)
             scalar_fd.save_record(fd_result, outdir / "fd_step_sweep.json")
@@ -153,11 +167,13 @@ def main(argv=None) -> int:
         return 0
     if args.cmd == "benchmark":
         from driftjax import console
+
         console.hr()
         print(console.accent(" driftjax benchmark"), "(Tier VI: performance scaling)")
         console.thin()
         t0 = _time.monotonic()
         from driftjax.validation.benchmarks import forward_scaling
+
         mesh_sizes = [int(x) for x in args.mesh.split(",")]
         print(f"\nMeasuring forward scaling at N = {mesh_sizes}")
         fs_result = forward_scaling.measure_forward_scaling(mesh_sizes=mesh_sizes)
@@ -168,24 +184,28 @@ def main(argv=None) -> int:
         console.hr()
         if args.json:
             from pathlib import Path
+
             outdir = Path(args.json)
             outdir.mkdir(parents=True, exist_ok=True)
             forward_scaling.save_record(fs_result, outdir / "forward_scaling.json")
         return 0
     if args.cmd == "release":
         from driftjax import console
+
         console.hr()
         print(console.accent(" driftjax release"), "(full publication-quality validation)")
         console.thin()
         t0 = _time.monotonic()
         # Tier I-III: verification
         from driftjax.validation.pyramid import run as pyramid_run
+
         print("\n[Tier I-III] Verification")
         v_res = pyramid_run(fast=True)
         # Tier IV-VII: validation
         from driftjax.validation.benchmarks import forward_scaling
         from driftjax.validation.gradients import scalar_fd
         from driftjax.validation.stability import condition_sweep
+
         print("\n[Tier IV] Gradient verification")
         fd_result = scalar_fd.fd_step_sweep()
         scalar_fd.print_summary(fd_result)
@@ -199,11 +219,16 @@ def main(argv=None) -> int:
         console.thin()
         npass = sum(v_res.values())
         ntotal = len(v_res)
-        print(console.ok(f" release suite: {npass}/{ntotal} verification gates + validation completed in {dt:.0f}s"))
+        print(
+            console.ok(
+                f" release suite: {npass}/{ntotal} verification gates + validation completed in {dt:.0f}s"
+            )
+        )
         console.hr()
         if args.json:
             import json
             from pathlib import Path
+
             outdir = Path(args.json)
             outdir.mkdir(parents=True, exist_ok=True)
             # Save all records
@@ -226,6 +251,7 @@ def main(argv=None) -> int:
             # Unified, machine-readable validation record (single source of
             # truth for the paper's methods/validation tables).
             from driftjax.validation import record as val_record
+
             rec = val_record.build_record(
                 verification=v_res,
                 fd=fd_result,

@@ -57,7 +57,7 @@ def test_solver_selection(
             J_dense = F_jacobian(cell, bound, pot)
             kappa = float(np.linalg.cond(np.array(J_dense)))
 
-            def objective(pv):
+            def objective(pv, cell=cell):
                 p = vec2pot(pv)
                 return jnp.sum(Jn(cell, p) + Jp(cell, p))
 
@@ -65,12 +65,20 @@ def test_solver_selection(
             g_obj = jax.grad(objective)(g_vec)
             g_dense = jnp.linalg.solve(J_dense.T, g_obj)
 
-            residual = float(jnp.linalg.norm(J_dense.T @ g_dense - g_obj) / (jnp.linalg.norm(g_obj) + 1e-30))
+            residual = float(
+                jnp.linalg.norm(J_dense.T @ g_dense - g_obj) / (jnp.linalg.norm(g_obj) + 1e-30)
+            )
 
-            case_results.append({
-                "name": name, "kappa": kappa, "method_used": "dense",
-                "error": residual, "passed": residual < tau, "status": "ok",
-            })
+            case_results.append(
+                {
+                    "name": name,
+                    "kappa": kappa,
+                    "method_used": "dense",
+                    "error": residual,
+                    "passed": residual < tau,
+                    "status": "ok",
+                }
+            )
 
         except Exception as e:
             case_results.append({"name": name, "status": f"error: {e}"})
@@ -79,8 +87,11 @@ def test_solver_selection(
     all_passed = all(c["passed"] for c in valid) if valid else True
 
     return {
-        "test": "V15_solver_selection", "tau": tau, "cases": case_results,
-        "n_tested": len(valid), "n_passed": sum(1 for c in valid if c["passed"]),
+        "test": "V15_solver_selection",
+        "tau": tau,
+        "cases": case_results,
+        "n_tested": len(valid),
+        "n_passed": sum(1 for c in valid if c["passed"]),
         "passed": all_passed,
     }
 
@@ -88,7 +99,10 @@ def test_solver_selection(
 def _default_test_devices() -> list[dict]:
     """Use material objects (not dict layers) — dict layers cause singular matrices."""
     import driftjax as dj
-    mat = dj.material(Chi=3.9, Eg=1.5, eps=9.4, Nc=8e17, Nv=1.8e19, mn=100, mp=100, tn=1e-8, tp=1e-8, A=1e4)
+
+    mat = dj.material(
+        Chi=3.9, Eg=1.5, eps=9.4, Nc=8e17, Nv=1.8e19, mn=100, mp=100, tn=1e-8, tp=1e-8, A=1e4
+    )
     return [
         {"name": "Si_N50", "n_points": 50, "layers": [(4e-5, mat, 1e17), (1e-4, mat, -1e15)]},
         {"name": "Si_N200", "n_points": 200, "layers": [(4e-5, mat, 1e17), (1e-4, mat, -1e15)]},
@@ -96,9 +110,9 @@ def _default_test_devices() -> list[dict]:
 
 
 def print_summary(result: dict) -> None:
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("TIER V — V15: Solver-Selection Production Contract")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"  Threshold: {result['tau']:.0e}")
     print(f"  Cases tested: {result['n_tested']}  passed: {result['n_passed']}")
     print(f"  Status: {'PASS' if result['passed'] else 'FAIL'}")
@@ -106,7 +120,9 @@ def print_summary(result: dict) -> None:
     print("-" * 65)
     for c in result["cases"]:
         if c.get("status") == "ok":
-            print(f"  {c['name']:<23s} {c['kappa']:>10.2e} {c['method_used']:<15s} {c['error']:>10.2e}")
+            print(
+                f"  {c['name']:<23s} {c['kappa']:>10.2e} {c['method_used']:<15s} {c['error']:>10.2e}"
+            )
         else:
             print(f"  {c['name']:<23s} {'N/A':>10s} {c['status']:<15s}")
     print()

@@ -45,8 +45,11 @@ def test_damped_newton_from_displaced_guess(stiff_cell):
     cell = stiff_cell
     bound = boundary_eq(cell)
     poisson = solve_eq(cell, bound, equilibrium_guess(cell).phi)
-    reference = solve_newton(cell, bound, Potentials(
-        jnp.zeros_like(poisson.phi), jnp.zeros_like(poisson.phi), poisson.phi))[0]
+    reference = solve_newton(
+        cell,
+        bound,
+        Potentials(jnp.zeros_like(poisson.phi), jnp.zeros_like(poisson.phi), poisson.phi),
+    )[0]
 
     displaced = poisson.phi + 5.0
     pot, stats = solve_newton(
@@ -63,12 +66,13 @@ def test_ptc_matches_staged_root(stiff_cell):
     cell = stiff_cell
     bound = boundary_eq(cell)
     poisson = solve_eq(cell, bound, equilibrium_guess(cell).phi)
-    reference = solve_newton(cell, bound, Potentials(
-        jnp.zeros_like(poisson.phi), jnp.zeros_like(poisson.phi), poisson.phi))[0]
+    reference = solve_newton(
+        cell,
+        bound,
+        Potentials(jnp.zeros_like(poisson.phi), jnp.zeros_like(poisson.phi), poisson.phi),
+    )[0]
 
-    start = Potentials(
-        jnp.zeros_like(poisson.phi), jnp.zeros_like(poisson.phi), poisson.phi
-    )
+    start = Potentials(jnp.zeros_like(poisson.phi), jnp.zeros_like(poisson.phi), poisson.phi)
     pot, stats = solve_ptc(cell, bound, start, max_steps=80)
     assert stats["converged"], stats
     err = float(jnp.max(jnp.abs(pot.phi - reference.phi)))

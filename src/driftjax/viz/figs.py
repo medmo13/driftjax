@@ -16,6 +16,7 @@ Example
     ax.set_ylabel(figs.LBL_J)
     figs.save(fig, "iv.png")
 """
+
 from driftjax.viz import style
 
 # re-export the public surface

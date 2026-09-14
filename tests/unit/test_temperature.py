@@ -69,10 +69,7 @@ def test_voc_slope_about_minus_1_4_mv_per_k():
     # 3-point slope is sufficient: ±20 K around 300 K pins the sign + magnitude
     Ts = np.array([280.0, 300.0, 320.0])
     vocs = np.array(
-        [
-            float(dj.simulate(_des(), dj.Sweep(vmax=0.8, n_steps=11), ls=LS, T=T).voc)
-            for T in Ts
-        ]
+        [float(dj.simulate(_des(), dj.Sweep(vmax=0.8, n_steps=11), ls=LS, T=T).voc) for T in Ts]
     )
     slope = np.polyfit(Ts, vocs, 1)[0] * 1000.0
     assert -2.5 < slope < -0.8, f"dVoc/dT = {slope:.2f} mV/K"

@@ -185,8 +185,15 @@ def adam(f, x0, steps: int = 200, lr: float = 1e-2, gtol: float = 1e-8):
     return x, float(val)
 
 
-def nelder_mead(f, x0, bounds=None, maxiter: int = 200, xatol: float = 1e-8,
-                fatol: float = 1e-15, adaptive: bool = True):
+def nelder_mead(
+    f,
+    x0,
+    bounds=None,
+    maxiter: int = 200,
+    xatol: float = 1e-8,
+    fatol: float = 1e-15,
+    adaptive: bool = True,
+):
     """Nelder-Mead simplex minimizer (derivative-free).
 
     Unlike SLSQP/L-BFGS-B, Nelder-Mead uses no line search and no Hessian
@@ -218,6 +225,5 @@ def nelder_mead(f, x0, bounds=None, maxiter: int = 200, xatol: float = 1e-8,
         _safe_f,
         np.asarray(x0, dtype=np.float64),
         method="Nelder-Mead",
-        options={"maxiter": maxiter, "xatol": xatol, "fatol": fatol,
-                 "adaptive": adaptive},
+        options={"maxiter": maxiter, "xatol": xatol, "fatol": fatol, "adaptive": adaptive},
     )

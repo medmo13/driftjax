@@ -56,6 +56,7 @@ def spsolve(data, indices, indptr, b, tol: float = 1e-6):
     result_shape = jax.ShapeDtypeStruct(b.shape, b.dtype)
     return jax.pure_callback(_spsolve_host, result_shape, data, indices, indptr, b)
 
+
 _W = 13  # banded width for the nearest-neighbour DDP Jacobian (3 unknowns/node)
 
 # NOTE: an earlier revision monkey-patched ``scipy.sparse.csr_matrix.__init__``
@@ -132,13 +133,17 @@ def blocks_to_csr(A, B, C) -> tuple:
     return banded_to_csr(banded)
 
 
-def _banded_matvec(banded_J: jax.Array, x: jax.Array) -> jax.Array:  # deprecated alias for test compatibility
+def _banded_matvec(
+    banded_J: jax.Array, x: jax.Array
+) -> jax.Array:  # deprecated alias for test compatibility
     """banded[i, d] · x[i + d − W/2] (zero-padded). Prefer banded direct solves."""
     n = banded_J.shape[0]
     half_w = _W // 2
     x_pad = jnp.pad(x, half_w)
+
     def onerow(i):
         return jnp.dot(banded_J[i], lax.dynamic_slice(x_pad, [i], [_W]))
+
     return vmap(onerow)(jnp.arange(n))
 
 
@@ -160,7 +165,11 @@ def linsolve(J, rhs, backend: str = "auto", tol: float = 1e-6):
     # Host spsolve is not jit/trace-safe (needs device_get on tracer)
     if backend in ("csr", "auto") and _is_tracer_linalg(J):
         x = jnp.linalg.solve(J, rhs)
-        return x, jnp.linalg.norm(J @ x - rhs) / (jnp.linalg.norm(rhs) + 1e-30), "dense-tracer-fallback"
+        return (
+            x,
+            jnp.linalg.norm(J @ x - rhs) / (jnp.linalg.norm(rhs) + 1e-30),
+            "dense-tracer-fallback",
+        )
     if backend == "dense":
         x = jnp.linalg.solve(J, rhs)
         # AUDIT: +1e-30 floor (was missing) — at an exact root rhs=0 the
@@ -188,7 +197,9 @@ def linsolve(J, rhs, backend: str = "auto", tol: float = 1e-6):
     if backend != "auto":
         # AUDIT: unknown backend strings previously fell through silently
         # into the auto-CSR path; fail loudly instead.
-        raise ValueError(f"unknown linsolve backend {backend!r} (use 'auto'|'csr'|'banded'|'dense')")
+        raise ValueError(
+            f"unknown linsolve backend {backend!r} (use 'auto'|'csr'|'banded'|'dense')"
+        )
     # auto: equilibrated CSR; dense fallback if the linear residual is bad
     Je, be, _ = row_equilibrate(J, rhs)
     data, indices, indptr = dense_to_csr(Je)

@@ -81,9 +81,7 @@ def solve_refined(J, b, tol: float = REFINE_TOL, max_refine: int = MAX_REFINE):
         rel_new = jnp.linalg.norm(be - Je @ x_new) / safe_nrm
         return (x_new, rel_new, i + 1)
 
-    x, rel, n_ref = jax.lax.while_loop(
-        _cond, _body, (x0, rel0, jnp.asarray(0, dtype=jnp.int32))
-    )
+    x, rel, n_ref = jax.lax.while_loop(_cond, _body, (x0, rel0, jnp.asarray(0, dtype=jnp.int32)))
     conv = rel < tol
     if _is_tracer_mp(conv):
         return x, rel, n_ref, conv
@@ -120,7 +118,9 @@ def mixed_dense_solve(A, b, tol: float = 1e-10, max_refine: int = 2):
         x_new = x + lu_solve(lu_piv, r.astype(jnp.float32)).astype(jnp.float64)
         return (x_new, r, i + 1)
 
-    x, _, _ = jax.lax.while_loop(_refine_cond, _refine_body, (x0, be, jnp.array(0, dtype=jnp.int32)))
+    x, _, _ = jax.lax.while_loop(
+        _refine_cond, _refine_body, (x0, be, jnp.array(0, dtype=jnp.int32))
+    )
     rel = jnp.linalg.norm(be - Ae @ x) / safe_nrm
     ok = jnp.all(jnp.isfinite(x)) & jnp.isfinite(rel) & (rel < tol)
     x_dense = jnp.linalg.solve(A, b)
@@ -206,9 +206,7 @@ def solve_refined_batched(Jb, bb, tol: float = REFINE_TOL, max_refine: int = MAX
         rel_new = jnp.linalg.norm(_resid(x_new), axis=-1, keepdims=True) / safe_nrm
         return (x_new, rel_new, i + 1)
 
-    x, rel, n_ref = jax.lax.while_loop(
-        _cond, _body, (x0, rel0, jnp.asarray(0, dtype=jnp.int32))
-    )
+    x, rel, n_ref = jax.lax.while_loop(_cond, _body, (x0, rel0, jnp.asarray(0, dtype=jnp.int32)))
     conv = jnp.all(rel < tol)
     if _is_tracer_mp(conv):
         return x, rel, n_ref, conv

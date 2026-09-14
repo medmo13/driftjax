@@ -20,23 +20,40 @@ def test_forward_parity() -> dict:
     from driftjax.units import energy
 
     ls = spectrum()
-    mat = dj.material(Chi=3.9, Eg=1.5, eps=9.4, Nc=8e17, Nv=1.8e19, mn=100, mp=100, tn=1e-8, tp=1e-8, A=1e4)
+    mat = dj.material(
+        Chi=3.9, Eg=1.5, eps=9.4, Nc=8e17, Nv=1.8e19, mn=100, mp=100, tn=1e-8, tp=1e-8, A=1e4
+    )
 
     try:
-        dev = dj.Device(n_points=200, layers=[(4e-5, mat, 1e17), (1e-4, mat, -1e15)], Snl=1e7, Snr=0, Spl=0, Spr=1e7)
+        dev = dj.Device(
+            n_points=200,
+            layers=[(4e-5, mat, 1e17), (1e-4, mat, -1e15)],
+            Snl=1e7,
+            Snr=0,
+            Spl=0,
+            Spr=1e7,
+        )
         cell = init_cell(dev.design(), ls)
         pot_eq = solve_eq(cell, boundary_bias(cell, 0.0), equilibrium_guess(cell).phi)
         voltages, currents, _ = sweep(cell, 1.2 / energy, n_steps=61, tol=1e-10, init=pot_eq)
 
         V = voltages * energy
-        I = currents * 1e3
-        Jsc = float(-I[0])
+        cur_mA = currents * 1e3
+        Jsc = float(-cur_mA[0])
         Voc = float(V[-1])
-        Pmax = float(jnp.max(V * (-I)))
+        Pmax = float(jnp.max(V * (-cur_mA)))
         FF = Pmax / (Voc * Jsc + 1e-30)
         PCE = Pmax / 100.0
 
-        return {"test": "V20_forward_parity", "Jsc_mA_cm2": Jsc, "Voc_V": Voc, "FF": FF, "PCE_percent": PCE * 100, "status": "ok", "passed": True}
+        return {
+            "test": "V20_forward_parity",
+            "Jsc_mA_cm2": Jsc,
+            "Voc_V": Voc,
+            "FF": FF,
+            "PCE_percent": PCE * 100,
+            "status": "ok",
+            "passed": True,
+        }
     except Exception as e:
         return {"test": "V20_forward_parity", "status": f"error: {e}", "passed": False}
 
@@ -54,10 +71,19 @@ def test_optimization_parity() -> dict:
     from driftjax.units import energy
 
     ls = spectrum()
-    mat = dj.material(Chi=3.9, Eg=1.5, eps=9.4, Nc=8e17, Nv=1.8e19, mn=100, mp=100, tn=1e-8, tp=1e-8, A=1e4)
+    mat = dj.material(
+        Chi=3.9, Eg=1.5, eps=9.4, Nc=8e17, Nv=1.8e19, mn=100, mp=100, tn=1e-8, tp=1e-8, A=1e4
+    )
 
     try:
-        dev = dj.Device(n_points=100, layers=[(4e-5, mat, 1e17), (1e-4, mat, -1e15)], Snl=1e7, Snr=0, Spl=0, Spr=1e7)
+        dev = dj.Device(
+            n_points=100,
+            layers=[(4e-5, mat, 1e17), (1e-4, mat, -1e15)],
+            Snl=1e7,
+            Snr=0,
+            Spl=0,
+            Spr=1e7,
+        )
         cell = init_cell(dev.design(), ls)
         pot_eq = solve_eq(cell, boundary_bias(cell, 0.0), equilibrium_guess(cell).phi)
         bound = boundary_bias(cell, 0.4 / energy)
@@ -75,15 +101,21 @@ def test_optimization_parity() -> dict:
             jax.grad(objective)(g_vec)
             times.append(time.perf_counter() - t0)
 
-        return {"test": "V21_optimization_parity", "time_s": float(np.median(times)), "n_params": len(g_vec), "status": "ok", "passed": True}
+        return {
+            "test": "V21_optimization_parity",
+            "time_s": float(np.median(times)),
+            "n_params": len(g_vec),
+            "status": "ok",
+            "passed": True,
+        }
     except Exception as e:
         return {"test": "V21_optimization_parity", "status": f"error: {e}", "passed": False}
 
 
 def print_summary(results: list[dict]) -> None:
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("TIER VII — Cross-Code Validation")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     for r in results:
         status = "PASS" if r.get("passed", False) else "FAIL"
         print(f"  [{status}] {r['test']}")

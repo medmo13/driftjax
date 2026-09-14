@@ -50,9 +50,13 @@ def main():
     figure, axes = new_figure(nrows=2, ncols=2, width=9.0, height=6.4)
     axes = axes.ravel()  # 2x2 grid -> flat [IV, convergence, bands, charges]
     for points, solution in zip(resolutions, solutions, strict=True):
-        plot_smooth_iv(axes[0], solution.voltages, solution.current,
-                       color=style.SERIES[resolutions.index(points) % len(style.SERIES)],
-                       label=f"N = {points}")
+        plot_smooth_iv(
+            axes[0],
+            solution.voltages,
+            solution.current,
+            color=style.SERIES[resolutions.index(points) % len(style.SERIES)],
+            label=f"N = {points}",
+        )
     axes[0].set(xlabel=style.LBL_BIAS, ylabel=style.LBL_J)
     axes[0].set_xlim(0, 1.1)
     # Tight y-range from the plotted data (no hardcoded floors)
@@ -60,7 +64,8 @@ def main():
     axes[0].set_ylim(0, 1.15 * j_max)
     axes[0].axhline(0, color="black", linewidth=0.5, alpha=0.6)
     compare_metrics_box(
-        axes[0], {f"N = {p}": sol for p, sol in zip(resolutions, solutions, strict=True)},
+        axes[0],
+        {f"N = {p}": sol for p, sol in zip(resolutions, solutions, strict=True)},
         loc="lower left",
     )
     axes[0].legend(frameon=False, loc="upper right", fontsize=8, handlelength=1.2)
@@ -69,12 +74,18 @@ def main():
     iv_knee_inset(axes[0], solutions[-1])
     # Finest mesh is the reference (error exactly 0): exclude it from the
     # log panel rather than flooring it to a misleading 1e-16 dot.
-    _conv = [(p, r["relative_efficiency_error"]) for p, r in zip(resolutions, results)
-             if r["relative_efficiency_error"] > 0]
+    _conv = [
+        (p, r["relative_efficiency_error"])
+        for p, r in zip(resolutions, results, strict=False)
+        if r["relative_efficiency_error"] > 0
+    ]
     axes[1].loglog(
         [p for p, _ in _conv],
         [e for _, e in _conv],
-        "o-", color=style.BLUE, markersize=5, linewidth=1.4,
+        "o-",
+        color=style.BLUE,
+        markersize=5,
+        linewidth=1.4,
     )
     axes[1].set(xlabel="number of grid points", ylabel="relative efficiency error")
     axes[1].grid(which="both", alpha=0.18, linestyle="--")
@@ -86,10 +97,11 @@ def main():
     # Dark-equilibrium band diagram and carrier densities at the finest mesh.
     # A separate dark solve (no illumination) ensures thermal equilibrium:
     # np = ni^2 everywhere, consistent with the mass-action law.
-    from driftjax.science.spectrum import LightSource
     import jax.numpy as jnp
-    dark_ls = LightSource(Lambda=jnp.array([0.5]),
-                          P_in=jnp.array([0.0]), kind="sun")
+
+    from driftjax.science.spectrum import LightSource
+
+    dark_ls = LightSource(Lambda=jnp.array([0.5]), P_in=jnp.array([0.0]), kind="sun")
     dark_eq = dj.simulate(ex1_device(resolutions[-1]), dj.Equilibrium(), ls=dark_ls)
     plot_bands(axes[2], dark_eq)
     axes[2].set_title(f"Dark-equilibrium bands (N = {resolutions[-1]})", fontsize=9, pad=8)

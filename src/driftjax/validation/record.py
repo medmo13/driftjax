@@ -78,8 +78,12 @@ def build_record(
         "bias_points": headline.get("bias_points", 41),
         "precision": headline.get("precision", "float64"),
         # ---- the numerical-validation gates (Table 3 of the paper) ----
-        "jacobian_error": headline.get("jacobian_error", _first_scalar(v, "jacobian_error", "max_abs_rel")),
-        "fd_gradient_error": headline.get("fd_gradient_error", _first_scalar(f, "max_rel_error", "E_fd")),
+        "jacobian_error": headline.get(
+            "jacobian_error", _first_scalar(v, "jacobian_error", "max_abs_rel")
+        ),
+        "fd_gradient_error": headline.get(
+            "fd_gradient_error", _first_scalar(f, "max_rel_error", "E_fd")
+        ),
         "fd_optimal_h": f.get("optimal_h"),
         "adjoint_method": headline.get(
             "adjoint_method",
@@ -126,9 +130,7 @@ def save_record(record: dict, path: str | Path) -> Path:
     """Write the consolidated record as pretty JSON and return its path."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(record, indent=2, sort_keys=True, default=_default) + "\n"
-    )
+    path.write_text(json.dumps(record, indent=2, sort_keys=True, default=_default) + "\n")
     return path
 
 

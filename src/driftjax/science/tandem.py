@@ -38,6 +38,7 @@ Everything is pure-jnp: differentiable in both curves' currents,
 `jax.jit`-able, `vmap`-safe.  Returned scalars are 0-d arrays — call
 ``float(...)`` outside of traces.
 """
+
 from __future__ import annotations
 
 import jax.numpy as jnp
@@ -111,22 +112,22 @@ def series_two_terminal(iv_top, iv_bottom, v_out=None):
     j_grid = jnp.sort(jnp.concatenate([fill, from_curve]))
     w_grid = v_of_j(vt, pt_tab, j_grid) + v_of_j(vb, pb_tab, j_grid)
 
-    order_w = jnp.argsort(w_grid)          # ascending total voltage
+    order_w = jnp.argsort(w_grid)  # ascending total voltage
     w_asc = w_grid[order_w]
     j_asc = j_grid[order_w]
 
-    plateau = j_asc[0]                     # current-matched saturation value
+    plateau = j_asc[0]  # current-matched saturation value
     # tandem curve: NaN above Voc_sum, parametric inside, plateau below
     # jnp.interp: left applies for v < min W (below the knee -> plateau),
     # right for v > max W (past Voc_sum -> no solution)
     current_norm = jnp.interp(v_out, w_asc, j_asc, left=plateau, right=jnp.nan)
 
-    current = current_norm * s_t           # report in the TOP cell's convention
+    current = current_norm * s_t  # report in the TOP cell's convention
 
     # scalar quantities from the parametric table (grid-independent MPP)
-    isc = plateau                          # I(0): limited sub-cell saturated
-    voc = w_asc[-1]                        # J -> 0 end of the parametric curve
-    p_table = j_grid * w_grid              # same units as V * J of the inputs
+    isc = plateau  # I(0): limited sub-cell saturated
+    voc = w_asc[-1]  # J -> 0 end of the parametric curve
+    p_table = j_grid * w_grid  # same units as V * J of the inputs
     impp = jnp.argmax(p_table)
     pmax = p_table[impp]
     vmpp = w_grid[impp]

@@ -1,6 +1,5 @@
 """Conservation identities on a converged solution."""
 
-
 import pytest
 
 from driftjax.science.contacts import boundary_bias, boundary_eq
@@ -17,6 +16,7 @@ from driftjax.validation.conservation import (
 def _cached_bias_pot(small_cell):
     """One eq + one bias solve shared by 2 conservation tests (was 4 solves)."""
     from driftjax.units import energy
+
     pot_eq = solve_eq(small_cell, boundary_eq(small_cell), equilibrium_guess(small_cell).phi)
     pot, info = solve_newton(small_cell, boundary_bias(small_cell, 0.4 / energy), pot_eq, tol=1e-10)
     return small_cell, pot, pot_eq
@@ -37,4 +37,3 @@ def test_gr_balance(_cached_bias_pot):
     r = gr_balance_residual(small_cell, pot)
     assert r < 1.0, r
     # keep single identity; manual Jn/R/G re-derive was redundant with gr_balance_residual
-

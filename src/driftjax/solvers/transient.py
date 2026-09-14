@@ -57,7 +57,6 @@ def solve_transient_step(cell, bound, pot_prev, dt, max_iter: int = 20, tol: flo
     from driftjax.numerics.analytic_jacobian import banded_jacobian
     from driftjax.numerics.block_thomas import block_thomas_solve
 
-    n_dof = 3 * pot_prev.n
     eye3 = jnp.eye(3)
 
     def _cond(state):
@@ -89,9 +88,7 @@ def solve_transient_step(cell, bound, pot_prev, dt, max_iter: int = 20, tol: flo
             return (alpha * 0.5, best_pot_ls, best_err_ls), None
 
         init_ls = (jnp.array(1.0), pot, err)
-        _, best_pot_final, best_err_final = jax.lax.scan(
-            _ls_step, init_ls, None, length=15
-        )[0]
+        _, best_pot_final, best_err_final = jax.lax.scan(_ls_step, init_ls, None, length=15)[0]
 
         # Update best if line search found improvement
         improved_any = best_err_final < err

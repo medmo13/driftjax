@@ -328,8 +328,18 @@ class SweepProgress:
     * non-TTY, quiet -> nothing until ``close()``
     """
 
-    def __init__(self, n_steps, *, vmax_v=None, label="IV sweep", verbose=None, file=None,
-                 design=None, alpha_mode=None, tol=None):
+    def __init__(
+        self,
+        n_steps,
+        *,
+        vmax_v=None,
+        label="IV sweep",
+        verbose=None,
+        file=None,
+        design=None,
+        alpha_mode=None,
+        tol=None,
+    ):
         self.n = int(n_steps)
         self.vmax_v = vmax_v
         self.label = label
@@ -423,8 +433,7 @@ class SweepProgress:
             self._draw(f"{self.label}  working…  {label}")
         elif self.verbose:
             print(
-                f"  [{self.label}] {label}"
-                + (f"  |R| = {resid:.2e}" if resid is not None else ""),
+                f"  [{self.label}] {label}" + (f"  |R| = {resid:.2e}" if resid is not None else ""),
                 file=self.file,
             )
 

@@ -74,7 +74,9 @@ def test_fresnel_rear_reflectance_honored():
     """G must grow monotonically with Rb; Rb=0 < Beer–Lambert (front loss)."""
     des = _design()
     sums = [
-        float(np.sum(np.asarray(fresnel_generation(des, LS, alpha_mode="tauc", rear_reflectance=rb))))
+        float(
+            np.sum(np.asarray(fresnel_generation(des, LS, alpha_mode="tauc", rear_reflectance=rb)))
+        )
         for rb in (0.0, 0.9, 1.0)
     ]
     assert sums[0] < sums[1] < sums[2], f"Rb ordering violated: {sums}"
@@ -96,9 +98,7 @@ def test_fresnel_rb0_absorptance_identity():
     R_f = np.abs((1.0 - n_tilde) / (1.0 + n_tilde)) ** 2
     A_an = (1.0 - R_f) * (1.0 - np.exp(-tauL))
     G = np.asarray(
-        _fresnel_per_lambda(
-            jnp.asarray(x_m), jnp.asarray(phi0), jnp.asarray(alpha), n_tilde, 0.0
-        )
+        _fresnel_per_lambda(jnp.asarray(x_m), jnp.asarray(phi0), jnp.asarray(alpha), n_tilde, 0.0)
     )
     A = (np.sum(G, axis=1) - 0.5 * (G[:, 0] + G[:, -1])) * dx / phi0
     m = A_an > 1e-06
@@ -115,7 +115,7 @@ def test_inv3_negative_det_keeps_sign():
     the negative sign instead of mapping to +1e-30 (block inversion)."""
     A = jnp.diag(jnp.array([-2e-31, 1.0, 1.0]))
     inv = _inv3(A[None])[0]
-    assert float(inv[0, 0]) < 0.0, f"sign flipped: inv[0,0]={float(inv[0,0])}"
+    assert float(inv[0, 0]) < 0.0, f"sign flipped: inv[0,0]={float(inv[0, 0])}"
     assert bool(jnp.all(jnp.isfinite(inv)))
 
 
@@ -128,8 +128,10 @@ def test_linsolve_zero_rhs_finite_residual():
     """At an exact root (rhs=0) the relative residual was 0/0=NaN."""
     J2 = jnp.array([[2.0, 0.5], [0.5, 3.0]])
     # banded backend needs a (3N, 3N) block-tridiagonal Jacobian (N=2 here)
-    J6 = jnp.diag(jnp.full(6, 2.0)) + jnp.diag(jnp.full(5, 0.25), 1) + jnp.diag(
-        jnp.full(5, 0.25), -1
+    J6 = (
+        jnp.diag(jnp.full(6, 2.0))
+        + jnp.diag(jnp.full(5, 0.25), 1)
+        + jnp.diag(jnp.full(5, 0.25), -1)
     )
     for backend, J in (("dense", J2), ("banded", J6), ("auto", J2), ("csr", J2)):
         rhs = jnp.zeros(J.shape[0])
@@ -321,12 +323,28 @@ def test_blakemore_statistics_warns():
 
 def _stiff_cell(n_points=40):
     cds = dj.material(
-        Chi=4.0, Eg=2.4, eps=9.0, Nc=2.2e18, Nv=1.8e19,
-        mn=100, mp=25, tn=1e-8, tp=1e-8, A=1e4,
+        Chi=4.0,
+        Eg=2.4,
+        eps=9.0,
+        Nc=2.2e18,
+        Nv=1.8e19,
+        mn=100,
+        mp=25,
+        tn=1e-8,
+        tp=1e-8,
+        A=1e4,
     )
     cdte = dj.material(
-        Chi=3.9, Eg=1.5, eps=9.4, Nc=8e17, Nv=1.8e19,
-        mn=100, mp=40, tn=1e-8, tp=1e-8, A=1e4,
+        Chi=3.9,
+        Eg=1.5,
+        eps=9.4,
+        Nc=8e17,
+        Nv=1.8e19,
+        mn=100,
+        mp=40,
+        tn=1e-8,
+        tp=1e-8,
+        A=1e4,
     )
     return dj.Device(
         layers=list(zip([4e-05, 0.0001], [cds, cdte], [1e17, -1e15], strict=False)),

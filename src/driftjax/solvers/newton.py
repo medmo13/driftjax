@@ -57,6 +57,7 @@ def _rebound_criterion(f_tol) -> float:
         return _REBOUND_CONV
     return min(_REBOUND_CONV, float(f_tol))
 
+
 def _linear_solve(J, rhs, tol=1e-6, dense=False, backend=None, refinement=False):
     if dense:
         x = jnp.linalg.solve(J, rhs)
@@ -204,7 +205,12 @@ def _step_newton_impl(cell, bound, x, dense, refinement, analytic, fused):
     from driftjax.numerics.residual import comp_F_precomputed
 
     pot = vec2pot(x)
-    use_analytic = analytic and not dense and not refinement and getattr(cell, "statistics", "boltzmann") == "boltzmann"
+    use_analytic = (
+        analytic
+        and not dense
+        and not refinement
+        and getattr(cell, "statistics", "boltzmann") == "boltzmann"
+    )
     _fused_pair = None
     _pre_n = _pre_p = _pre_ni = None
     if fused and use_analytic:
@@ -236,16 +242,23 @@ def _step_newton_impl(cell, bound, x, dense, refinement, analytic, fused):
         a_det, b_det, c_det = A[..., 0, 0], A[..., 0, 1], A[..., 0, 2]
         d_det, e_det, f_det = A[..., 1, 0], A[..., 1, 1], A[..., 1, 2]
         g_det, h_det, i_det = A[..., 2, 0], A[..., 2, 1], A[..., 2, 2]
-        det = a_det * (e_det * i_det - f_det * h_det) - b_det * (d_det * i_det - f_det * g_det) + c_det * (d_det * h_det - e_det * g_det)
+        det = (
+            a_det * (e_det * i_det - f_det * h_det)
+            - b_det * (d_det * i_det - f_det * g_det)
+            + c_det * (d_det * h_det - e_det * g_det)
+        )
         is_singular = jnp.any(jnp.abs(det) < DET_TOL)
 
         def _do_analytic(_):
             from driftjax.numerics.analytic_jacobian import blockwise_residual
+
             p_a = block_thomas_solve(A, B, C, (-F).reshape(n, 3)).reshape(-1)
             # jrystal-style gate: unpivoted BT is unstable on the degenerate
             # equilibrium Jacobian (cond ~ 1e28); measure, do not assume.
             # O(N) block-wise check instead of O(N²) dense_from_blocks.
-            lin_a = jnp.linalg.norm(blockwise_residual(A, B, C, F, p_a)) / (jnp.linalg.norm(F) + 1e-30)
+            lin_a = jnp.linalg.norm(blockwise_residual(A, B, C, F, p_a)) / (
+                jnp.linalg.norm(F) + 1e-30
+            )
             return p_a, lin_a
 
         def _do_fallback(_):
@@ -379,7 +392,9 @@ def solve_newton(
     """
     # Float64 is mandatory (Jacobians ~1e19, Nc*Nv ~1e38 overflow float32).
     if pot_ini.phi.dtype != jnp.float64:
-        raise TypeError(f"solve_newton requires float64 potentials, got {pot_ini.phi.dtype}; ensure JAX_ENABLE_X64=1")
+        raise TypeError(
+            f"solve_newton requires float64 potentials, got {pot_ini.phi.dtype}; ensure JAX_ENABLE_X64=1"
+        )
     if (not allow_trace) and _is_tracer(pot_ini.phi):
         return pot_ini, {"backend": "tracer_passthrough"}
 
@@ -432,11 +447,7 @@ def solve_newton(
     # under trace, where the conditional would concretize. M5: every eager
     # return path sets a concrete Python-bool "converged", so `not` never
     # sees a tracer here; default False (missing flag ⇒ try recovery).
-    if (
-        (not allow_trace)
-        and (not last_stats.get("converged", False))
-        and globalization == "auto"
-    ):
+    if (not allow_trace) and (not last_stats.get("converged", False)) and globalization == "auto":
         from driftjax.solvers.ptc import solve_newton_ls
 
         pot_ls, sls = solve_newton_ls(
@@ -554,9 +565,7 @@ def _solve_newton_while(
         # clean best survives NaN tails.
         r_new = stats["resid_f"]
         step_failed = (
-            (~jnp.isfinite(error_new))
-            | (~jnp.isfinite(stats["resid"]))
-            | (~jnp.isfinite(r_new))
+            (~jnp.isfinite(error_new)) | (~jnp.isfinite(stats["resid"])) | (~jnp.isfinite(r_new))
         )
         improved = r_new < best_resid
         best_pot_new = jax.tree.map(lambda b, p: jnp.where(improved, p, b), best_pot, pot)
@@ -564,9 +573,7 @@ def _solve_newton_while(
         # Freeze the iterate on failure but preserve the NaN error for
         # diagnostics (matches eager `last_stats["error"]`); the gate below
         # stays safe because NaN <= tol is False.
-        pot_out = jax.tree.map(
-            lambda new, old: jnp.where(step_failed, old, new), pot_new, pot
-        )
+        pot_out = jax.tree.map(lambda new, old: jnp.where(step_failed, old, new), pot_new, pot)
         return (
             it + 1,
             pot_out,
@@ -586,9 +593,7 @@ def _solve_newton_while(
         jnp.array(jnp.inf, dtype=jnp.float64),
         jnp.array(False),
     )
-    it, pot, error, resid_f, best_pot, best_resid, failed = jax.lax.while_loop(
-        _cond, _body, init
-    )
+    it, pot, error, resid_f, best_pot, best_resid, failed = jax.lax.while_loop(_cond, _body, init)
     step_converged = error <= tol
     resid_converged = (resid_f < f_tol) if f_tol_active else jnp.array(False)
     converged = step_converged | resid_converged
@@ -677,9 +682,7 @@ def _solve_newton_python(
             except Exception:
                 pass
         if err < tol:
-            last_stats = newton_stats(
-                **{**last_stats, "converged": True, "stagnated": False}
-            )
+            last_stats = newton_stats(**{**last_stats, "converged": True, "stagnated": False})
             return pot, last_stats
         if jnp.isnan(error) or jnp.isnan(stats["resid"]):
             # junk/NaN step: the best iterate seen is the closest-to-root state
@@ -727,7 +730,5 @@ def _solve_newton_python(
             }
         )
         return pot, last_stats
-    last_stats = newton_stats(
-        **{**last_stats, "converged": last_stats.get("converged", False)}
-    )
+    last_stats = newton_stats(**{**last_stats, "converged": last_stats.get("converged", False)})
     return pot, last_stats

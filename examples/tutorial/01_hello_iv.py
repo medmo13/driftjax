@@ -34,9 +34,13 @@ def main():
     )
     save_json(
         "tutorial_01_hello_iv",
-        {"metadata": execution_metadata(), 
-         "n_points": points, "wall_s": wall, "figure": str(fig_path),
-         **solution_metrics(sol)},
+        {
+            "metadata": execution_metadata(),
+            "n_points": points,
+            "wall_s": wall,
+            "figure": str(fig_path),
+            **solution_metrics(sol),
+        },
     )
     report("tutorial_01", wall_s=wall, **solution_metrics(sol))
     report_fom("tutorial_01", sol=sol)

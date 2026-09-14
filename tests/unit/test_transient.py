@@ -41,9 +41,9 @@ N = 40
 @pytest.fixture(scope="module")
 def si_ops():
     Si = dj.load_material("Si")
-    dev = dj.Device(n_points=N,
-                    layers=[(5e-5, Si, 1e16), (5e-5, Si, -1e16)],
-                    Snl=1e7, Snr=1e7, Spl=1e7, Spr=1e7)
+    dev = dj.Device(
+        n_points=N, layers=[(5e-5, Si, 1e16), (5e-5, Si, -1e16)], Snl=1e7, Snr=1e7, Spl=1e7, Spr=1e7
+    )
     eq = simulate(dev, Equilibrium(), solver=Newton())
     # dense grid; we always operate on exact grid points
     sol = simulate(dev, Sweep(vmax=0.6, n_steps=16), solver=Newton())
@@ -55,8 +55,7 @@ def _on_grid_index(sol, v_v):
     """Index whose STORED voltage equals v_v exactly (grid must contain it)."""
     v_grid = np.asarray(sol.voltages)
     k = int(np.argmin(np.abs(v_grid - v_v)))
-    assert abs(v_grid[k] - v_v) < 1e-12, \
-        f"v={v_v} not on sweep grid (nearest {v_grid[k]})"
+    assert abs(v_grid[k] - v_v) < 1e-12, f"v={v_v} not on sweep grid (nearest {v_grid[k]})"
     return k
 
 
@@ -78,11 +77,11 @@ def test_transient_step_residual_below_tolerance(si_ops):
     k = _on_grid_index(sol, 0.36)
     v_dim = float(sol.voltages[k]) / scE
     pot_dc = sol.at_bias(float(sol.voltages[k]))
-    pot_new, info = solve_transient_step(cell, boundary_bias(cell, jnp.asarray(v_dim)),
-                                         pot_dc, dt=1e3)
+    pot_new, info = solve_transient_step(
+        cell, boundary_bias(cell, jnp.asarray(v_dim)), pot_dc, dt=1e3
+    )
     assert info["converged"], info
-    F_t = transient_residual(cell, boundary_bias(cell, jnp.asarray(v_dim)),
-                             pot_new, pot_dc, dt=1e3)
+    F_t = transient_residual(cell, boundary_bias(cell, jnp.asarray(v_dim)), pot_new, pot_dc, dt=1e3)
     assert float(jnp.max(jnp.abs(F_t))) < 1e-6
 
 
@@ -93,8 +92,9 @@ def test_transient_fixed_point_at_dc_root(si_ops):
     k = _on_grid_index(sol, 0.36)
     v_dim = float(sol.voltages[k]) / scE
     pot_dc = sol.at_bias(float(sol.voltages[k]))
-    pot_new, info = solve_transient_step(cell, boundary_bias(cell, jnp.asarray(v_dim)),
-                                         pot_dc, dt=1e12)
+    pot_new, info = solve_transient_step(
+        cell, boundary_bias(cell, jnp.asarray(v_dim)), pot_dc, dt=1e12
+    )
     assert info["converged"], info
     d_max = float(jnp.max(jnp.abs(pot2vec(pot_new) - pot2vec(pot_dc))))
     assert d_max < 1e-6, f"DC root drifted by {d_max:.2e}"
@@ -136,6 +136,9 @@ def test_ac_finite(si_ops):
     cell, _, sol, scE, _ = si_ops
     omega = jnp.array([1e-2, 1e0, 1e2, 1e4])
     k = _on_grid_index(sol, 0.36)
-    Y = np.asarray(ac_small_signal(cell, float(sol.voltages[k]) / scE,
-                                   sol.at_bias(float(sol.voltages[k])), omega))
+    Y = np.asarray(
+        ac_small_signal(
+            cell, float(sol.voltages[k]) / scE, sol.at_bias(float(sol.voltages[k])), omega
+        )
+    )
     assert np.all(np.isfinite(Y.view(np.float64))), "non-finite admittance"

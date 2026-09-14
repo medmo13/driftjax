@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.1.16 (release, 2026-09-14)
+
+### Repository
+- GitHub-ready cleanup: removed internal audit/context files, compiled PDFs,
+  generated figures/logs/matrices, stale benchmark baselines, and cache directories.
+- Paper sources isolated in `docs/paper/` with a build README; removed duplicate
+  `docs/CHANGELOG.md`, `docs/CITATION.cff`, stale `docs/README.md`, and template
+  leftovers.
+- Single-sourced version `0.1.16` (`pyproject.toml`, `__init__.py`, `CITATION.cff`).
+- Added issue/PR templates and `SECURITY.md`; fixed mkdocs nav and CI test deps.
+
 ## v0.1.15 (release, 2026-09-14)
 
 ### Documentation

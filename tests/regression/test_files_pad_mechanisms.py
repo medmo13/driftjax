@@ -77,11 +77,13 @@ def test_aln_alpha_zero_below_edge():
     # Fallback to legacy csv if still present (v0.1.5 compat)
     try:
         from driftjax.io import _load_optics_from_db
+
         lam_k, alpha_m = _load_optics_from_db("AlN")
         if lam_k is None or lam_k.size == 0:
             raise FileNotFoundError
         # alpha is in m^-1, convert to cm^-1 for the 100 cm^-1 gate
-        lam_k = np.asarray(lam_k); alpha_cm = np.asarray(alpha_m) / 100.0
+        lam_k = np.asarray(lam_k)
+        alpha_cm = np.asarray(alpha_m) / 100.0
     except Exception:
         csv_path = Path(io.__file__).resolve().parent / "resources" / "AlN.csv"
         lam_k, alpha_cm = ([], [])
@@ -113,6 +115,7 @@ def test_aln_lambda_grids_can_diverge():
     # and, if csv still present, that n/k can diverge (legacy).
     try:
         from driftjax.io import _load_optics_from_db
+
         lam_k, _ = _load_optics_from_db("AlN")
         if lam_k is not None and lam_k.size:
             # Single grid in modern DB — just check it's present and sorted

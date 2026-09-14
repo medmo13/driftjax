@@ -36,7 +36,7 @@ def gr_balance_residual(cell, pot) -> float:
     ave = 0.5 * (cell.dgrid[:-1] + cell.dgrid[1:])
     r = recomb_total(cell, pot)[1:-1]
     g = cell.G[1:-1]
-    delta = float(jn[-1] - jn[0])          # telescopes over interior nodes
+    delta = float(jn[-1] - jn[0])  # telescopes over interior nodes
     integral = float(jnp.sum((r - g) * ave))
     scale = float(jnp.mean(jnp.abs(j)) + 1e-30)
     return float(jnp.abs(delta - integral) / scale)

@@ -8,6 +8,7 @@ difference for all 16 parameters.
 
 Run:  PYTHONPATH=src python validation/grad_vs_fd.py
 """
+
 import time
 
 import jax
@@ -19,27 +20,48 @@ from driftjax.problems import Sweep
 
 
 def build_device(x, mn=130.0):
-    m1 = dj.material(Eg=x[0], Chi=x[1], eps=x[2], Nc=10 ** x[3],
-                                  Nv=10 ** x[4], mn=mn, mp=x[5], A=2e4)
-    m2 = dj.material(Eg=x[6], Chi=x[7], eps=x[8], Nc=10 ** x[9],
-                                  Nv=10 ** x[10], mn=mn, mp=x[11], A=2e4)
-    return dj.Device(n_points=20,
-                     layers=[(x[12], m1, 10 ** x[13]), (x[14], m2, -10 ** x[15])],
-                     Snl=1e7, Snr=0.0, Spl=0.0, Spr=1e7)
+    m1 = dj.material(
+        Eg=x[0], Chi=x[1], eps=x[2], Nc=10 ** x[3], Nv=10 ** x[4], mn=mn, mp=x[5], A=2e4
+    )
+    m2 = dj.material(
+        Eg=x[6], Chi=x[7], eps=x[8], Nc=10 ** x[9], Nv=10 ** x[10], mn=mn, mp=x[11], A=2e4
+    )
+    return dj.Device(
+        n_points=20,
+        layers=[(x[12], m1, 10 ** x[13]), (x[14], m2, -(10 ** x[15]))],
+        Snl=1e7,
+        Snr=0.0,
+        Spl=0.0,
+        Spr=1e7,
+    )
 
 
 def pce(x):
-    s = dj.simulate(build_device(x), Sweep(n_steps=5),
-                    optics=BeerLambert("tauc"), progress=False)
+    s = dj.simulate(build_device(x), Sweep(n_steps=5), optics=BeerLambert("tauc"), progress=False)
     return s.eff
 
 
-NAMES = ["Eg1", "Chi1", "eps1", "lNc1", "lNv1", "mp1",
-         "Eg2", "Chi2", "eps2", "lNc2", "lNv2", "mp2",
-         "t1", "t2", "lNd", "lNa"]
-X0 = jnp.array([1.4, 3.0, 10.0, 18.0, 18.0, 160.0,
-               1.4, 3.0, 10.0, 18.0, 18.0, 160.0,
-               1e-4, 1e-4, 17.0, 17.0])
+NAMES = [
+    "Eg1",
+    "Chi1",
+    "eps1",
+    "lNc1",
+    "lNv1",
+    "mp1",
+    "Eg2",
+    "Chi2",
+    "eps2",
+    "lNc2",
+    "lNv2",
+    "mp2",
+    "t1",
+    "t2",
+    "lNd",
+    "lNa",
+]
+X0 = jnp.array(
+    [1.4, 3.0, 10.0, 18.0, 18.0, 160.0, 1.4, 3.0, 10.0, 18.0, 18.0, 160.0, 1e-4, 1e-4, 17.0, 17.0]
+)
 
 
 def main():
@@ -63,17 +85,19 @@ def main():
 
     rows.sort(key=lambda r: -r[3])
     print()
-    print("%-6s %16s %16s %12s  %s" % ("param", "analytic", "FD", "rel.err", "note"))
+    print(f"{'param':<6} {'analytic':>16} {'FD':>16} {'rel.err':>12}  note")
     worst = 0.0
     for nm, an, fd, rel, mag in rows:
         note = "" if mag > SIG else "(noise floor)"
-        print("%-6s %16.6e %16.6e %12.2e  %s" % (nm, an, fd, rel, note))
+        print(f"{nm:<6} {an:>16.6e} {fd:>16.6e} {rel:>12.2e}  {note}")
         if mag > SIG:
             worst = max(worst, rel)
     print()
-    print("max rel.err over SIGNIFICANT params (|g| > %.0e) = %.2e" % (SIG, worst))
+    print(f"max rel.err over SIGNIFICANT params (|g| > {SIG:.0e}) = {worst:.2e}")
     assert worst < 1e-4, "analytic gradient disagrees with finite differences on significant params"
-    print("PASS: analytic gradient matches central FD to < 1e-4 relative error on all significant params")
+    print(
+        "PASS: analytic gradient matches central FD to < 1e-4 relative error on all significant params"
+    )
 
 
 if __name__ == "__main__":

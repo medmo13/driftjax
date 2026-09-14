@@ -99,7 +99,7 @@ RC: dict[str, Any] = {
 # ----------------------------------------------------------------------------
 # semantic colours (shared across both modes and driftjax.viz.plotting)
 # ----------------------------------------------------------------------------
-BLUE = "#0C5DA5"   # SciencePlots blue
+BLUE = "#0C5DA5"  # SciencePlots blue
 GREEN = "#00B945"
 ORANGE = "#FF9500"
 RED = "#FF2C00"
@@ -107,17 +107,31 @@ VIOLET = "#845B97"
 GRAY = "#474747"
 
 # Semiconductor band-diagram / carrier conventions.
-EC = "#F08080"     # lightcoral  (electron / conduction band)
-EV = "#6495ED"     # cornflowerblue (hole / valence band)
-EF = "#111111"     # Fermi level (dark)
+EC = "#F08080"  # lightcoral  (electron / conduction band)
+EV = "#6495ED"  # cornflowerblue (hole / valence band)
+EF = "#111111"  # Fermi level (dark)
 FERMI = "#9a9a9a"  # equilibrium Fermi level
 
 # multi-series categorical palette (distinguishable in colour + greyscale)
-SERIES = ["#0C5DA5", "#00B945", "#FF9500", "#845B97", "#FF2C00", "#474747",
-          "#18857C", "#B48C2F"]
-BAR_PALETTE = ["#D4A017", "#E69F00", "#009E73", "#56B4E9", "#CC79A7"]  # gold/orange/green/blue/pink (print-safe, no yellow-on-white)
+SERIES = ["#0C5DA5", "#00B945", "#FF9500", "#845B97", "#FF2C00", "#474747", "#18857C", "#B48C2F"]
+BAR_PALETTE = [
+    "#D4A017",
+    "#E69F00",
+    "#009E73",
+    "#56B4E9",
+    "#CC79A7",
+]  # gold/orange/green/blue/pink (print-safe, no yellow-on-white)
 # Colorblind-safe Wong/Okabe-Ito series (use when DRIFTJAX_COLORBLIND=1)
-COLORBLIND_SERIES = ["#0072B2", "#E69F00", "#009E73", "#CC79A7", "#56B4E9", "#D55E00", "#000000", "#999999"]
+COLORBLIND_SERIES = [
+    "#0072B2",
+    "#E69F00",
+    "#009E73",
+    "#CC79A7",
+    "#56B4E9",
+    "#D55E00",
+    "#000000",
+    "#999999",
+]
 # retained alias used by driftjax.viz.plotting (material bars)
 MAT_COLORS = SERIES
 # default sequential colormap for 2-D scans / trajectories
@@ -162,9 +176,13 @@ def register_fonts() -> None:
             continue
         fm.fontManager.ttflist.append(
             fm.FontEntry(
-                fname=fp, name="CMU Serif", style=meta["style"],
-                variant="normal", weight=meta["weight"],
-                stretch="normal", size="scalable",
+                fname=fp,
+                name="CMU Serif",
+                style=meta["style"],
+                variant="normal",
+                weight=meta["weight"],
+                stretch="normal",
+                size="scalable",
             )
         )
         seen.add(key)
@@ -265,9 +283,7 @@ def figure(
     apply(mode)
     if w_in is None:
         w_in, h_in = plt.rcParams["figure.figsize"]
-    fig, ax = plt.subplots(
-        ncols, nrows, figsize=(w_in, h_in), constrained_layout=constrained
-    )
+    fig, ax = plt.subplots(ncols, nrows, figsize=(w_in, h_in), constrained_layout=constrained)
     return fig, ax
 
 

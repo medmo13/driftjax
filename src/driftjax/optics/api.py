@@ -29,7 +29,9 @@ class BeerLambert(AbstractOptics):
         super().__init__()
         am = _normalize_alpha_mode(alpha_mode)
         if am not in ("tauc", "table", "beer-lambert"):
-            raise ValueError(f"BeerLambert alpha_mode must be tauc/table/beer-lambert, got {alpha_mode!r}")
+            raise ValueError(
+                f"BeerLambert alpha_mode must be tauc/table/beer-lambert, got {alpha_mode!r}"
+            )
         self.alpha_mode = am
 
     def generation(self, design: DeviceDesign, ls: LightSource):

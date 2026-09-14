@@ -27,11 +27,25 @@ from examples.support import (
 
 
 def _generation(thickness_m, eg_ev, n_points=500):
-    mat = dj.material(Chi=4.05, Eg=eg_ev, eps=11.7, Nc=2.8e19, Nv=1.04e19,
-                      mn=1400, mp=450, tn=1e-6, tp=1e-6, A=1e4)
+    mat = dj.material(
+        Chi=4.05,
+        Eg=eg_ev,
+        eps=11.7,
+        Nc=2.8e19,
+        Nv=1.04e19,
+        mn=1400,
+        mp=450,
+        tn=1e-6,
+        tp=1e-6,
+        A=1e4,
+    )
     dev = dj.Device(
         layers=[(thickness_m, mat, 1e16)],
-        n_points=n_points, Snl=1e7, Snr=1e7, Spl=1e7, Spr=1e7,
+        n_points=n_points,
+        Snl=1e7,
+        Snr=1e7,
+        Spl=1e7,
+        Spr=1e7,
     )
     cell = init_cell(dev.design(), spectrum(normalize=False))
     x_um = np.asarray(cell.x) * float(length) * 1e4
@@ -51,26 +65,33 @@ def main():
             x_um, g = _generation(th, eg)
             label = f"{th * 1e6:.0f} µm, Eg={eg} eV"
             (ax0 if i == 0 else ax1).semilogy(
-                x_um, g, lw=1.6, label=label,
-                color=style.SERIES[list(thicknesses).index(th) % len(style.SERIES)])
-            summary[label] = {"g_mean": float(np.mean(g)),
-                              "g_max": float(np.max(g)),
-                              "depth_90pct_um": float(x_um[np.argmin(
-                                  np.abs(np.cumsum(g) / np.sum(g) - 0.9))])}
+                x_um,
+                g,
+                lw=1.6,
+                label=label,
+                color=style.SERIES[list(thicknesses).index(th) % len(style.SERIES)],
+            )
+            summary[label] = {
+                "g_mean": float(np.mean(g)),
+                "g_max": float(np.max(g)),
+                "depth_90pct_um": float(x_um[np.argmin(np.abs(np.cumsum(g) / np.sum(g) - 0.9))]),
+            }
     for ax, eg in zip([ax0, ax1], gaps, strict=True):
-        ax.set(xlabel="position / µm", ylabel="generation (dimensionless)",
-               title=f"Eg = {eg} eV")
+        ax.set(xlabel="position / µm", ylabel="generation (dimensionless)", title=f"Eg = {eg} eV")
         ax.legend(frameon=False, fontsize=7)
         ax.grid(alpha=0.2, which="both", linestyle="--")
     tag_panels(axes.ravel())
     fp = save_figure(fig, "research_10_generation_profile")
-    save_json("research_10_generation_profile", {
-        "metadata": execution_metadata(),
-        "summary": summary, "figure": fp.name,
-    })
+    save_json(
+        "research_10_generation_profile",
+        {
+            "metadata": execution_metadata(),
+            "summary": summary,
+            "figure": fp.name,
+        },
+    )
     thin_key = f"{thicknesses[0] * 1e6:.0f} µm, Eg=1.1 eV"
-    report("research_10", n_curves=len(summary),
-           gmax_thin=float(summary[thin_key]["g_max"]))
+    report("research_10", n_curves=len(summary), gmax_thin=float(summary[thin_key]["g_max"]))
 
 
 if __name__ == "__main__":
