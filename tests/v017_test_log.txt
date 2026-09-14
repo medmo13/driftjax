@@ -1,0 +1,58 @@
+============================= test session starts ==============================
+platform linux -- Python 3.13.13, pytest-9.1.1, pluggy-1.6.0
+benchmark: 5.2.3 (defaults: timer=time.perf_counter disable_gc=False min_rounds=5 min_time=0.000005 max_time=1.0 calibration_precision=10 warmup=False warmup_iterations=100000)
+rootdir: /home/med/Desktop/final/open14/driftjax_v0.1.17
+configfile: pyproject.toml
+plugins: hypothesis-6.155.6, jaxtyping-0.3.11, xdist-3.8.0, timeout-2.4.0, cov-7.1.0, benchmark-5.2.3
+timeout: 600.0s
+timeout method: signal
+timeout func_only: False
+collected 238 items
+
+tests/conservation/test_identities.py ...                                [  1%]
+tests/convergence/test_mms_poisson.py ...                                [  2%]
+tests/convergence/test_spline_convergence.py .                           [  2%]
+tests/gradient/test_adjoint_ab.py ...                                    [  4%]
+tests/gradient/test_grad_fd.py ..                                        [  5%]
+tests/gradient/test_inverse_design_grad.py ..                            [  5%]
+tests/literature/test_experimental.py ..                                 [  6%]
+tests/literature/test_ideal_diode.py ..                                  [  7%]
+tests/literature/test_scaps_cdte.py ....                                 [  9%]
+tests/literature/test_sq_limit.py ..............                         [ 15%]
+tests/property/test_fused_simulate.py ..                                 [ 15%]
+tests/property/test_invariants.py .....                                  [ 18%]
+tests/property/test_sharding.py ......                                   [ 20%]
+tests/property/test_sweep_properties.py .                                [ 21%]
+tests/regression/test_files_pad_mechanisms.py ..........                 [ 25%]
+tests/regression/test_iv_reference.py .....                              [ 27%]
+tests/regression/test_release_validated.py ......x..                     [ 31%]
+tests/reproducibility/test_bit_identical.py ...                          [ 32%]
+tests/unit/test_analytic_adjoint.py .....                                [ 34%]
+tests/unit/test_analytic_jacobian.py .....                               [ 36%]
+tests/unit/test_audit_fixes_2.py ........                                [ 39%]
+tests/unit/test_audit_fixes_3.py .................                       [ 47%]
+tests/unit/test_audit_fixes_4.py ..................                      [ 54%]
+tests/unit/test_banded_solve.py .....                                    [ 56%]
+tests/unit/test_bernoulli.py ..                                          [ 57%]
+tests/unit/test_checkpointing.py .....                                   [ 59%]
+tests/unit/test_console.py ................                              [ 66%]
+tests/unit/test_contacts.py ...                                          [ 67%]
+tests/unit/test_fresnel.py ....                                          [ 69%]
+tests/unit/test_fused_kernels.py .....                                   [ 71%]
+tests/unit/test_globalization.py ...                                     [ 72%]
+tests/unit/test_hardening_fixes.py .....                                 [ 74%]
+tests/unit/test_materials.py ....                                        [ 76%]
+tests/unit/test_mixed_precision.py ...                                   [ 77%]
+tests/unit/test_provenance_lineage.py ....                               [ 79%]
+tests/unit/test_public_api.py ...                                        [ 80%]
+tests/unit/test_spectrum.py ....                                         [ 82%]
+tests/unit/test_spline.py ......                                         [ 84%]
+tests/unit/test_statistics.py ..........                                 [ 89%]
+tests/unit/test_tandem.py .....                                          [ 91%]
+tests/unit/test_temperature.py .....                                     [ 93%]
+tests/unit/test_tmm.py .....                                             [ 95%]
+tests/unit/test_transient.py .....                                       [ 97%]
+tests/unit/test_units.py ..                                              [ 98%]
+tests/validation/test_pyramid_gates.py ....                              [100%]
+
+================== 237 passed, 1 xfailed in 908.16s (0:15:08) ==================
