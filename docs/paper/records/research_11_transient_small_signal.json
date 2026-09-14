@@ -1,6 +1,6 @@
 {
-  "efficiency_fraction": 0.06648145971135212,
-  "ff": 0.778743399598248,
+  "efficiency_fraction": 0.06648145971325424,
+  "ff": 0.7787433996209636,
   "figure": "research_11_transient_small_signal.png",
   "jsc_A_per_cm2": 0.015681564284417644,
   "metadata": {
@@ -12,8 +12,8 @@
     "x64": true
   },
   "n_points": 500,
-  "pmax_dimensionless": 2.1118859478380626e-07,
+  "pmax_dimensionless": 2.111885947898486e-07,
   "t_settle_us": 0.0,
-  "voc_V": 0.4899131988447077,
-  "y0_vs_didv_rel": 1.8291913551733286e-05
+  "voc_V": 0.4899131988444341,
+  "y0_vs_didv_rel": 1.3185905154724927e-05
 }

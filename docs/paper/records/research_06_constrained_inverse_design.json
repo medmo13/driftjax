@@ -1,5 +1,5 @@
 {
-  "baseline_efficiency_fraction": 0.16292907843704757,
+  "baseline_efficiency_fraction": 0.16292907843709395,
   "figure": "research_06_constrained_inverse_design.png",
   "initial": [
     1.0,
@@ -19,6 +19,6 @@
     1.958666634559631,
     16.217487716674768
   ],
-  "optimized_efficiency_fraction": 0.18908892606760022,
+  "optimized_efficiency_fraction": 0.18908892606761268,
   "success": false
 }

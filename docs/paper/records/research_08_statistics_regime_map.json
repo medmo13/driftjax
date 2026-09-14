@@ -252,12 +252,12 @@
   },
   "results": [
     {
-      "efficiency_fraction": 0.06612039134589347,
-      "ff": 0.7688896718606452,
+      "efficiency_fraction": 0.0661203913455931,
+      "ff": 0.7688896718569335,
       "jsc_A_per_cm2": 0.015681564284417644,
       "mode": "boltzmann",
-      "pmax_dimensionless": 2.1004160551712687e-07,
-      "voc_V": 0.4934968220496673
+      "pmax_dimensionless": 2.1004160551617266e-07,
+      "voc_V": 0.49349682204980755
     },
     {
       "efficiency_fraction": 0.06612039134274687,
