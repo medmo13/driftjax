@@ -7,11 +7,11 @@ import time
 
 import jax.numpy as jnp
 import numpy as np
-from _helpers import bt_transpose, equilibrate, iterative_refinement, solve_sparse_lu
+from _helpers import banded_transpose_solve, equilibrate, iterative_refinement, solve_sparse_lu
 
 import driftjax as dj
 from driftjax import BeerLambert, Sweep
-from driftjax.numerics.block_thomas import extract_blocks
+from driftjax.numerics.banded_solve import extract_blocks
 from driftjax.numerics.residual import F_jacobian
 from driftjax.science.contacts import boundary_bias
 
@@ -37,16 +37,16 @@ t_d = time.time() - t0
 r_d = float(jnp.linalg.norm(J.T @ lam_d - g) / (jnp.linalg.norm(g) + 1e-30))
 print(f"Dense:        r={r_d:.2e} t={t_d * 1000:.1f}ms")
 
-# BT
+# Pivoted banded transpose
 t0 = time.time()
-lam_bt = bt_transpose(A, B, C, g)
-t_bt = time.time() - t0
-r_bt = (
-    float(jnp.linalg.norm(J.T @ lam_bt - g) / (jnp.linalg.norm(g) + 1e-30))
-    if np.all(np.isfinite(np.array(lam_bt)))
+lam_banded = banded_transpose_solve(A, B, C, g)
+t_banded = time.time() - t0
+r_banded = (
+    float(jnp.linalg.norm(J.T @ lam_banded - g) / (jnp.linalg.norm(g) + 1e-30))
+    if np.all(np.isfinite(np.array(lam_banded)))
     else float("inf")
 )
-print(f"BT:           r={r_bt:.2e} t={t_bt * 1000:.1f}ms")
+print(f"Banded:           r={r_banded:.2e} t={t_banded * 1000:.1f}ms")
 
 # Sparse LU
 t0 = time.time()
@@ -77,19 +77,19 @@ else:
 t_sps = time.time() - t0
 print(f"Scaled Sparse r={r_sps:.2e} t={t_sps * 1000:.1f}ms")
 
-# BT + IR
+# Pivoted banded transpose + IR
 t0 = time.time()
-lam_ir, r_ir = iterative_refinement(J.T, g, lam_bt, iters=2)
+lam_ir, r_ir = iterative_refinement(J.T, g, lam_banded, iters=2)
 t_ir = time.time() - t0
-print(f"BT+IR(2):     r={r_ir:.2e} t={t_ir * 1000:.1f}ms (incl. BT)")
+print(f"Banded+IR(2): r={r_ir:.2e} t={t_ir * 1000:.1f}ms (incl. banded)")
 
 # Gradient comparison
 lam_d_np = np.array(lam_d)
-lam_bt_np = np.array(lam_bt)
+lam_banded_np = np.array(lam_banded)
 print("\n--- Gradient FD error (X0, N=120, V=0.5) ---")
 print(
-    f"|lam_BT - lam_dense|_max = {np.max(np.abs(lam_bt_np - lam_d_np)):.2e} (negligible vs FD error 5.56e-7)"
+    f"|lam_banded - lam_dense|_max = {np.max(np.abs(lam_banded_np - lam_d_np)):.2e} (negligible vs FD error 5.56e-7)"
 )
 print(
-    "Conclusion: Scaled sparse worsens residual (1.8e-07 vs 6e-12), BT+IR recovers to 8e-12, dense/sparse/BT all viable at N=120."
+    "Conclusion: Scaled sparse worsens residual (1.8e-07 vs 6e-12), banded+IR recovers to 8e-12; dense/sparse/banded all viable at N=120."
 )

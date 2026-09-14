@@ -96,39 +96,35 @@ The Jacobian is assembled analytically — no automatic differentiation needed. 
 
 **Code:** `numerics/analytic_jacobian.py:banded_jacobian(n_v=..., p_v=..., ni_v=...)`
 
-## Block-Thomas Solver
+## Pivoted Banded Solver
 
-The block-tridiagonal system J·dx = −F is solved in **O(N)** by the Block-Thomas algorithm — a block generalization of the scalar Thomas algorithm for tridiagonal systems.
+The block-tridiagonal system J·dx = −F (interleaved 3×3 blocks,
+bandwidth kl=ku=5) is solved by LAPACK `dgbsv` with partial pivoting
+(via `scipy.linalg.solve_banded` through a host callback). Flop cost is
+**O(N·kl·ku)**, independent of the condition number. Pivoting is
+essential: the former unpivoted block-Thomas elimination failed on
+ill-conditioned heterojunctions while the banded solver stays at
+residual ~1e-9 (see the main article, structured-solver diagnosis).
 
-### Forward Elimination
+**Code:** `numerics/banded_solve.py:banded_solve()`
 
-```
-for k = 1, 2, …, N-1:
-    m_k = A_k − C_{k-1} · A_{k-1}^{-1} · B_{k-1}
-    b_k = b_k − C_{k-1} · A_{k-1}^{-1} · b_{k-1}
-```
+### Non-finite / singular guard
 
-### Back Substitution
+Near degenerate conditions (e.g., equilibrium Jacobian at flatband) the
+blocks can be non-finite or singular. The solver checks the assembled
+band matrix for finiteness and the linear residual against 1e-4, and
+falls back to pivoted dense `JAX.linalg.solve` when either check trips.
 
-```
-x_{N-1} = A_{N-1}^{-1} · b_{N-1}
-for k = N-2, N-3, …, 0:
-    x_k = A_{k-1}^{-1} · (b_k − B_k · x_{k+1})
-```
+**Code:** `numerics/banded_solve.py:banded_solve()`, `solvers/newton.py:_step_newton_impl()`
 
-Each step involves a **3×3 matrix solve** (via the analytical `inv3` formula), making the total cost O(9N) — linear in the number of nodes.
-
-**Code:** `numerics/block_thomas.py:block_thomas_solve()`
-
-### Singularity Guard
-
-Near degenerate conditions (e.g., equilibrium Jacobian at flatband), the 3×3 blocks can become nearly singular. The solver includes a determinant check (`DET_TOL = 1e-30`) and falls back to `JAX.linalg.solve` when blocks are singular.
-
-**Code:** `numerics/block_thomas.py:_inv3()`, `solvers/newton.py:_step_newton_impl()`
+**Differentiability note:** the forward solve runs through a host
+callback opaque to AD — forward Newton steps are not differentiable
+through. Gradients flow exclusively through the `custom_vjp`
+implicit-adjoint path.
 
 ## Dense Fallback
 
-When the analytic Jacobian is unavailable (non-Boltzmann statistics, refinement mode) or when the Block-Thomas residual check fails, the solver falls back to:
+When the analytic Jacobian is unavailable (non-Boltzmann statistics, refinement mode) or when the banded residual check fails, the solver falls back to:
 
 1. **Dense Jacobian** via `jax.jacfwd(comp_F)` — forward-mode AD of the flat residual
 2. **Dense solve** via `jax.linalg.solve`

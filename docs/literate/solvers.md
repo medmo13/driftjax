@@ -152,7 +152,7 @@ where C = diag(n, p, 0) per node is the carrier storage capacitance.
 
 ### Implementation
 
-Each time step solves a modified Newton system using banded Jacobian + Block-Thomas (O(N)):
+Each time step solves a modified Newton system using banded Jacobian + pivoted banded solve (LAPACK dgbsv):
 
 ```
 (J + C/dt) · dx = −F_trans

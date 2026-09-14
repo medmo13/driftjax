@@ -11,7 +11,7 @@ import numpy as np
 
 import driftjax as dj
 from driftjax import BeerLambert, Sweep
-from driftjax.numerics.block_thomas import block_thomas_solve, extract_blocks
+from driftjax.numerics.banded_solve import banded_transpose, extract_blocks
 from driftjax.numerics.residual import F_jacobian
 from driftjax.science.contacts import boundary_bias
 
@@ -45,23 +45,20 @@ for idx, (pot, vb) in enumerate(zip(s.potentials, s.voltages, strict=False)):
     A, B, C = extract_blocks(J)
 
     def bt(g_, _A=A, _B=B, _C=C):
-        At = jnp.transpose(_A, (0, 2, 1))
-        Ct = jnp.transpose(_C, (0, 2, 1))
-        Bt = jnp.transpose(_B, (0, 2, 1))
-        return block_thomas_solve(At, Ct, Bt, g_.reshape(_A.shape[0], 3)).reshape(-1)
+        return banded_transpose(_A, _B, _C, g_)
 
     import jax
 
-    jbt = jax.jit(bt)
+    jbanded = jax.jit(bt)
     jdense = jax.jit(lambda JT, gg: jnp.linalg.solve(JT, gg))
     # Warmup
-    _ = jbt(g).block_until_ready()
+    _ = jbanded(g).block_until_ready()
     _ = jdense(J.T, g).block_until_ready()
     # Time warm
     t0 = time.time()
     for _ in range(3):
-        jbt(g).block_until_ready()
-    t_bt = (time.time() - t0) / 3 * 1000
+        jbanded(g).block_until_ready()
+    t_banded = (time.time() - t0) / 3 * 1000
     t0 = time.time()
     for _ in range(3):
         jdense(J.T, g).block_until_ready()
@@ -76,12 +73,12 @@ for idx, (pot, vb) in enumerate(zip(s.potentials, s.voltages, strict=False)):
     lam_sp = lu.solve(np.array(g))
     t_sp = (time.time() - t0) * 1000
     # Residuals
-    lam_bt = jbt(g)
+    lam_banded = jbanded(g)
     lam_d = jdense(J.T, g)
-    r_bt = float(jnp.linalg.norm(J.T @ lam_bt - g) / (jnp.linalg.norm(g) + 1e-30))
+    r_banded = float(jnp.linalg.norm(J.T @ lam_banded - g) / (jnp.linalg.norm(g) + 1e-30))
     r_d = float(jnp.linalg.norm(J.T @ lam_d - g) / (jnp.linalg.norm(g) + 1e-30))
     r_sp = float(np.linalg.norm(JT_sp @ lam_sp - np.array(g)) / (np.linalg.norm(g) + 1e-30))
-    print(f"  BT warm r={r_bt:.2e} t={t_bt:.1f}ms")
+    print(f"  Banded warm r={r_banded:.2e} t={t_banded:.1f}ms")
     print(f"  Dense warm r={r_d:.2e} t={t_d:.1f}ms")
     print(f"  Sparse r={r_sp:.2e} t={t_sp:.1f}ms")
     # Memory
@@ -90,7 +87,7 @@ for idx, (pot, vb) in enumerate(zip(s.potentials, s.voltages, strict=False)):
     print(
         f"  Memory dense {mem_dense:.1f} MB vs banded {n * 3 * 3 * 8 / 1e6:.1f} MB (A,B,C) / {mem_banded:.1f} MB (band storage)"
     )
-    print(f"  Flops dense ~{int(2 * (n**3) / 3):.2e} vs BT ~{120 * n:.2e} (108N)")
+    print(f"  Flops dense ~{int(2 * (n**3) / 3):.2e} vs banded ~{120 * n:.2e} (108N)")
 
 # Restore
 psc.N = orig_N

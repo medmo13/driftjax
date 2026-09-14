@@ -1,12 +1,12 @@
-"""Test pivoted banded/sparse LU vs Block-Thomas vs Dense for perovskite adjoint"""
+"""Test pivoted banded/sparse LU vs Dense for perovskite adjoint"""
 
 import jax.numpy as jnp
 import numpy as np
-from _helpers import bt_transpose, equilibrate, solve_sparse_lu
+from _helpers import banded_transpose_solve, equilibrate, solve_sparse_lu
 
 import driftjax as dj
 from driftjax import BeerLambert, Sweep
-from driftjax.numerics.block_thomas import extract_blocks
+from driftjax.numerics.banded_solve import extract_blocks
 from driftjax.numerics.residual import F_jacobian
 from driftjax.science.contacts import boundary_bias
 
@@ -39,12 +39,12 @@ def test():
                 if np.all(np.isfinite(np.array(lam_d)))
                 else float("inf")
             )
-            # BT
+            # Pivoted banded transpose
             A, B, C = extract_blocks(J)
-            lam_bt = bt_transpose(A, B, C, g)
-            r_bt = (
-                float(jnp.linalg.norm(J.T @ lam_bt - g) / (jnp.linalg.norm(g) + 1e-30))
-                if np.all(np.isfinite(np.array(lam_bt)))
+            lam_banded = banded_transpose_solve(A, B, C, g)
+            r_banded = (
+                float(jnp.linalg.norm(J.T @ lam_banded - g) / (jnp.linalg.norm(g) + 1e-30))
+                if np.all(np.isfinite(np.array(lam_banded)))
                 else float("inf")
             )
             # Sparse pivoted
@@ -70,7 +70,7 @@ def test():
             except Exception:
                 c = float("inf")
             print(
-                f"V={vb:.2f} dense r={r_d:.2e} BT r={r_bt:.2e} sparse r={r_sp:.2e} equil-sparse r={r_eq:.2e} cond {c:.2e}"
+                f"V={vb:.2f} dense r={r_d:.2e} banded r={r_banded:.2e} sparse r={r_sp:.2e} equil-sparse r={r_eq:.2e} cond {c:.2e}"
             )
 
 

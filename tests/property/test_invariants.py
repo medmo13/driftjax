@@ -53,16 +53,16 @@ def test_banded_matvec_matches_dense():
 
 def test_extract_blocks_consistent():
     n = 20
-    from driftjax.numerics.banded_solve import _legacy_solve_block_tridiagonal as solve_block_tridiagonal
+    from driftjax.numerics.banded_solve import banded_solve
 
     A = jax.random.normal(jax.random.PRNGKey(2), (3 * n, 3 * n))
     A = jnp.tril(jnp.triu(A, -3), 3) + 30.0 * jnp.eye(3 * n)
     D, U, Lb = extract_blocks(A)
     assert D.shape == (n, 3, 3) and U.shape == (n - 1, 3, 3) and (Lb.shape == (n - 1, 3, 3))
     b = jax.random.normal(jax.random.PRNGKey(3), (3 * n,))
-    x_bt = solve_block_tridiagonal(A, b)
+    x_banded = banded_solve(D, U, Lb, b.reshape(n, 3)).reshape(-1)
     x_d = jnp.linalg.solve(A, b)
-    assert float(jnp.max(jnp.abs(x_bt - x_d))) < 1e-09
+    assert float(jnp.max(jnp.abs(x_banded - x_d))) < 1e-09
 
 
 def test_dense_to_csr_roundtrip():

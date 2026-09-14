@@ -7,11 +7,11 @@ import time
 
 import jax.numpy as jnp
 import numpy as np
-from _helpers import bt_transpose, equilibrate, iterative_refinement, solve_sparse_lu
+from _helpers import banded_transpose_solve, equilibrate, iterative_refinement, solve_sparse_lu
 
 import driftjax as dj
 from driftjax import BeerLambert, Sweep
-from driftjax.numerics.block_thomas import extract_blocks
+from driftjax.numerics.banded_solve import extract_blocks
 from driftjax.numerics.residual import F_jacobian
 from driftjax.science.contacts import boundary_bias
 
@@ -48,25 +48,25 @@ for idx, (pot, vb) in enumerate(zip(s.potentials, s.voltages, strict=False)):
         else float("inf")
     )
     print(f"  Dense        r={r_d:.2e} t={t_d * 1000:.1f}ms")
-    # BT
+    # Pivoted banded transpose
     A, B, C = extract_blocks(J)
     t0 = time.time()
-    lam_bt = bt_transpose(A, B, C, g)
-    t_bt = time.time() - t0
-    r_bt = (
-        float(jnp.linalg.norm(J.T @ lam_bt - g) / (jnp.linalg.norm(g) + 1e-30))
-        if np.all(np.isfinite(np.array(lam_bt)))
+    lam_banded = banded_transpose_solve(A, B, C, g)
+    t_banded = time.time() - t0
+    r_banded = (
+        float(jnp.linalg.norm(J.T @ lam_banded - g) / (jnp.linalg.norm(g) + 1e-30))
+        if np.all(np.isfinite(np.array(lam_banded)))
         else float("inf")
     )
-    print(f"  BT           r={r_bt:.2e} t={t_bt * 1000:.1f}ms")
-    # Scaled BT
+    print(f"  Banded           r={r_banded:.2e} t={t_banded * 1000:.1f}ms")
+    # Scaled banded
     J_tilde, Dr, Dc = equilibrate(J.T)
     g_tilde = Dr @ np.array(g)
-    # Need to solve scaled BT: J_tilde^T? Actually for equilibration, solve Dr*J*Dc * y = Dr*g, then lam = Dc*y, where y solves J_tilde^T? Wait J is original, JT is J.T, we equilibrate JT
-    # For JT, equilibration: JT_tilde = Dr @ JT @ Dc, solve JT_tilde @ y = Dr @ g, then lam = Dc @ y, but using BT on JT_tilde's blocks?
+    # Need to solve scaled banded: J_tilde^T? Actually for equilibration, solve Dr*J*Dc * y = Dr*g, then lam = Dc*y, where y solves J_tilde^T? Wait J is original, JT is J.T, we equilibrate JT
+    # For JT, equilibration: JT_tilde = Dr @ JT @ Dc, solve JT_tilde @ y = Dr @ g, then lam = Dc @ y, but using the banded solve on JT_tilde's blocks?
     # For simplicity, test scaled dense
-    # Scaled BT via scaled blocks (approx)
-    # We skip detailed scaled BT for now, just test scaled sparse
+    # Scaled banded via scaled blocks (approx)
+    # We skip detailed scaled banded for now, just test scaled sparse
     # Pivoted sparse (SuperLU)
     t0 = time.time()
     lam_sp, r_sp = solve_sparse_lu(J.T, g)
@@ -87,10 +87,10 @@ for idx, (pot, vb) in enumerate(zip(s.potentials, s.voltages, strict=False)):
     t_sp_s = time.time() - t0
     print(f"  Scaled Sparse r={r_sp_s_unscaled:.2e} t={t_sp_s * 1000:.1f}ms")
     # Banded + IR
-    if lam_bt is not None and np.all(np.isfinite(np.array(lam_bt))):
-        lam_ir, r_ir = iterative_refinement(J.T, g, lam_bt, iters=2)
-        print(f"  BT+IR(2)     r={r_ir:.2e}")
+    if lam_banded is not None and np.all(np.isfinite(np.array(lam_banded))):
+        lam_ir, r_ir = iterative_refinement(J.T, g, lam_banded, iters=2)
+        print(f"  Banded+IR(2)     r={r_ir:.2e}")
     else:
-        print("  BT+IR(2)     r=inf (BT failed)")
+        print("  Banded+IR(2) r=inf (banded failed)")
 
 print("\nDone")

@@ -18,8 +18,9 @@ print(solution.efficiency, solution.voc, solution.ff)
 - `grad_vs_fd.py` compares the implicit adjoint with central finite
   differences over a parameterized two-layer junction.
 - `timing.py` reports first-call compilation and warm-call execution costs.
-- `transpose_block_thomas_instability.py` records the numerical rationale for
-  the stable transposed linear solve used by the adjoint.
+- `transpose_banded_stability.py` records the numerical rationale for
+  the stable transposed linear solve used by the adjoint (historical
+  unpivoted-transpose instability plus v0.1.17 pivoted-banded port).
 - `psc.py`, `multi.py`, and `holistic.py` are standalone inverse-design
   workflows for perovskite design, IV-curve material recovery, and constrained
   device optimization.

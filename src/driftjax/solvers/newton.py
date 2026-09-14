@@ -32,7 +32,7 @@ def logdamp(move):
 # L1: covers the full solve_refined range (MAX_REFINE = 8); anything else
 # maps to 9 (unknown) instead of silently colliding with a real backend.
 _BACKEND_CODE = {
-    "analytic-block-thomas": 0,
+    "analytic-banded": 0,
     "csr": 1,
     "dense": 2,
     "mixed_f32": 3,
@@ -605,7 +605,7 @@ def _solve_newton_while(
         best_resid,
         jnp.where(settled, jnp.fmin(best_resid, r_tail), jnp.where(converged, resid_f, r_tail)),
     )
-    backend_label = "dense" if dense else ("refined" if refinement else "analytic-block-thomas")
+    backend_label = "dense" if dense else ("refined" if refinement else "analytic-banded")
     last_stats = newton_stats(
         backend=backend_label,
         iters=it,
@@ -652,7 +652,7 @@ def _solve_newton_python(
             **stats,
             "iters": it,
             "fallback": None,
-            "backend": "dense" if dense else ("refined" if refinement else "analytic-block-thomas"),
+            "backend": "dense" if dense else ("refined" if refinement else "analytic-banded"),
         }
         r = float(stats["resid_f"])  # max|F| at pot_prev (the state stepped FROM)
         if best_resid is None or r < best_resid:

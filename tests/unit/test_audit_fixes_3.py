@@ -4,7 +4,6 @@ Each test fails on the pre-fix code and passes after:
 
 * Fresnel ``rear_reflectance`` was accepted but never forwarded — every call
   silently used a perfect rear mirror (Rb=1).
-* ``_inv3`` singularity guard flipped the sign of near-singular blocks.
 * ``linsolve`` dense/banded/auto returned NaN residuals at exact roots
   (``0/0``) and silently accepted unknown backends.
 * ``_eq_bwd`` dropped the direct cell channel (wrong equilibrium gradients
@@ -23,7 +22,6 @@ import numpy as np
 import pytest
 
 import driftjax as dj
-from driftjax.numerics.banded_solve import _inv3
 from driftjax.numerics.linalg import linsolve
 from driftjax.science.optics import (
     _fresnel_per_lambda,
@@ -103,20 +101,6 @@ def test_fresnel_rb0_absorptance_identity():
     A = (np.sum(G, axis=1) - 0.5 * (G[:, 0] + G[:, -1])) * dx / phi0
     m = A_an > 1e-06
     assert float(np.max(np.abs(A[m] / A_an[m] - 1.0))) < 0.0025
-
-
-# ---------------------------------------------------------------------------
-# Banded solve singularity guard preserves sign
-# ---------------------------------------------------------------------------
-
-
-def test_inv3_negative_det_keeps_sign():
-    """diag(-2e-31,1,1) has det=-2e-31 (below DET_TOL): the guard must keep
-    the negative sign instead of mapping to +1e-30 (block inversion)."""
-    A = jnp.diag(jnp.array([-2e-31, 1.0, 1.0]))
-    inv = _inv3(A[None])[0]
-    assert float(inv[0, 0]) < 0.0, f"sign flipped: inv[0,0]={float(inv[0, 0])}"
-    assert bool(jnp.all(jnp.isfinite(inv)))
 
 
 # ---------------------------------------------------------------------------

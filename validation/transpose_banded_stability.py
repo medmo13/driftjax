@@ -1,34 +1,31 @@
-"""Why the adjoint uses the dense solve, not the O(N) transposed Block-Thomas.
+"""Why the adjoint uses the dense solve (history) and the forward uses dgbsv.
 
-The drift-diffusion Jacobian J (3n x 3n, block-tridiagonal: diag A, super B,
-sub C) has a STABLE, exact forward solve via block_thomas_solve. The adjoint
-needs J^T lam = g. The O(N) idea is to feed J^T's blocks into the forward
-block-thomas elimination. J^T is also block-tridiagonal, with blocks
-    diag = A^T,  super = C^T,  sub = B^T          (each 3x3 block transposed).
+Historical record (pre-v0.1.17): the drift-diffusion Jacobian J (3n x 3n,
+block-tridiagonal: diag A, super B, sub C) had a forward solve via
+unpivoted block-Thomas. Feeding J^T's blocks (diag A^T, super C^T,
+sub B^T) into that elimination was exact on clean synthetic systems
+(residual 8.9e-16) and stable on homojunctions (~1e-14), but blew up on
+the ill-conditioned 3-layer perovskite Jacobian (kappa ~ 1e14):
+residual 1e6 at V=0 and NaN near open-circuit. Hence the production
+adjoint keeps the pivoted dense solve.
 
-Findings (see validation/transpose_block_thomas_instability.py output):
-  * On a clean synthetic block-tridiagonal the O(N) transpose solve is EXACT
-    (residual 8.9e-16) -- the algorithm is mathematically sound.
-  * On a real homojunction Jacobian it is stable too (residual ~1e-14).
-  * BUT on the ill-conditioned 3-layer perovskite Jacobian (kappa ~ 1e14, the
-    actual optimization target) it blows up: residual 1e6 at V=0 and NaN near
-    open-circuit. This is exactly the 5.77x gradient error from commit 56ee78d.
+v0.1.17 port: all solver calls below now use the pivoted banded solver
+(LAPACK dgbsv) — forward via banded_solve, transpose via
+banded_transpose (same block reordering, with partial pivoting). The
+expected outcome changes accordingly: the pivoted transpose should now
+be stable on all three cases, while the dense adjoint remains the
+production backward path.
 
-The dense jnp.linalg.solve(J.T, g) (with partial pivoting) is uniformly stable
-across all architectures -- the same direct solver deltapv uses. So the adjoint
-keeps the dense solve; the bias loop is vectorised with jax.vmap for compile
-speed only. (The forward newton step still uses the fast O(N) block_thomas.)
-
-Run:  PYTHONPATH=src python validation/transpose_block_thomas_instability.py
+Run:  PYTHONPATH=src python validation/transpose_banded_stability.py
 """
 
 import jax.numpy as jnp
 import jax.random as jr
 import numpy as onp
-from _helpers import bt_transpose
+from _helpers import banded_transpose_solve
 
 import driftjax as dj
-from driftjax.numerics.block_thomas import block_thomas_solve, extract_blocks
+from driftjax.numerics.banded_solve import banded_solve, extract_blocks
 from driftjax.numerics.residual import F_jacobian
 from driftjax.optics.api import BeerLambert
 from driftjax.problems import Sweep
@@ -56,19 +53,17 @@ def synthetic():
         Jn[3 * i + 3 : 3 * i + 6, 3 * i : 3 * i + 3] = onp.asarray(C[i])
     J = jnp.asarray(Jn)
     g = jnp.ones(3 * N)
-    # forward
-    x_bt = block_thomas_solve(A, B, C, g.reshape(N, 3)).reshape(-1)
+    # forward (pivoted banded)
+    x_banded = banded_solve(A, B, C, g.reshape(N, 3)).reshape(-1)
     x_de = jnp.linalg.solve(J, g)
-    fwd = float(jnp.max(jnp.abs(x_bt - x_de)))
+    fwd = float(jnp.max(jnp.abs(x_banded - x_de)))
     # transpose (correct super/sub ordering)
-    lam_bt = bt_transpose(A, B, C, g)
+    lam_banded = banded_transpose_solve(A, B, C, g)
     lam_de = jnp.linalg.solve(J.T, g)
-    res = float(jnp.max(jnp.abs(J.T @ lam_bt - g)))
-    err = float(jnp.max(jnp.abs(lam_bt - lam_de)))
-    print(f"  forward  block-thomas vs dense : max|err| = {fwd:.2e} (expect ~1e-16)")
-    print(
-        f"  transpose block-thomas vs dense: residual = {res:.2e}, lam err = {err:.2e} (expect ~1e-16)"
-    )
+    res = float(jnp.max(jnp.abs(J.T @ lam_banded - g)))
+    err = float(jnp.max(jnp.abs(lam_banded - lam_de)))
+    print(f"  forward  banded vs dense : max|err| = {fwd:.2e} (expect ~1e-16)")
+    print(f"  transpose banded vs dense: residual = {res:.2e}, lam err = {err:.2e} (expect ~1e-16)")
 
 
 def real_dev(dev, label):
@@ -81,10 +76,10 @@ def real_dev(dev, label):
         A, B, C = extract_blocks(J)
         n = J.shape[0]
         g = jnp.ones(n)
-        lam_bt = bt_transpose(A, B, C, g)
+        lam_banded = banded_transpose_solve(A, B, C, g)
         lam_de = jnp.linalg.solve(J.T, g)
-        res = float(jnp.max(jnp.abs(J.T @ lam_bt - g)))
-        err = float(jnp.max(jnp.abs(lam_bt - lam_de)))
+        res = float(jnp.max(jnp.abs(J.T @ lam_banded - g)))
+        err = float(jnp.max(jnp.abs(lam_banded - lam_de)))
         flag = "" if res < 1e-6 else "  <-- UNSTABLE"
         print(f"  V={vb:6.3f}  transpose_residual={res:.3e}  lam_vs_dense={err:.3e}{flag}")
         if not jnp.isnan(res):
@@ -116,11 +111,10 @@ def main():
     real_dev(dev_h, "Homojunction (n_points=15) -- well-conditioned")
     real_dev(dev_3, "3-layer perovskite (n_points=15) -- ill-conditioned target")
     print()
-    print("Conclusion: the O(N) transposed block-Thomas is exact on clean / homojunction")
-    print("Jacobians but UNSTABLE on the ill-conditioned 3-layer perovskite (the real")
-    print("optimization target). The adjoint therefore uses the exact, uniformly stable")
-    print("dense jnp.linalg.solve(J.T, g) -- matching deltapv. The forward newton step")
-    print("still uses the fast O(N) block_thomas solve.")
+    print("Conclusion (v0.1.17): pivoted banded forward + transpose solves are")
+    print("stable on clean, homojunction AND perovskite Jacobians. The historical")
+    print("unpivoted-transpose instability above motivated both the dense production")
+    print("adjoint and the dgbsv forward default.")
 
 
 if __name__ == "__main__":

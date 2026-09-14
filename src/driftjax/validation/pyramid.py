@@ -83,7 +83,7 @@ def run(fast: bool = True) -> dict:
 
     # ---- L2: property invariants ------------------------------------------
     print("[L2] property invariants")
-    from driftjax.numerics.banded_solve import _legacy_solve_block_tridiagonal
+    from driftjax.numerics.banded_solve import banded_solve, extract_blocks
     from driftjax.numerics.linalg import linsolve
 
     rng = jax.random.key(0)
@@ -102,10 +102,11 @@ def run(fast: bool = True) -> dict:
         Jb = Jb.at[3 * (i + 1) : 3 * (i + 1) + 3, 3 * i : 3 * i + 3].set(Jr[i + 1, :, i, :])
     b = jax.random.normal(rng, (3 * n,))
     x_dense = jnp.linalg.solve(Jb, b)
-    x_bt = _legacy_solve_block_tridiagonal(Jb, b)
+    Ab, Bb, Cb = extract_blocks(Jb)
+    x_banded = banded_solve(Ab, Bb, Cb, b.reshape(-1, 3)).reshape(-1)
     results["l2_banded"] = _gate(
         "Banded solve == dense solve",
-        lambda: float(jnp.max(jnp.abs(x_bt - x_dense))),
+        lambda: float(jnp.max(jnp.abs(x_banded - x_dense))),
         lambda v: v < 1e-10,
     )
     x_csr, rel, tag = linsolve(Jb, b, backend="csr")

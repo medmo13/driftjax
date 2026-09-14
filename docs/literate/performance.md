@@ -8,7 +8,7 @@ All hot-path functions are decorated with `@jax.jit`, which compiles them to opt
 
 - `comp_F` / `fused_residual` — residual assembly
 - `banded_jacobian` / `fused_jacobian_banded` — Jacobian assembly
-- `block_thomas_solve` — linear solver
+- `banded_solve` — linear solver (LAPACK dgbsv via host callback)
 - `_step_newton_impl` — full Newton step (residual + Jacobian + solve)
 
 The first call triggers compilation (typically 1–5 seconds); subsequent calls reuse the compiled program.
@@ -57,17 +57,17 @@ XLA's Common Subexpression Elimination (CSE) can theoretically share identical s
 2. Whether XLA CSE fires depends on the traced IR structure — not guaranteed
 3. Explicit sharing is more reliable and portable
 
-## Block-Thomas vs Dense
+## Banded (dgbsv) vs Dense
 
-| Operation | Block-Thomas | Dense |
+| Operation | Banded (dgbsv) | Dense |
 |-----------|-------------|-------|
 | Jacobian assembly | O(9N) | O(9N²) |
-| Linear solve | O(9N) | O(N³) |
+| Linear solve | O(N·kl·ku), kl=ku=5 | O(N³) |
 | Memory | O(27N) | O(9N²) |
 | N=100 time | ~27ms | ~861ms |
 | N=100 memory | 21 KB | 703 KB |
 
-The analytic Jacobian + Block-Thomas path is the default and should be used whenever possible.
+The analytic Jacobian + pivoted banded path is the default and should be used whenever possible. (Timings above predate the v0.1.17 solver switch; current controlled numbers are in the main article §6 and `docs/paper/records/bench_v017_dgbsv.json`.)
 
 ## O(N) Block Operations
 
@@ -157,7 +157,7 @@ The simulate time scales linearly with N_bias (each bias point is an independent
 For a typical N=100, 10-bias sweep:
 - **Newton iterations**: ~3–5 per bias point
 - **Residual + Jacobian**: ~36ms per iteration (fused)
-- **Block-Thomas solve**: ~2ms per iteration
+- **Banded (dgbsv) solve**: ~2ms per iteration (plus host-callback round trip)
 - **Total per bias**: ~55ms forward, ~82ms adjoint
 - **Total simulate (warm)**: ~55ms
 - **Total gradient (warm)**: ~815ms

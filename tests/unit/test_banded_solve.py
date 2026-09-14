@@ -53,6 +53,17 @@ def test_jvp_through_banded_solve_raises_loudly():
         jax.jvp(lambda A_: banded_solve(A_, B, C, b), (A,), (jnp.ones_like(A),))
 
 
+def test_banded_transpose_matches_dense():
+    """banded_transpose solves J^T·x=g to dense accuracy on exact structure."""
+    from driftjax.numerics.banded_solve import banded_transpose
+
+    A, B, C, b = _synthetic_blocks(key_seed=3, n=30)
+    x = banded_transpose(A, B, C, b.reshape(-1))
+    J = _dense_from(A, B, C)
+    rel = float(jnp.linalg.norm(J.T @ x - b.reshape(-1)) / (jnp.linalg.norm(b) + 1e-30))
+    assert rel < 1e-12
+
+
 def test_lapack_banded_layout_matches_dense():
     """_blocks_to_lapack_banded must reproduce the dense matrix entries."""
     A, B, C, _ = _synthetic_blocks(key_seed=2, n=5)

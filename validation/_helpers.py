@@ -5,15 +5,12 @@ import numpy as np
 import scipy.sparse
 import scipy.sparse.linalg
 
-from driftjax.numerics.block_thomas import block_thomas_solve
+from driftjax.numerics.banded_solve import banded_transpose
 
 
-def bt_transpose(A, B, C, g):
-    """Solve J^T x = g via transposed Block-Thomas (O(N))."""
-    At = jnp.transpose(A, (0, 2, 1))
-    Ct = jnp.transpose(C, (0, 2, 1))
-    Bt = jnp.transpose(B, (0, 2, 1))
-    return block_thomas_solve(At, Ct, Bt, g.reshape(A.shape[0], 3)).reshape(-1)
+def banded_transpose_solve(A, B, C, g):
+    """Solve J^T x = g via pivoted banded transpose (LAPACK dgbsv)."""
+    return banded_transpose(A, B, C, g)
 
 
 def solve_sparse_lu(JT, g):

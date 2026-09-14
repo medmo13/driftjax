@@ -169,5 +169,5 @@ def test_analytic_solve_matches_dense(pn_cell):
     bnd = boundary_bias(pn_cell, 0.5 / energy)
     pa, ia = solve_newton(pn_cell, bnd, pot0, tol=1e-10)
     pd_, id_ = solve_newton(pn_cell, bnd, pot0, tol=1e-10, dense=True)
-    assert ia["backend"] == "analytic-block-thomas"
+    assert ia["backend"] == "analytic-banded"
     assert float(jnp.max(jnp.abs(pa.phi - pd_.phi))) < 1e-09

@@ -11,7 +11,7 @@ Tracks:
     - Simulate time (warm) for N=100 with 10 and 20 bias points
     - Gradient time (warm) for N=100 with 10 bias points
     - Residual + Jacobian assembly time
-    - Block-Thomas solve time
+    - Banded (dgbsv) solve time
     - Memory usage
 """
 
