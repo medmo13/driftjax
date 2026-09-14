@@ -1,0 +1,37 @@
+{
+  "figures": [
+    "/home/med/Desktop/final/open14/driftjax_v0.1.13/driftjax_v0.1.11/examples/tutorial/outputs/tutorial_04_init.png",
+    "/home/med/Desktop/final/open14/driftjax_v0.1.13/driftjax_v0.1.11/examples/tutorial/outputs/tutorial_04_opt.png"
+  ],
+  "init": {
+    "efficiency_fraction": 0.07337505765943049,
+    "ff": 0.7651726212357565,
+    "jsc_A_per_cm2": 0.00837475286304244,
+    "pmax_dimensionless": 2.3308717026605615e-07,
+    "voc_V": 1.0304321215091818
+  },
+  "metadata": {
+    "backend": "cpu",
+    "driftjax": "0.1.13",
+    "jax": "0.10.2",
+    "platform": "Linux-6.8.0-138-generic-x86_64-with-glibc2.35",
+    "python": "3.13.13",
+    "x64": true
+  },
+  "n_points": 500,
+  "opt": {
+    "efficiency_fraction": 0.22306231129526757,
+    "ff": 0.8576750339832007,
+    "jsc_A_per_cm2": 0.022256666925092428,
+    "pmax_dimensionless": 7.085917829754192e-07,
+    "voc_V": 1.0515880878470643
+  },
+  "x0": [
+    0.7,
+    0.7
+  ],
+  "x_opt": [
+    3.0,
+    3.0
+  ]
+}

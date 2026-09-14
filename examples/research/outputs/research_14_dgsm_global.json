@@ -1,0 +1,38 @@
+{
+  "N": 32,
+  "NAMES": [
+    "$\\mu_n$",
+    "$\\mu_p$",
+    "$\\log_{10}\\tau_n$",
+    "$\\log_{10}\\tau_p$"
+  ],
+  "caption": "DGSM (Sobol) vs local: global ranking from IFT gradients; bars normalized to max.",
+  "dgsm_normalized": [
+    5.261287658736376e-07,
+    1.4280260599711436e-05,
+    0.09975014157855974,
+    1.0
+  ],
+  "figure": "research_14_dgsm_global.png",
+  "g_loc": [
+    3.382060436628729e-05,
+    0.00019396521178737577,
+    0.018857347350663533,
+    0.055729748528499205
+  ],
+  "metadata": {
+    "backend": "cpu",
+    "driftjax": "0.1.14",
+    "jax": "0.10.2",
+    "platform": "Linux-6.8.0-138-generic-x86_64-with-glibc2.35",
+    "python": "3.13.13",
+    "x64": true
+  },
+  "most_influential_global": "$\\log_{10}\\tau_p$",
+  "order": [
+    3,
+    2,
+    1,
+    0
+  ]
+}

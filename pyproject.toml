@@ -1,0 +1,120 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "driftjax"
+version = "0.1.15"
+description = "driftjax — modern 1-D drift-diffusion–Poisson solar-cell simulator in JAX"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "The DriftJax Authors" }]
+keywords = [
+  "solar-cell", "drift-diffusion", "poisson", "jax", "simulation",
+  "semiconductor", "photovoltaic", "differentiable-programming",
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Scientific/Engineering :: Physics",
+  "Topic :: Scientific/Engineering :: Chemistry",
+]
+dependencies = [
+  "jax>=0.4.20",
+  "jaxlib>=0.4.20",
+  "equinox>=0.13",
+  "jaxtyping>=0.3",
+  "numpy>=1.26",
+  "scipy>=1.13",
+  "optax>=0.2",
+  "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+optimistix = ["optimistix>=0.1", "lineax>=0.1"]
+viz = ["matplotlib>=3.8"]
+dev = ["pytest>=8", "pytest-xdist>=3.6", "pytest-cov>=4", "hypothesis>=6", "ruff>=0.6", "mypy>=1.10", "mkdocs-material>=9", "build>=1.2"]
+
+[project.urls]
+Homepage = "https://github.com/driftjax/driftjax"
+Repository = "https://github.com/driftjax/driftjax"
+Documentation = "https://driftjax.readthedocs.io"
+Changelog = "https://github.com/driftjax/driftjax/blob/main/CHANGELOG.md"
+"Bug Tracker" = "https://github.com/driftjax/driftjax/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/driftjax"]
+license-files = ["LICENSE"]
+
+[tool.hatch.build.targets.sdist]
+license-files = ["LICENSE"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Serial by default. For a parallel CPU run use `make test-par` (capped -n4)
+# or pass xdist flags explicitly: pytest -n4 --dist worksteal
+markers = [
+  "slow: long-running regression / golden tests",
+  "experimental: L9 comparison vs published experimental data (real gate)",
+  "smoke: sub-60s dev-loop tier (no solves, no subprocesses, no hypothesis)",
+]
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+# Library gate: examples/ and validation/ are now linted (previously excluded
+# — moved to per-file-ignores where needed). Bench/docs are demonstration
+# only and remain excluded.
+exclude = [
+  "bench",
+  "docs",
+  "results",
+  "resources",
+  ".benchmarks",
+  ".hypothesis",
+]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "W", "UP", "B", "SIM", "C4"]
+ignore = ["B008", "SIM108", "SIM105", "C401", "C408"]
+
+# jaxtyping uses symbolic shape variables (Float[Array, n], ...) which static
+# name-resolution flags as F821/F722; they are intentional and runtime-valid.
+[tool.ruff.lint.per-file-ignores]
+"src/driftjax/__init__.py" = ["E402"]  # x64 must be enabled before submodule imports
+"src/driftjax/fields.py" = ["F722", "F821"]
+"src/driftjax/numerics/drift_diffusion.py" = ["F821"]
+"src/driftjax/numerics/mesh.py" = ["F821"]
+"src/driftjax/numerics/poisson.py" = ["F821"]
+"src/driftjax/numerics/residual.py" = ["F821"]
+"src/driftjax/science/contacts.py" = ["F821"]
+"src/driftjax/science/optics.py" = ["F821"]
+"src/driftjax/science/recombination.py" = ["F821"]
+"src/driftjax/solvers/continuation.py" = ["F821"]
+"src/driftjax/solvers/transient.py" = ["F821"]
+"src/driftjax/console.py" = ["SIM115"]  # DebugLog keeps a long-lived file handle (closed in .close())
+"tests/**" = ["E402"]  # test modules sometimes import after fixtures/setup
+
+[tool.coverage.run]
+source = ["driftjax"]
+branch = true
+omit = ["*/validation/pyramid.py"]
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 65
+
+[tool.mypy]
+python_version = "3.11"
+warn_unused_ignores = true
+ignore_missing_imports = true
+exclude = ["tests/", "examples/"]
+files = ["src/driftjax"]

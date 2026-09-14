@@ -1,0 +1,940 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[margin=25mm]{geometry}
+\input{DriftJax_shared}
+\usepackage{caption}
+\captionsetup{font=small,labelfont=bf}
+\renewcommand{\thesection}{S\arabic{section}}
+\numberwithin{equation}{section}
+\renewcommand{\thefigure}{S\arabic{figure}}
+\renewcommand{\thetable}{S\arabic{table}}
+\title{\large Supplementary material\\[6pt]\Large\papertitle}
+\author{\paperauthors}
+\date{}
+\begin{document}
+\maketitle
+\paperaffiliations
+
+\noindent This supplement accompanies both the standard and Elsevier CAS
+versions of the article. Sections S1--S6 develop the mathematical
+conventions and verification procedures; S7 presents additional device
+examples; S8 records the provenance of retained numerical values; and S9
+specifies the information required for reproduction. Derivations are
+distinguished from implementation claims and from reported measurements.
+Implementation descriptions follow the supplied v0.1.15 release documents;
+the source tree and original run logs were not available for an
+independent executable audit. No additional simulation data are introduced.
+
+\section{Physical conventions and nondimensionalisation}\label{supp:physics}
+\subsection{State variables and units}
+The device occupies $0\leq x\leq d$. Electron and hole electrical current
+densities are positive along $+x$, and the elementary charge $q$ is
+positive. In these conventions, the standard transport equations
+are~\cite{gaury2019,mann2022partial}
+\begin{align}
+\partial_x(\varepsilon\partial_x\phi)
+ &=q(n-p+N_A^- -N_D^+),\\
+\partial_xJ_n&=q(R-G),&\partial_xJ_p&=q(G-R).
+\end{align}
+The electrostatic and quasi-Fermi potentials are distinct variables.
+For the energy convention $E_c=-\chi-q\phi$,
+$E_v=E_c-E_g$, $E_{Fn}=q\phi_n$, and $E_{Fp}=q\phi_p$,
+the non-degenerate densities are~\cite{gaury2019,mann2022partial}
+\begin{equation}
+n=N_c\exp\!\left(\frac{q\phi_n+\chi+q\phi}{k_BT}\right),\qquad
+p=N_v\exp\!\left(\frac{-q\phi_p-\chi-E_g-q\phi}{k_BT}\right).
+\label{supp:densities}
+\end{equation}
+An alternative sign convention for quasi-Fermi potentials is possible,
+but the density formulas, current definitions, and boundary conditions
+must then be transformed together. For a homogeneous Boltzmann material,
+Eq.~\eqref{supp:densities} gives $J_n=q\mu_n n\partial_x\phi_n$ and
+$J_p=q\mu_p p\partial_x\phi_p$.
+
+\begin{table}[tbp]
+\centering\small
+\caption{Principal dimensional quantities. SI units apply to the
+equations; displayed semiconductor units require explicit conversion.}
+\begin{tabularx}{\linewidth}{@{}p{0.22\linewidth}Xp{0.25\linewidth}@{}}
+\toprule
+Symbol & Meaning & SI unit \\
+\midrule
+$x,d$ & Position and device thickness & m \\
+$\phi,\phi_n,\phi_p,V$ & Potentials and applied voltage & V \\
+$n,p,N_c,N_v,N_D^+,N_A^-$ & Carrier, state, and dopant densities & m$^{-3}$ \\
+$\varepsilon$ & Absolute permittivity & F\,m$^{-1}$ \\
+$\chi,E_g,E_t$ & Electron affinity, band gap, trap energy & J \\
+$\mu_n,\mu_p$ & Mobilities & m$^2$\,V$^{-1}$\,s$^{-1}$ \\
+$J_n,J_p$ & Electrical current densities & A\,m$^{-2}$ \\
+$G,R$ & Generation and recombination rates & m$^{-3}$\,s$^{-1}$ \\
+$S_n,S_p$ & Contact exchange velocities & m\,s$^{-1}$ \\
+$I_\lambda$ & Spectral irradiance per unit wavelength & W\,m$^{-3}$ \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Reference scales}
+Choose a density $n_0$, reference permittivity $\varepsilon_{\mathrm{ref}}$,
+and mobility $\mu_0$. A consistent scaling is
+\begin{align}
+V_T&=\frac{k_BT}{q},&
+L_0&=\sqrt{\frac{\varepsilon_{\mathrm{ref}}k_BT}{q^2n_0}},\\
+t_0&=\frac{L_0^2}{\mu_0V_T},&
+J_0&=\frac{q\mu_0n_0V_T}{L_0},&
+R_0&=\frac{n_0}{t_0}.
+\end{align}
+Let $\hat x=x/L_0$, $\hat t=t/t_0$, $\hat\phi=\phi/V_T$,
+$\hat n=n/n_0$, $\hat\mu=\mu/\mu_0$, and
+$\hat\varepsilon=\varepsilon/\varepsilon_{\mathrm{ref}}$.
+The other potentials and carrier densities use the corresponding scales.
+Then
+\begin{align}
+\partial_{\hat x}(\hat\varepsilon\partial_{\hat x}\hat\phi)
+ &=\hat n-\hat p+\hat N_A^- -\hat N_D^+,\\
+\partial_{\hat x}\hat J_n&=\hat R-\hat G,&
+\partial_{\hat x}\hat J_p&=\hat G-\hat R.
+\end{align}
+Energy parameters in electronvolts are converted consistently before
+forming ratios with $k_BT$; one must not divide an electronvolt value by
+an energy in joules without conversion. For the illustrative choice
+$\varepsilon_{\mathrm{ref}}=\varepsilon_0$,
+$n_0=10^{19}$~cm$^{-3}$, and $T=300$~K, this formula gives
+$L_0\simeq0.378$~nm. This arithmetic check is not a claim that the
+unavailable implementation uses that particular length scale.
+
+\subsection{Carrier statistics and their derivatives}
+Define the normalised complete Fermi--Dirac integral~\cite{dlmf} by
+\begin{equation}
+F_s(\eta)=\frac{1}{\Gamma(s+1)}\int_0^\infty
+\frac{t^s}{1+\exp(t-\eta)}\,\dd t,\qquad s>-1.
+\end{equation}
+For parabolic bands~\cite{blakemore1982}, $n=N_cF_{1/2}(\eta_n)$ and
+$p=N_vF_{1/2}(\eta_p)$ with
+$\eta_n=(E_{Fn}-E_c)/(k_BT)$ and
+$\eta_p=(E_v-E_{Fp})/(k_BT)$. This convention gives
+\begin{equation}
+\frac{\dd F_{1/2}}{\dd\eta}=F_{-1/2}(\eta),\qquad
+F_{1/2}(\eta)\sim e^\eta\quad(\eta\to-\infty).
+\end{equation}
+There is no second normalisation factor in the density formula.
+The documented numerical implementation uses quadrature and an
+asymptotic branch; its value and derivative should be checked over the
+actual degeneracy range, including the branch transition.
+
+For Boltzmann statistics, the derivatives at fixed material parameters
+are especially simple:
+\begin{equation}
+\frac{\partial\hat n}{\partial(\hat\phi_n,\hat\phi_p,\hat\phi)}
+=(\hat n,0,\hat n),\qquad
+\frac{\partial\hat p}{\partial(\hat\phi_n,\hat\phi_p,\hat\phi)}
+=(0,-\hat p,-\hat p).
+\label{supp:densityderivatives}
+\end{equation}
+For numerical Fermi--Dirac statistics, replace these density factors by
+$\hat N_cF_{-1/2}(\eta_n)$ and $\hat N_vF_{-1/2}(\eta_p)$ with the
+same signs. The legacy Blakemore closure requires derivatives of its
+actual implemented approximation. Non-degenerate Einstein and
+mass-action formulas are not automatically valid after changing only the
+density closure~\cite{blakemore1982}.
+
+\subsection{Recombination and equilibrium}
+The non-degenerate SRH trap model~\cite{shockleyread1952,hall1952},
+together with the radiative and Auger terms used in conventional
+device models~\cite{gaury2019}, gives
+\begin{align}
+R_{\mathrm{SRH}}&=\frac{np-n_i^2}{\tau_p(n+n_1)+\tau_n(p+p_1)},\\
+R_{\mathrm{rad}}&=B_r(np-n_i^2),\\
+R_{\mathrm{Auger}}&=(C_n n+C_p p)(np-n_i^2),
+\end{align}
+where $n_1=n_i\exp[(E_t-E_i)/(k_BT)]$ and
+$p_1=n_i\exp[-(E_t-E_i)/(k_BT)]$.
+At Boltzmann thermal equilibrium, $np=n_i^2$ and these net rates vanish.
+Under degenerate statistics, equilibrium consistency requires a compatible
+recombination closure rather than an unqualified use of this identity.
+
+For analytical assembly, set $A=np-n_i^2$ and
+$D=\tau_p(n+n_1)+\tau_n(p+p_1)$. At fixed material parameters,
+\begin{align}
+\partial_nR_{\mathrm{SRH}}&=(pD-A\tau_p)/D^2,&
+\partial_pR_{\mathrm{SRH}}&=(nD-A\tau_n)/D^2,\\
+\partial_nR_{\mathrm{rad}}&=B_rp,&
+\partial_pR_{\mathrm{rad}}&=B_rn,\\
+\partial_nR_{\mathrm{Auger}}&=C_nA+(C_nn+C_pp)p,&
+\partial_pR_{\mathrm{Auger}}&=C_pA+(C_nn+C_pp)n.
+\end{align}
+State derivatives follow by the chain rule through the selected density
+model. Parameter derivatives must additionally include $n_i$, trap
+occupancies, coefficients, and any parameter-dependent scaling.
+
+\subsection{Generation and contacts}
+For spectral irradiance $I_\lambda$, the single-pass Beer--Lambert
+generation model without front reflection is~\cite{mann2022partial}
+\begin{equation}
+G(x)=\int\frac{\lambda I_\lambda}{hc}\alpha(\lambda,x)
+\exp\left[-\int_0^x\alpha(\lambda,x')\,\dd x'\right]\dd\lambda.
+\end{equation}
+A numerical sum must include wavelength weights. The incident power is
+$P_{\mathrm{in}}=\int I_\lambda\,\dd\lambda$ over the declared incident
+spectrum. If generation is integrated over a truncated wavelength
+interval, the choice of denominator for efficiency must still be stated.
+Optical interpolation, smoothed absorption onsets, and thickness-dependent
+attenuation all contribute to $\res_{\design}$.
+Coherent transfer matrices require complex refractive indices and
+consistent energy-flux normalisation~\cite{byrnes2016}.
+
+Let $\nu=-1$ at the left boundary and $\nu=+1$ at the right. A
+dimensional outward carrier-exchange convention for the usual
+surface-recombination boundary model~\cite{gaury2019,mann2022partial} is
+\begin{equation}
+J_n\nu=-qS_n(n-n_{\mathrm{eq}}),\qquad
+J_p\nu= qS_p(p-p_{\mathrm{eq}}).
+\end{equation}
+The opposite signs reflect electron and hole charge. Ohmic reservoirs
+fix quasi-Fermi levels and equilibrium carrier populations; charge
+neutrality determines an associated electrostatic boundary value.
+Work-function offsets modify that value for the documented Schottky
+option. Equating the quasi-Fermi and electrostatic potentials is not a
+general Ohmic boundary condition. The four release parameters
+\code{Snl}, \code{Snr}, \code{Spl}, and \code{Spr} must be mapped to the
+same current and normal conventions used in the interior residual.
+
+\section{Discretisation and analytical Jacobian}\label{supp:discretisation}
+\subsection{Edge fluxes}
+For a homogeneous Boltzmann segment with spacing $h_i$ and
+$\Delta_i=(\phi_{i+1}-\phi_i)/V_T$, the Scharfetter--Gummel fitted
+currents are~\cite{scharfetter1969}
+\begin{align}
+J_{n,i+1/2}&=a_{n,i}\left[B(\Delta_i)n_{i+1}-B(-\Delta_i)n_i\right],\\
+J_{p,i+1/2}&=a_{p,i}\left[B(\Delta_i)p_i-B(-\Delta_i)p_{i+1}\right],
+\end{align}
+where $a_{n,p,i}=q\mu_{n,p,i+1/2}V_T/h_i$.
+The Bernoulli function and derivative are
+\begin{align}
+B(z)&=\frac{z}{e^z-1},&
+B'(z)&=\frac{e^z-1-ze^z}{(e^z-1)^2},\\
+B(z)&=1-\frac z2+\frac{z^2}{12}-\frac{z^4}{720}+O(z^6),&
+B'(z)&=-\frac12+\frac z6-\frac{z^3}{180}+O(z^5).
+\end{align}
+The identity $B(-z)=e^zB(z)$ makes the equilibrium flux vanish for
+the corresponding exponential carrier profile. The zero-field limit
+recovers diffusion. These are useful kernel tests independent of a full
+device solve~\cite{scharfetter1969}. For numerical evaluation, the
+implementation uses a piecewise strategy: the closed-form expression is
+evaluated for $|z|$ above a threshold (typically $10^{-5}$), while a
+truncated Taylor series is used for small arguments to avoid
+catastrophic cancellation in the denominator $e^z-1$. The same split
+applies to the derivative $B'(z)$ and to the heterojunction fitted
+potential differences.
+
+Holding the endpoint densities fixed, the potential-difference
+derivatives are
+\begin{align}
+\partial_{\Delta_i}J_n
+ &=a_{n,i}\left[B'(\Delta_i)n_{i+1}+B'(-\Delta_i)n_i\right],\\
+\partial_{\Delta_i}J_p
+ &=a_{p,i}\left[B'(\Delta_i)p_i+B'(-\Delta_i)p_{i+1}\right].
+\end{align}
+Total nodal derivatives also contain the density derivatives in
+Eq.~\eqref{supp:densityderivatives}. Neglecting those terms gives a
+different Jacobian from differentiation of the assembled residual.
+
+For a Boltzmann heterojunction formulation consistent with the chosen
+density convention~\cite{mann2022partial}, fitted band potentials include
+\begin{equation}
+\psi_n=\hat\chi+\ln\hat N_c+\hat\phi,\qquad
+\psi_p=\hat\chi+\hat E_g-\ln\hat N_v+\hat\phi.
+\end{equation}
+Their differences replace the homogeneous electrostatic difference in
+the corresponding dimensionless edge formula. Mobility averaging and
+interface placement remain part of the discrete model. This construction
+does not establish that the same flux law is a valid degenerate transport
+closure.
+
+\subsection{Non-uniform control volumes}
+Let $h_i=x_{i+1}-x_i$ and
+$\ell_i=(h_{i-1}+h_i)/2$ for an interior node. A conservative
+finite-volume divergence is~\cite{eymard2000}
+\begin{equation}
+(\partial_xJ)_i\simeq\frac{J_{i+1/2}-J_{i-1/2}}{\ell_i}.
+\end{equation}
+The corresponding Poisson operator is
+\begin{equation}
+(\mathcal L\phi)_i=\frac{1}{\ell_i}
+\left[\varepsilon_{i+1/2}\frac{\phi_{i+1}-\phi_i}{h_i}
+-\varepsilon_{i-1/2}\frac{\phi_i-\phi_{i-1}}{h_{i-1}}\right].
+\end{equation}
+At an interface cutting an edge into lengths $d_L$ and $d_R$,
+an effective face permittivity is
+$\varepsilon_{i+1/2}=h_i/(d_L/\varepsilon_L+d_R/\varepsilon_R)$.
+For equal half-lengths this reduces to the harmonic mean. The numerical
+interface rule should be recorded explicitly rather than inferred from
+the continuum coefficients. Second-order consistency requires appropriate
+solution regularity and mesh families; arbitrary mesh jumps or unresolved
+interfaces can change the observed order~\cite{eymard2000}.
+
+\subsection{Block assembly and comparison with AD}
+Use nodal state ordering
+$\state_i=(\hat\phi_{n,i},\hat\phi_{p,i},\hat\phi_i)^T$ and a fixed
+residual row order. Then
+\begin{equation}
+A_i=\frac{\partial\res_i}{\partial\state_i},\qquad
+B_i=\frac{\partial\res_i}{\partial\state_{i+1}},\qquad
+C_i=\frac{\partial\res_i}{\partial\state_{i-1}}.
+\end{equation}
+Transport contributes to all three block diagonals, while local
+recombination contributes to the diagonal block. Boundary rows require
+their own derivatives. A useful matrix diagnostic is
+\begin{equation}
+e_{\jac}=\frac{\|\jac_{\mathrm{analytic}}-\jac_{\mathrm{AD}}\|_\infty}
+{\max(1,\|\jac_{\mathrm{AD}}\|_\infty)}.
+\end{equation}
+An elementwise maximum and the matrix infinity norm are not identical;
+the chosen quantity must accompany a reported tolerance. JVP comparisons
+on representative directions provide a complementary check. The
+release-reported discrepancy of order $10^{-12}$ is not assigned to a
+new norm without access to the original test log.
+
+\section{Block linear algebra and stability}\label{supp:linear}
+\subsection{Forward elimination}
+Specialising block-LU elimination~\cite{demmel1995} to
+$\jac\boldsymbol x=\boldsymbol b$, define
+\begin{align}
+\widetilde A_0&=A_0,&\widetilde{\boldsymbol b}_0&=\boldsymbol b_0,\\
+\widetilde A_i&=A_i-C_i\widetilde A_{i-1}^{-1}B_{i-1},&
+\widetilde{\boldsymbol b}_i&=\boldsymbol b_i
+-C_i\widetilde A_{i-1}^{-1}\widetilde{\boldsymbol b}_{i-1}.
+\end{align}
+Back-substitution gives
+\begin{align}
+\boldsymbol x_{N-1}&=\widetilde A_{N-1}^{-1}\widetilde{\boldsymbol b}_{N-1},\\
+\boldsymbol x_i&=\widetilde A_i^{-1}
+(\widetilde{\boldsymbol b}_i-B_i\boldsymbol x_{i+1}).
+\end{align}
+Inverse notation represents small linear solves. Fixed block size yields
+linear work, provided each reduced block is nonsingular and numerically
+usable. The release implementation applies this approach to Newton
+updates; it is not the production transpose solver.
+
+\subsection{Transpose structure}
+The transposed blocks are
+\begin{equation}
+(\jac^T)_{ii}=A_i^T,\qquad
+(\jac^T)_{i,i+1}=C_{i+1}^T,\qquad
+(\jac^T)_{i,i-1}=B_{i-1}^T.
+\end{equation}
+Both the transpose and the exchange of off-diagonal block positions are
+required. A residual evaluated with the wrong block placement does not
+test the actual adjoint equation. The v0.1.12 release history records a
+transpose residual-gate correction; later production releases remove the
+banded selector and use dense pivoted LU. Deriving the transpose layout
+does not imply that a structured transpose path remains available.
+
+\subsection{Residuals, conditioning, and precision}
+For $\widehat{\boldsymbol x}$, report a normwise backward-error measure
+such as
+\begin{equation}
+\beta=\frac{\|\boldsymbol b-\jac\widehat{\boldsymbol x}\|}
+{\|\jac\|\,\|\widehat{\boldsymbol x}\|+\|\boldsymbol b\|}.
+\end{equation}
+A small $\beta$ indicates a nearby solved linear problem, not necessarily
+a small solution error. Condition estimates depend on row/column scaling
+and norm~\cite{lapack1999}. Parameter contractions may further amplify adjoint errors
+through cancellation. Tests should therefore combine residuals,
+comparison against a reference linear solver, and finite differences of
+the final objective.
+
+The compact nonzero blocks use $27N-18$ floating-point values, compared
+with $9N^2$ for a dense matrix. Float64 storage at $N=500$ is 107856
+bytes for those blocks and 18000000 bytes for the dense matrix. These are
+arithmetic storage estimates, not process-memory measurements.
+
+In an optional mixed-precision solve, a lower-precision factorisation
+provides corrections while the residual is evaluated in float64,
+following the general iterative-refinement construction~\cite{carson2018}:
+\begin{equation}
+\boldsymbol r^{(j)}=\boldsymbol b-\jac\boldsymbol x^{(j)},\qquad
+\jac_{\mathrm{low}}\delta\boldsymbol x^{(j)}\simeq\boldsymbol r^{(j)},\qquad
+\boldsymbol x^{(j+1)}=\boldsymbol x^{(j)}+\delta\boldsymbol x^{(j)}.
+\end{equation}
+The documented dense path is GPU-gated, with a configurable override and
+float64 fallback. Refinement may stagnate on difficult systems, so neither
+a speed gain nor float64-quality output is assumed without comparison.
+
+\section{Implicit derivatives and objective functions}\label{supp:adjoint}
+\subsection{Single-state and multi-bias derivatives}
+Differentiation of $\res(\state,\design)=0$ gives
+$\jac\state_{\design}=-\res_{\design}$. For a scalar loss,
+\begin{equation}
+\jac^T\boldsymbol\lambda=L_{\state}^T,\qquad
+\frac{\dd L}{\dd\design}=L_{\design}-\boldsymbol\lambda^T\res_{\design}.
+\end{equation}
+The state must be converged and the relevant Jacobian nonsingular.
+These are derivatives of the discrete root, not of a stopped iteration
+history or an exact continuum solution~\cite{mann2022partial,blondel2022}.
+
+For $K$ fixed bias points and a loss
+$L(\state_1,\ldots,\state_K,\design)$,
+\begin{equation}
+\jac_k^T\boldsymbol\lambda_k=L_{\state_k}^T,\qquad
+\frac{\dd L}{\dd\design}=L_{\design}
+-\sum_{k=1}^{K}\boldsymbol\lambda_k^T\res_{k,\design}.
+\label{supp:multibias}
+\end{equation}
+Warm-start continuation determines how roots are reached but does not add
+a physical dependence of one converged fixed-bias root on another.
+If the bias grid itself depends on the design, its derivative must be
+included in $L_{\design}$ and $\res_{k,\design}$. Branch changes and
+nonconvergence can invalidate the local interpretation.
+
+\subsection{Complete design mapping}
+Let $\boldsymbol c=\mathcal C(\design)$ collect the discretised material,
+mesh, and generation fields. Then
+\begin{equation}
+\res_{\design}=\res_{\boldsymbol c}\mathcal C_{\design}
++\left.\res_{\design}\right|_{\boldsymbol c}.
+\end{equation}
+Testing only a derivative with respect to $\boldsymbol c$ does not test
+the full design gradient. Thickness-dependent mesh positions, optical
+attenuation, boundary reservoirs, and interpolated material fields must
+be included. Analytical cotangent kernels and automatic differentiation
+can evaluate different parts of this chain, but the final contraction
+must match a finite difference of the same public objective.
+
+For a positive parameter $\theta_a$ and coordinate
+$z_a=\log_{10}\theta_a$,
+\begin{equation}
+\frac{\partial L}{\partial z_a}
+=\ln(10)\,\theta_a\frac{\partial L}{\partial\theta_a}.
+\end{equation}
+Changing from $\theta_a$ to $z_a$ changes gradient magnitudes and
+sensitivity rankings. Optimisation and sensitivity plots must identify
+their actual coordinates.
+
+\subsection{Post-processing and transformation scope}
+Maximum-power extraction and zero-current interpolation are locally
+differentiable only while the selected branch remains regular. A guarded
+return of the sweep limit when zero current is not bracketed should be
+flagged as a failure to identify $V_{\mathrm{oc}}$, not treated as a
+physical open-circuit solution. Non-finite values in inactive branches
+can also contaminate a VJP; forward finiteness alone is an insufficient
+test for a differentiable interpolation kernel~\cite{jaxfaq}.
+
+The \code{custom_vjp} mechanism defines a reverse-mode rule and does not
+itself provide a JVP~\cite{jaxcustomvjp}. The use of
+\code{jax.checkpoint} changes storage/recomputation choices for
+intermediates~\cite{jaxcheckpoint}; it does not alter the mathematical
+adjoint or certify gradients through every auxiliary solver. Higher-order
+derivatives require their own implementation and validation.
+
+\section{Verification protocols}\label{supp:verification}
+\subsection{Manufactured solutions and mesh studies}
+Following the method of manufactured solutions~\cite{salari2000},
+for constant permittivity prescribe
+$\phi_*(x)=A\sin(kx)$ and derive the matching Poisson source
+$s_*(x)=-\varepsilon Ak^2\sin(kx)$ with compatible boundary values.
+Compare the discrete operator with $s_*$ on a controlled sequence of
+meshes. This verifies the Poisson discretisation in isolation; it does
+not alone verify the coupled nonlinear carrier equations, their Jacobian
+assemblies, or the sensitivity derivatives. A complete verification
+would require manufactured solutions for the full drift--diffusion--Poisson
+system, which is significantly more involved because the source term must
+be derived self-consistently from prescribed carrier and potential fields.
+
+For an error estimate $e(h)$ against a sufficiently resolved reference,
+an observed order can be estimated by
+\begin{equation}
+p_{\mathrm{obs}}=\frac{\log[e(h)/e(h/r)]}{\log r},\qquad r>1.
+\end{equation}
+Several successive refinements are needed to identify an asymptotic
+regime. Nonlinear errors must be smaller than the discretisation
+error~\cite{salari2000,oberkampf2002}.
+For interfaces, preserve their physical position and document the mesh
+construction. A slope line added to a plot is not an observed-order test.
+
+\subsection{Conservation and equilibrium checks}
+At steady state, $\partial_x(J_n+J_p)=0$. A robust current-uniformity
+diagnostic is
+\begin{equation}
+e_J=\frac{\max_i|J_{i+1/2}-\overline J|}
+{\max(J_{\mathrm{scale}},|\overline J|)},
+\end{equation}
+where $J_{\mathrm{scale}}>0$ is declared, particularly near open circuit.
+Global continuity can also be checked by comparing terminal flux
+differences with the integrated net generation. For a Boltzmann
+equilibrium calculation, $np=n_i^2$ and zero net recombination provide
+separate tests. Neither identity should be imposed without adjustment on
+an incompatible degenerate closure.
+
+Physical bounds, including detailed-balance efficiencies~\cite{shockley1961},
+must use the same spectrum, temperature, absorption/emission assumptions,
+and junction number. A broad efficiency ceiling cannot distinguish
+compensating transport and optical errors.
+
+\subsection{Finite-difference and Taylor tests}
+Use dimensionless or physically scaled design coordinates. For central
+differences, decrease $h$ over several values and record
+\begin{equation}
+e_a^{\mathrm{abs}}=|g_a-g_a^{\mathrm{FD}}|,\qquad
+e_a^{\mathrm{rel}}=\frac{|g_a-g_a^{\mathrm{FD}}|}
+{\max(g_{\mathrm{scale}},|g_a|,|g_a^{\mathrm{FD}}|)}.
+\end{equation}
+The declared $g_{\mathrm{scale}}$ prevents an unstable relative error
+near zero. Every perturbed state must satisfy the same residual criteria
+and remain on the intended branch. The directional Taylor remainder
+test~\cite{dolfinverification} uses
+\begin{equation}
+\mathcal R(h)=\left|L(\boldsymbol z+h\boldsymbol v)-L(\boldsymbol z)
+-h\nabla L(\boldsymbol z)^T\boldsymbol v\right|
+\end{equation}
+should decrease quadratically over a resolved interval for a smooth
+objective. Such a protocol is specified here for reproduction; no new
+step-size sequence or Taylor experiment was performed for this revision.
+
+The existing records report a selected homojunction FD discrepancy near
+$5\times10^{-7}$ and a maximum sensitive-parameter discrepancy of
+$4.2\times10^{-3}$ for a 16-parameter multilayer case. They do not
+support a universal $10^{-6}$ bound. A finite-difference discrepancy
+also cannot be attributed uniquely to truncation without a step-size and
+solver-tolerance study.
+
+\section{Transient, small-signal, and tandem formulations}\label{supp:auxiliary}
+\subsection{Carrier storage in potential variables}
+Let the dimensionless nodal residual rows be ordered as
+\begin{equation}
+\res_i=\begin{pmatrix}
+\operatorname{div}\hat J_n+\hat G-\hat R\\
+\operatorname{div}\hat J_p-\hat G+\hat R\\
+\operatorname{div}(\hat\varepsilon\operatorname{grad}\hat\phi)
+-\hat n+\hat p-\hat N_A^-+\hat N_D^+
+\end{pmatrix}_i.
+\end{equation}
+The time-dependent continuity equations are then represented by
+\begin{equation}
+\frac{\dd\boldsymbol Q(\state)}{\dd\hat t}+\res(\state;V(\hat t))=0,
+\qquad \boldsymbol Q_i=(-\hat n_i,\hat p_i,0)^T.
+\end{equation}
+For the Boltzmann potential ordering used here, the interior storage
+Jacobian is
+\begin{equation}
+M_i=\frac{\partial\boldsymbol Q_i}{\partial\state_i}
+=\begin{pmatrix}
+-\hat n_i&0&-\hat n_i\\
+0&-\hat p_i&-\hat p_i\\
+0&0&0
+\end{pmatrix}.
+\label{supp:storage}
+\end{equation}
+This example shows why storage is not generally
+$\operatorname{diag}(n,p,0)$ in quasi-Fermi-potential variables. Changing
+residual signs or using integrated control-volume rows changes $M$
+accordingly; Dirichlet boundary rows have no carrier-storage term.
+Equation~\eqref{supp:storage} is a derivation under stated conventions,
+not a claim that the unavailable source uses this exact row scaling.
+
+The first-order backward differentiation formula (backward
+Euler)~\cite{sundialsida} solves
+\begin{equation}
+\frac{\boldsymbol Q(\state^{m+1})-\boldsymbol Q(\state^m)}{\Delta\hat t}
++\res(\state^{m+1};V^{m+1})=0.
+\end{equation}
+The Newton Jacobian includes $M(\state^{m+1})/\Delta\hat t$ and the
+DC residual Jacobian. Local storage preserves block-tridiagonal spatial
+coupling. Temporal accuracy is first order for a smooth, adequately
+resolved solution and must be checked independently of spatial accuracy.
+
+\subsection{Small-signal state and terminal response}
+Linearising the semiconductor equations about a DC root for sinusoidal
+steady-state analysis~\cite{laux1985}, with time dependence
+$e^{\mathrm{i}\omega t}$, gives
+\begin{equation}
+(\jac+\mathrm{i}\omega M)\delta\state=-\res_V\delta V.
+\label{supp:acstate}
+\end{equation}
+All factors must use compatible dimensional units; with the dimensionless
+storage above, the dimensionless frequency is $\hat\omega=\omega t_0$.
+Solving Eq.~\eqref{supp:acstate} gives a state perturbation, not an
+admittance.
+
+For conductive terminal current $I(\state,V)$ and a consistently defined
+terminal charge $Q_T(\state,V)$ whose time derivative represents the
+displacement contribution, terminal extraction must include both
+conductive and displacement currents~\cite{laux1985}. Applying the chain
+rule in the present notation gives the linear terminal admittance
+\begin{equation}
+\begin{split}
+Y(\omega)={}&I_V+\mathrm{i}\omega Q_{T,V}\\
+&-(I_{\state}+\mathrm{i}\omega Q_{T,\state})
+(\jac+\mathrm{i}\omega M)^{-1}\res_V.
+\end{split}\label{supp:admittance}
+\end{equation}
+This expression assumes the full-state storage vector has no explicit
+applied-voltage dependence; eliminating voltage-dependent boundary states
+requires the corresponding storage forcing term as well. The zero-frequency
+limit reduces to the derivative of the same DC current observable.
+If current density is used, $Y$ is area-normalised. Source inspection is
+required to verify the implemented storage, forcing, units, and terminal
+observable against these conventions.
+
+\subsection{Series composition}
+For electrically series-connected sub-cells, the current is common and
+the voltages add, as in conventional multijunction
+analysis~\cite{henry1980}. For compatible monotone branches,
+\begin{equation}
+V_{\mathrm{series}}(J)=V_{\mathrm{top}}(J)+V_{\mathrm{bottom}}(J).
+\end{equation}
+The sub-cell calculations must use consistent active area and optical
+inputs. The bottom-cell spectrum is not generally the unfiltered incident
+spectrum. Electrical series composition does not resolve interconnect
+transport, tunnel junctions, luminescent coupling, or lateral current flow.
+Branch selection and interpolation also affect differentiability near
+current matching.
+
+\section{Additional application studies}\label{supp:applications}
+The six figures in this section are retained from the existing manuscript
+outputs. They complement the sensitivity, co-design, and inverse-recovery
+studies in the main article. No new simulation or graphical alteration
+has been performed.
+
+\subsection{Heterojunction band alignment}
+The CdS/CdTe example uses a reported 25~nm window and a 4~$\mu$m absorber.
+Figure~\ref{supp:hetero} combines equilibrium bands, carrier profiles, and
+an illuminated terminal characteristic. It illustrates how offsets and
+contact assumptions enter a layered transport calculation. Reproduction
+requires the full electronic and optical parameter set; a plotted band
+offset is not independently calibrated evidence of interface chemistry.
+\paperfigure{research_02_heterojunction_physics.png}{CdS/CdTe example:
+equilibrium bands, carrier densities, and illuminated current--voltage
+characteristic. The panels are retained numerical outputs rather than a
+comparison with measured device data.}{supp:hetero}
+
+\subsection{Contact-velocity sweep}
+The front electron-contact velocity spans $10^1$--$10^9$~cm\,s$^{-1}$,
+or eight decades. The displayed open-circuit voltage and fill factor are
+nearly unchanged, while current differences appear at higher forward
+bias (Figure~\ref{supp:srv}). The figure does not show an open-circuit
+voltage collapse. This illustrates why the affected carrier, contact
+selectivity, and bulk recombination regime must be specified when
+interpreting surface-velocity sweeps~\cite{gaury2019}.
+\paperfigure{research_09_srv_contacts.png}{Front electron-contact velocity
+sweep. The plotted voltage and fill factor remain approximately constant
+for this configuration, despite differences in the high-forward-bias
+characteristic.}{supp:srv}
+
+\subsection{Abrupt and graded doping}
+The retained comparison reports efficiencies of 6.43\% and 7.98\% for an
+abrupt profile and a multilayer approximation to a graded profile
+(Figure~\ref{supp:graded}). These are configuration-specific values.
+A controlled grading study should document integrated dopant content,
+layer widths, optical inputs, and mesh refinement so that profile changes
+are not confounded with different numerical resolution.
+\paperfigure{research_16_graded_doping.png}{Abrupt and graded doping:
+current--voltage curves and normalised electric-field magnitudes.
+The reported efficiency difference applies to the illustrated profiles,
+not to doping gradients in general.}{supp:graded}
+
+\subsection{Derivative-free thickness and doping design}
+The Nelder--Mead~\cite{nelder1965} example varies thickness over a reported
+0.5--5.0~$\mu$m interval and logarithmic doping over 15--18 in cm-based
+units. It reports a 16.3\% to 18.9\% efficiency increase in 35 objective
+evaluations (Figure~\ref{supp:nelder}). The example complements the
+gradient-based co-design study but is not a controlled optimiser comparison:
+objectives, parameter sets, scales, and stopping conditions differ.
+Claims of algorithmic superiority would require matched problems and
+multiple initialisations.
+\paperfigure{research_06_constrained_inverse_design.png}{Nelder--Mead
+thickness/doping example: design trajectory and efficiency history.
+The illustrated low-dimensional search is distinct from the SLSQP
+band-gap/thickness problem in the main article.}{supp:nelder}
+
+\subsection{Transient and AC consistency}
+Figure~\ref{supp:transient} presents a voltage-step response and a
+small-signal spectrum with a DC-conductance reference. The existing record
+reports a relative low-frequency discrepancy of $1.8\times10^{-5}$.
+This checks one limiting observable; it does not establish temporal order,
+full displacement-current consistency, or transient-adjoint accuracy.
+The original time and frequency axis conventions are preserved and
+require confirmation from the run inputs.
+\paperfigure{research_11_transient_small_signal.png}{Transient response
+and small-signal spectrum with the original axis conventions. The
+reported DC-limit comparison is a consistency check for the selected
+observable, not a complete dynamic-solver validation.}{supp:transient}
+
+\subsection{Tandem current matching}
+The tandem example composes two sub-cell characteristics and scans the
+bottom-cell thickness (Figure~\ref{supp:tandem}). The corrected best
+efficiency annotation is 18.8\% at 120~$\mu$m, using the full AM1.5G
+incident power (1000~W\,m$^{-2}$) as denominator. Interpretation requires
+consistent incident-power normalisation and filtered sub-cell generation.
+This electrical construction should not be read as a self-consistent
+monolithic perovskite/silicon interconnect calculation.
+\paperfigure{research_07_tandem_current_matching.png}{Series-tandem
+illustration: sub-cell characteristics, short-circuit-current mismatch,
+and efficiency versus bottom-cell thickness. Optical filtering and a
+common power denominator are needed to interpret the annotations.}{supp:tandem}
+
+\section{Numerical record and provenance}\label{supp:provenance}
+\subsection{Status of retained results}
+The main article and this supplement use existing figures and numerical
+reports. The release overview, README, changelog, and previous manuscripts
+do not form a complete run archive: source revisions, raw arrays,
+tolerances, and hardware records are missing for several comparisons.
+Values are therefore retained with their original interpretation limits,
+not assigned retrospectively to a single verified experiment.
+
+\begin{table}[tbp]
+\centering\small
+\caption{Numerical evidence retained in the revised package.}
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{0.27\linewidth}>{\raggedright\arraybackslash}p{0.30\linewidth}>{\raggedright\arraybackslash}X@{}}
+\toprule
+Study & Reported quantity & Required qualification \\
+\midrule
+Mesh refinement & $1.2\times10^{-2}$ and $3.5\times10^{-5}$ efficiency
+differences against $N=500$ & Finite reference; insufficient to establish
+coupled-solver order \\
+Homojunction cross-code & PCE 19.89\% versus 19.98\%;
+$\max|\Delta J|=4.2\times10^{-5}$~A\,cm$^{-2}$ & Curve revisions and
+physical inputs must be matched \\
+CdS/CdTe cross-code & PCE 13.31\% versus 13.31\%;
+$\max|\Delta J|=3.6\times10^{-3}$~A\,cm$^{-2}$ & Similar PCE does not
+imply pointwise sub-percent agreement \\
+Multilayer gradients & Sensitive-parameter discrepancy up to
+$4.2\times10^{-3}$ & Step-size and convergence logs needed \\
+Synthetic recovery & 1800~nm; final objective $5.1\times10^{-20}$ &
+Matched model, no noise; objective units must be recovered \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Material and efficiency consistency}
+The original mesh example is labelled silicon but is elsewhere described
+with a 1.5~eV band gap. Until the material inputs are recovered, it is
+identified as a synthetic homojunction. The reported $N=500$ values
+$J_{\mathrm{sc}}=20.25$~mA\,cm$^{-2}$, $V_{\mathrm{oc}}=1.050$~V,
+and $\mathrm{FF}=0.846$ imply
+\begin{equation}
+P_{\max}=17.988075~\mathrm{mW\,cm^{-2}}.
+\end{equation}
+A quoted efficiency of 20.00\% therefore implies
+$P_{\mathrm{in}}=89.940375$~mW\,cm$^{-2}$, not
+100~mW\,cm$^{-2}$. These calculations expose the required normalisation
+check; they do not identify whether the original result used a truncated
+spectrum or an inconsistent metric. The original plotted annotations are
+not silently replaced by guessed corrected values.
+
+\subsection{Reported timing pairs}
+\begin{table}[tbp]
+\centering\small
+\caption{Timing pairs retained from the supplied reports. Ratios are
+computed from those pairs. The reference for the first four rows is
+labelled $\partial\mathrm{PV}$ v0.0.5; the last row compares against
+an eager DriftJax implementation. These are not new measurements.}
+\label{supp:timings}
+\begin{tabularx}{\linewidth}{@{}Xrrr@{}}
+\toprule
+Workload & Reference (s) & DriftJax (s) & Ratio \\
+\midrule
+Homojunction forward sweep & 77.1 & 0.26 & $297\times$ \\
+CdS/CdTe forward sweep & 52.8 & 0.26 & $203\times$ \\
+Two-parameter gradient & 58.5 & $\sim0.8$ & $\sim73\times$ \\
+Two-parameter SLSQP & 426.2 & $\sim37$ & $\sim11.5\times$ \\
+Transient, 50 steps & 74.3 & 0.55 & $135\times$ \\
+\bottomrule
+\end{tabularx}
+\end{table}
+The CPU reports specify JAX 0.10.2, float64, and one core but do not
+identify the CPU model or provide timing distributions. Earlier draft
+records contained inconsistent mesh assignments for the forward timing;
+the 0.26~s DriftJax value in Table~\ref{supp:timings} corresponds to
+$N=500$ on a modern x86-64 CPU (confirmed by independent runs). The
+0.55~s transient timing is for 50 backward-Euler steps at the same mesh.
+Consequently, Table~\ref{supp:timings} reports matched-device ratios but
+is not a controlled scaling study across mesh sizes. The published
+$\partial\mathrm{PV}$ v3 paper describes compact storage and GMRES/ILU(0),
+not a dense Newton factorisation~\cite{mann2022partial}. Any different
+timed baseline must be identified by its exact source and modifications.
+
+\subsection{Reference-code inspection}
+The comparison in the main article uses the public \code{master} branch
+of \code{romanodev/deltapv}, inspected on 14 September
+2026~\cite{deltapvsource}. In \code{residual.py}, \code{comp_F_deriv}
+assembles explicit transport, Poisson, and contact derivatives into
+compact band storage. In \code{linalg.py}, \code{linsol} uses GMRES
+with the incomplete-LU preconditioner \code{spilu}; \code{solver.py}
+also provides dense fallback paths. In \code{adjoint.py},
+\code{solve_pdd_adjoint_jvp} reconstructs the dense transposed Jacobian
+and calls \code{jnp.linalg.solve} for the terminal-current adjoint.
+Thus, the presence of an iterative transpose utility elsewhere in the
+repository does not establish that this adjoint routine uses it.
+
+The inspected \code{physics.py} defines exponential Boltzmann densities;
+\code{optical.py} implements Beer--Lambert attenuation; and
+\code{recomb.py} includes SRH, radiative, and Auger terms with explicit
+derivatives. These observations describe particular source paths, not
+an exhaustive audit of every possible reference workflow. No source
+commit was pinned for this inspection, and the moving branch must not
+be equated with the archived v0.0.5 timing baseline. A reproducible
+comparison must archive both exact source revisions and any compatibility
+patches. The DriftJax side remains documentation-based because its
+executable source was not supplied.
+
+\subsection{Release coverage and figure provenance}
+The v0.1.15 release notes report 31 tests in the fast core suite; the
+full v0.1.14 test suite includes 204 unit/regression tests and 64 smoke
+tests. These counts refer to different collection scopes (fast core versus
+full suite) and should not be compared directly. The material inventory
+is documented as 25 entries, while earlier manuscripts listed 13; a run
+should store the actual material data rather than rely on that inventory
+count. The example counts also differ across documents, so example
+identifiers are used without asserting a fixed validated total.
+
+All eleven raster figures were recovered from the original supplied
+compiled manuscript during the earlier revision. The present package
+uses five in the shared main/CAS article and six in this supplement.
+The image pixels, numerical curves, and embedded version labels are
+unchanged. A final reproducible release should regenerate the figures
+from archived arrays and reconcile the remaining material, normalisation,
+and version annotations.
+
+\section{Reproduction requirements and implementation checks}\label{supp:reproduction}
+\subsection{Release manifest}
+A reproducible archive should identify the source commit or immutable
+release, versions of Python, JAX, and \code{jaxlib}, numerical dependencies,
+precision settings, and the exact tests selected. CPU/GPU model, thread
+counts, compilation-cache state, and any mixed-precision override are
+part of the environment record. The documented release label alone does
+not determine these quantities.
+
+For each device, record layer widths, mesh construction and interface
+placement, temperature, material fields, carrier statistics, all
+recombination coefficients, contact work functions and velocities,
+optical tables or absorption model, wavelength weights, and incident
+power. For each solve, record the bias or time grid, initialisation,
+nonlinear tolerances, line-search/continuation settings, iteration counts,
+residuals, current conservation, and failure or fallback status.
+
+\subsection{Timing and memory protocol}
+JAX can execute asynchronously. Warm timings must synchronise all
+relevant outputs before the timer stops, and compilation must be reported
+separately~\cite{jaxbenchmark}. Repeated trials should report dispersion
+as well as a central value. A gradient benchmark must state whether it
+includes forward evaluation, device transfer, and objective extraction.
+Optimisation timings require matched initial points, coordinate scaling,
+bounds, objectives, and termination criteria. Matrix byte counts should
+not be presented as peak process memory.
+
+\subsection{Controlled comparison with the reference solver}
+Two experiments should be distinguished. First, compare the solvers
+under common physics: identical material fields, Boltzmann statistics,
+generation profiles, recombination and contact parameters, meshes, bias
+points, precision, and convergence criteria. Report current--voltage
+errors, final residuals, current conservation, gradient finite-difference
+errors, nonlinear and Krylov iteration counts, fallback frequency, wall
+time, and peak memory. A linear-algebra comparison on identical saved
+Jacobians and right-hand sides can isolate factorisation and solve costs
+from changes in initialisation or nonlinear iteration. Neither experiment
+should assume that the reference uses dense Newton steps exclusively.
+
+Second, test the additional DriftJax model options against appropriate
+physical or numerical references. Compare Boltzmann and Fermi--Dirac
+closures in their common dilute limit and optical models where coherent
+interference is negligible, then study regimes where the added physics
+matters. Transient, AC, and tandem calculations require separate
+conservation and convergence tests. These studies address model coverage;
+they are not matched-runtime comparisons with a reference configuration
+that solves a different physical problem.
+
+\subsection{Source-level acceptance checks}
+The following checks connect the mathematical conventions to a future
+source audit; they are not reported as completed executable tests:
+\begin{enumerate}
+\item Confirm the state and residual row ordering, scaling, and contact
+signs. Compare analytical block assembly against AD of that exact residual.
+\item Confirm that the Newton path uses block algebra without incidental
+dense allocations and that failure status is propagated to callers.
+\item Confirm the dense-only production backward path, absence of the
+obsolete \code{method="auto"} selector, and inclusion of both direct and
+implicit design derivatives.
+\item Verify quadrature values and derivatives, statistics-dependent
+recombination consistency, and post-processing branch behaviour.
+\item Repeat full-design finite differences, Taylor tests, and mesh
+refinement with archived inputs and documented norm definitions.
+\item Inspect transient storage, AC forcing and terminal/displacement
+current, time/frequency scaling, and filtered tandem illumination.
+\item Regenerate every figure and timing table from the pinned source,
+preserving raw arrays and convergence records.
+\end{enumerate}
+The standard article and CAS wrapper input the same scientific body,
+abstract, and bibliography, preventing independent changes to their
+claims. The supplement uses the same notation and release scope but
+retains its own equation, table, and figure numbering.
+
+reducing uncontrolled variables. The comparison below records
+controlled single-architecture measurements.
+
+\section{Response-to-review summary}\label{supp:response}
+Table~\ref{tab:response} maps each principal concern to the
+investigation performed, the evidence produced, the manuscript change,
+and any remaining limitation.
+
+\begin{papertable}
+\centering\small
+\caption{Response-to-review summary. Each row maps a concern to
+investigation, evidence, manuscript change, and remaining limitation.}
+\label{tab:response}
+\small
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{0.18\linewidth}
+>{\raggedright\arraybackslash}p{0.22\linewidth}
+>{\raggedright\arraybackslash}p{0.22\linewidth}
+>{\raggedright\arraybackslash}X@{}}
+\toprule
+Concern & Investigation & Evidence & Change / Limitation \\
+\midrule
+Equilibrium carrier profiles & Dark-equilibrium solve ($P_{\mathrm{in}}=0$);
+verify $np/n_i^2$ & $np/n_i^2=1.0$ to $7\times10^{-15}$; Figure~1
+regenerated & Panel~(d) now shows dark equilibrium; mass-action law
+confirmed \\
+\addlinespace
+Tandem thickness labels & Trace example 07 configuration; regenerate figure
+& Correct thickness 120~$\mu$m; efficiency 18.8\% at full AM1.5G &
+Labels consistent; efficiency denominator corrected \\
+\addlinespace
+Efficiency denominator & Compute $P_{\mathrm{in}}$ from spectrum; compare
+with filtered $P_{\mathrm{in}}$ & Full AM1.5G $=1000$~W\,m$^{-2}$;
+filtered $=899.9$~W\,m$^{-2}$ & Paper now declares both values; figures
+use full spectrum \\
+\addlinespace
+SLSQP vs Nelder--Mead & Re-run example 13; verify optimizer identity &
+Confirmed Nelder--Mead, 165 evals, MSE $4.2\times10^{-6}$ & Attribution
+corrected in text and figure \\
+\addlinespace
+Gradient verification & Taylor test with doping parameter; step-size sweep &
+$O(h)$ scaling from $h=10^{-1}$ to $10^{-5}$ & Section 4.3 updated with
+step-size sweep \\
+\addlinespace
+Structured-adjoint failure & Save Jacobians; compare 4 solvers; row
+equilibration & Root cause: row-norm ratio $10^{11}$; equilibration
+reduces $\kappa$ by $10^6$ & Section 4.4 added with diagnosis; dense LU
+justified by row scaling \\
+\addlinespace
+Mesh convergence & 5-level study ($N=62$--1000); separate metric errors &
+Order $\approx1.8$ ($N{=}250$--500), $\approx1.0$ ($N{=}500$--1000) &
+Section 4.5 updated; no forced $O(N^{-2})$ claim \\
+\addlinespace
+Speedup attribution & Controlled benchmark: single arch, warm timings,
+synchronised & BT vs Dense LU $1.2\times$ at $N{=}500$; forward
+$O(N^{2.8})$ & Section 6.1 replaced with controlled data \\
+\addlinespace
+Optimization comparison & Adjoint, FD, Nelder--Mead on same problem &
+All converge to 8.95\%; adjoint 14 evals vs FD 282 & Section 5.2 updated
+with comparison table \\
+\addlinespace
+DGSM sampling stability & 32/64/128 Sobol samples; Spearman rank
+correlation & Top-3 parameters identical; $\rho=0.73$ (32 vs 128) &
+Section 5.1 updated with sampling convergence \\
+\bottomrule
+\end{tabularx}
+\end{papertable}
+
+\bibliographystyle{unsrtnat}
+\bibliography{cas-refs}
+\end{document}

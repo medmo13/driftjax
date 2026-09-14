@@ -1,0 +1,13 @@
+EXAMPLE_RESULT developer_adjoint_check grad_fd_relative_error=1.15173e-05
+EXAMPLE_RESULT developer_batching_and_jit iv_rel_error=6.23784e-05 generation_rel_error=0.580763
+EXAMPLE_RESULT developer_batching_and_jit serial_eff=6.6445 serial_voc=0.4932 serial_jsc=15.6816 serial_ff=0.7731 serial_pmax=0.00597954 repeat_eff=6.6445 repeat_voc=0.4932 repeat_jsc=15.6816 repeat_ff=0.7731 repeat_pmax=0.00597954
+EXAMPLE_RESULT developer_adjoint_check grad_fd_relative_error=1.15173e-05
+EXAMPLE_RESULT developer_adjoint_check grad_fd_relative_error=1.15173e-05
+EXAMPLE_RESULT developer_adjoint_check grad_fd_relative_error=1.15173e-05
+EXAMPLE_RESULT developer_adjoint_check grad_fd_relative_error=1.15174e-05
+EXAMPLE_RESULT developer_adjoint_check grad_fd_relative_error=1.15174e-05
+EXAMPLE_RESULT developer_adjoint_check grad_fd_relative_error=1.15173e-05
+EXAMPLE_RESULT developer_adjoint_check grad_fd_relative_error=1.15173e-05
+EXAMPLE_RESULT developer_adjoint_check grad_fd_relative_error=1.15173e-05
+EXAMPLE_RESULT developer_batching_and_jit iv_rel_error=6.23784e-05 generation_rel_error=0.580763
+EXAMPLE_RESULT developer_batching_and_jit serial_eff=6.6445 serial_voc=0.4932 serial_jsc=15.6816 serial_ff=0.7731 serial_pmax=0.00597954 repeat_eff=6.6445 repeat_voc=0.4932 repeat_jsc=15.6816 repeat_ff=0.7731 repeat_pmax=0.00597954

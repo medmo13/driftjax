@@ -1,0 +1,61 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+*.egg
+dist/
+build/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# Testing / quality
+.pytest_cache/
+.hypothesis/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# XLA / JAX caches
+.cache/
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Documentation figure cache
+.figcache/
+docs/.figcache/
+docs/figures/*.png
+!docs/figures/fig*.png
+!docs/figures/supp_*.png
+
+# Agent scratch
+.agent-scratch/
+
+# Lock files (regenerate from pyproject.toml)
+uv.lock
+
+# LaTeX build artifacts
+docs/*.aux
+docs/*.log
+docs/*.out
+docs/*.bbl
+docs/*.blg
+docs/*.abs
+docs/*.synctex.gz

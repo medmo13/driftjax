@@ -1,0 +1,18 @@
+{
+  "efficiency_fraction": 0.20000158737425694,
+  "ff": 0.8459442959892921,
+  "figure": "/home/med/Desktop/final/open14/driftjax_v0.1.13/driftjax_v0.1.11/examples/tutorial/outputs/tutorial_01_dossier.png",
+  "jsc_A_per_cm2": 0.02025495467268568,
+  "metadata": {
+    "backend": "cpu",
+    "driftjax": "0.1.14",
+    "jax": "0.10.2",
+    "platform": "Linux-6.8.0-138-generic-x86_64-with-glibc2.35",
+    "python": "3.13.13",
+    "x64": true
+  },
+  "n_points": 500,
+  "pmax_dimensionless": 6.353358421353608e-07,
+  "voc_V": 1.050419451781579,
+  "wall_s": 2.7271600999956718
+}

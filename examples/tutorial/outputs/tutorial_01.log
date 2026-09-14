@@ -1,0 +1,4 @@
+EXAMPLE_RESULT tutorial_01 wall_s=6.32462 efficiency_fraction=0.200002 voc_V=1.05042 jsc_A_per_cm2=0.020255 ff=0.845944 pmax_dimensionless=6.35336e-07
+EXAMPLE_RESULT tutorial_01 sol_eff=20.0002 sol_voc=1.0504 sol_jsc=20.2550 sol_ff=0.8459 sol_pmax=0.0179985
+EXAMPLE_RESULT tutorial_01 wall_s=2.72716 efficiency_fraction=0.200002 voc_V=1.05042 jsc_A_per_cm2=0.020255 ff=0.845944 pmax_dimensionless=6.35336e-07
+EXAMPLE_RESULT tutorial_01 sol_eff=20.0002 sol_voc=1.0504 sol_jsc=20.2550 sol_ff=0.8459 sol_pmax=0.0179985

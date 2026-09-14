@@ -1,0 +1,2 @@
+EXAMPLE_RESULT research_12 bandgap_eV=1.61991 thickness_um=2.5 pce_percent=19.8028
+EXAMPLE_RESULT research_12 optimal_eff=19.8028 optimal_voc=1.1196 optimal_jsc=18.6242 optimal_ff=0.8546 optimal_pmax=0.0178208

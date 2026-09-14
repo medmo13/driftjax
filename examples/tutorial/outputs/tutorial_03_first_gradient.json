@@ -1,0 +1,30 @@
+{
+  "efficiency_fraction": 0.20000158737425694,
+  "fd_check": {
+    "adjoint": 0.00041290698517333044,
+    "fd": 0.00041294006645645415,
+    "index": 250,
+    "name": "Eg"
+  },
+  "ff": 0.8459442959892921,
+  "figure": "/home/med/Desktop/final/open14/driftjax_v0.1.13/driftjax_v0.1.11/examples/tutorial/outputs/tutorial_03_dossier.png",
+  "jsc_A_per_cm2": 0.02025495467268568,
+  "metadata": {
+    "backend": "cpu",
+    "driftjax": "0.1.13",
+    "jax": "0.10.2",
+    "platform": "Linux-6.8.0-138-generic-x86_64-with-glibc2.35",
+    "python": "3.13.13",
+    "x64": true
+  },
+  "n_points": 500,
+  "pmax_dimensionless": 6.353358421353608e-07,
+  "top_sensitivities": {
+    "Br": 0.22877797791857218,
+    "Nc": 0.018397887950428734,
+    "Ndop": 0.03083353842697426,
+    "Snr": 0.371800829160445,
+    "Spl": 2.157500364624897
+  },
+  "voc_V": 1.050419451781579
+}

@@ -1,0 +1,40 @@
+\PassOptionsToPackage{hyperfootnotes=false}{hyperref}
+\documentclass[a4paper,fleqn]{cas-sc}
+\newcommand{\DriftJaxCAS}{}
+\input{DriftJax_shared}
+\let\printorcid\relax
+\begin{document}
+\shorttitle{DriftJax: Structure-aware differentiable device simulation}
+\shortauthors{Benaissa et al.}
+\title[mode=title]{\papertitle}
+\author[1]{Mohammed Benaissa}
+\author[1,2]{Abd Elouahab Noua}
+\cormark[1]
+\author[1]{Mohamed Maouadj}
+\affiliation[1]{organization={Research Center in Semiconductor Technology
+for Energetics (CRTSE)},
+addressline={02 Bd. Frantz Fanon, B.P. 140},
+city={Algiers},postcode={16038},country={Algeria}}
+\affiliation[2]{organization={Department of Sciences and Technology,
+University Larbi Ben M'hidi},
+city={Oum El Bouaghi},postcode={04000},country={Algeria}}
+\cortext[1]{Corresponding author: Abd Elouahab Noua.}
+\input{DriftJax_abstract}
+\begin{highlights}
+\item Analytical block Jacobians support linear-cost Newton steps.
+\item A dense implicit adjoint makes backward-pass complexity explicit.
+\item Verification separates residual accuracy from sensitivity accuracy.
+\item Design examples link sensitivities, optimisation, and synthetic recovery.
+\end{highlights}
+\begin{keywords}
+photovoltaic devices \sep drift--diffusion \sep implicit differentiation
+\sep Scharfetter--Gummel scheme \sep adjoint sensitivity \sep scientific software
+\end{keywords}
+\ExplSyntaxOn
+\box_gset_wd:Nn \g_stm_key_box { 0pt }
+\ExplSyntaxOff
+\maketitle
+\input{DriftJax_content}
+\bibliographystyle{unsrtnat}
+\bibliography{cas-refs}
+\end{document}

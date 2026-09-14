@@ -1,0 +1,55 @@
+\usepackage[T1]{fontenc}
+\ifdefined\DriftJaxCAS\else
+\usepackage{lmodern}
+\fi
+\usepackage{amsmath,amssymb,mathtools}
+\usepackage{graphicx}
+\graphicspath{{figures/}}
+\usepackage{booktabs,tabularx,array}
+\usepackage{xcolor}
+\usepackage[expansion=false]{microtype}
+\usepackage{listings,enumitem}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage{hyperref}
+\hypersetup{colorlinks=true,linkcolor=blue!45!black,
+  citecolor=blue!45!black,urlcolor=blue!45!black}
+\lstset{basicstyle=\ttfamily\small,breaklines=true,language=Python,
+  frame=single,backgroundcolor=\color{gray!4},showstringspaces=false,
+  columns=fullflexible,keepspaces=true}
+\setlist{itemsep=2pt,topsep=4pt}
+\setlength{\emergencystretch}{2em}
+\newcommand{\code}[1]{\texttt{\detokenize{#1}}}
+\newcommand{\dd}{\mathrm{d}}
+\newcommand{\jac}{\mathcal{J}}
+\newcommand{\design}{\boldsymbol{\theta}}
+\newcommand{\state}{\boldsymbol{u}}
+\newcommand{\res}{\boldsymbol{F}}
+\newcommand{\papertitle}{DriftJax: A Structure-Aware Differentiable
+Drift--Diffusion Solver for Photovoltaic Device Design}
+\newcommand{\paperauthors}{Mohammed Benaissa$^{a}$ \and
+Abd Elouahab Noua$^{a,b}$\textsuperscript{*} \and Mohamed Maouadj$^{a}$}
+\newcommand{\paperaffiliations}{%
+\begin{center}\small
+$^{a}$Research Center in Semiconductor Technology for Energetics (CRTSE),
+02 Bd. Frantz Fanon, B.P. 140, 16038 Algiers, Algeria\\
+$^{b}$Department of Sciences and Technology, University Larbi Ben M'hidi,
+04000 Oum El Bouaghi, Algeria\\[3pt]
+\textsuperscript{*}Corresponding author: Abd Elouahab Noua.
+\end{center}}
+\newcommand{\paperfigure}[3]{%
+\ifdefined\DriftJaxCAS
+\begin{figure}[pos=tbp]
+\else
+\begin{figure}[tbp]
+\fi
+\centering
+\includegraphics[width=0.96\linewidth]{#1}
+\caption{#2}\label{#3}
+\end{figure}}
+\newenvironment{papertable}{%
+\ifdefined\DriftJaxCAS
+\begin{table}[pos=tbp]
+\else
+\begin{table}[tbp]
+\fi
+}{\end{table}}

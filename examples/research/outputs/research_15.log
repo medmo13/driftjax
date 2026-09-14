@@ -1,0 +1,2 @@
+EXAMPLE_RESULT research_15 ex1_eff_pct=19.8891 ex2_eff_pct=13.309 ex1_maxdI=4.17979e-05 ex2_maxdI=0.00360207
+EXAMPLE_RESULT research_15 ex1_eff=19.8891 ex1_voc=1.0495 ex1_jsc=20.2550 ex1_ff=0.8419 ex1_pmax=0.0178985 ex2_eff=13.3090 ex2_voc=0.8873 ex2_jsc=18.1638 ex2_ff=0.7432 ex2_pmax=0.011977

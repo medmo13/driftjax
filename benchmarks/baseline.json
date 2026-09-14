@@ -1,0 +1,109 @@
+{
+  "timestamp": "2026-09-12T23:47:02",
+  "python": "3.13.13",
+  "jax": "0.10.2",
+  "platform": "Linux 6.8.0-138-generic",
+  "results": [
+    {
+      "name": "newton_warm_n50",
+      "value": 19.24,
+      "unit": "ms",
+      "meta": {
+        "N": 50,
+        "n_measure": 10
+      }
+    },
+    {
+      "name": "newton_warm_n100",
+      "value": 23.72,
+      "unit": "ms",
+      "meta": {
+        "N": 100,
+        "n_measure": 10
+      }
+    },
+    {
+      "name": "newton_warm_n200",
+      "value": 24.7,
+      "unit": "ms",
+      "meta": {
+        "N": 200,
+        "n_measure": 10
+      }
+    },
+    {
+      "name": "newton_warm_n400",
+      "value": 48.95,
+      "unit": "ms",
+      "meta": {
+        "N": 400,
+        "n_measure": 10
+      }
+    },
+    {
+      "name": "simulate_warm_n100_steps10",
+      "value": 55.01,
+      "unit": "ms",
+      "meta": {
+        "N": 100,
+        "n_steps": 10
+      }
+    },
+    {
+      "name": "simulate_warm_n100_steps20",
+      "value": 69.25,
+      "unit": "ms",
+      "meta": {
+        "N": 100,
+        "n_steps": 20
+      }
+    },
+    {
+      "name": "gradient_warm_n100_steps10",
+      "value": 814.83,
+      "unit": "ms",
+      "meta": {
+        "N": 100,
+        "n_steps": 10
+      }
+    },
+    {
+      "name": "comp_F_n100",
+      "value": 23.046,
+      "unit": "ms",
+      "meta": {
+        "N": 100
+      }
+    },
+    {
+      "name": "comp_F_precomputed_n100",
+      "value": 15.026,
+      "unit": "ms",
+      "meta": {
+        "N": 100
+      }
+    },
+    {
+      "name": "banded_jacobian_n100",
+      "value": 21.4,
+      "unit": "ms",
+      "meta": {
+        "N": 100
+      }
+    },
+    {
+      "name": "fused_pair_n100",
+      "value": 35.7,
+      "unit": "ms",
+      "meta": {
+        "N": 100
+      }
+    },
+    {
+      "name": "peak_rss",
+      "value": 1816804,
+      "unit": "KB",
+      "meta": {}
+    }
+  ]
+}

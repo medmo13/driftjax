@@ -1,0 +1,25 @@
+\begin{abstract}
+We present DriftJax, a one-dimensional drift--diffusion--Poisson framework
+for photovoltaic simulation and design sensitivity analysis. The numerical
+method combines Scharfetter--Gummel fluxes with an analytically assembled
+block-tridiagonal Jacobian and a direct Block-Thomas Newton step. For a mesh
+of $N$ nodes, the forward linear solve requires $O(N)$ work and storage.
+Sensitivities of converged steady-state solutions are evaluated using the
+implicit function theorem and a custom reverse-mode rule in JAX. The
+production adjoint uses pivoted dense LU, with $O(N^3)$ factorisation work
+and $O(N^2)$ matrix storage per bias; checkpointing reduces retained
+intermediates without changing this scaling. This separation of forward
+and backward linear algebra makes the computational trade-off explicit.
+The framework combines carrier-statistics, optical-generation, and
+recombination models with a common device interface. Reported verification
+studies compare analytical Jacobians, linear residuals, conservation
+identities, and finite-difference sensitivities. Illustrative applications
+address derivative-based sensitivity analysis, constrained band-gap/thickness
+optimisation, and recovery of a synthetic current--voltage curve.
+The results support the use of structured forward computation within a
+differentiable design workflow, while also identifying the importance of
+conditioning, objective normalisation, and convergence checks. The reported
+timing ratios are specific to the matched configurations and have not been
+isolated by controlled ablation; the available release records do not
+constitute a fully reproducible benchmark archive.
+\end{abstract}
