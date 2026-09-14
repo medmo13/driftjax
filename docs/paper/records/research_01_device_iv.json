@@ -1,0 +1,43 @@
+{
+  "figure": "research_01_device_iv.png",
+  "metadata": {
+    "backend": "cpu",
+    "driftjax": "0.1.16",
+    "jax": "0.10.2",
+    "platform": "Linux-6.8.0-138-generic-x86_64-with-glibc2.35",
+    "python": "3.13.13",
+    "x64": true
+  },
+  "results": [
+    {
+      "efficiency_fraction": 0.20231792684335953,
+      "ff": 0.8585712633859326,
+      "jsc_A_per_cm2": 0.020112142926546915,
+      "n_points": 125,
+      "pmax_dimensionless": 6.426940511705714e-07,
+      "relative_efficiency_error": 0.011581605423801435,
+      "voc_V": 1.0543918151086762,
+      "wall_s": 3.1359600979994866
+    },
+    {
+      "efficiency_fraction": 0.20000860316948796,
+      "ff": 0.8479745083297217,
+      "jsc_A_per_cm2": 0.020196934820683993,
+      "n_points": 250,
+      "pmax_dimensionless": 6.353581288893306e-07,
+      "relative_efficiency_error": 3.5078697739986345e-05,
+      "voc_V": 1.0509517339292604,
+      "wall_s": 2.752337281999644
+    },
+    {
+      "efficiency_fraction": 0.20000158737425694,
+      "ff": 0.8459442959892921,
+      "jsc_A_per_cm2": 0.02025495467268568,
+      "n_points": 500,
+      "pmax_dimensionless": 6.353358421353608e-07,
+      "relative_efficiency_error": 0.0,
+      "voc_V": 1.050419451781579,
+      "wall_s": 3.176340480997169
+    }
+  ]
+}

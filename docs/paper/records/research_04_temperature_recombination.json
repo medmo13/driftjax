@@ -1,0 +1,43 @@
+{
+  "assumption": "material parameters are held fixed except thermal scaling",
+  "figure": "research_04_temperature_recombination.png",
+  "metadata": {
+    "backend": "cpu",
+    "driftjax": "0.1.16",
+    "jax": "0.10.2",
+    "platform": "Linux-6.8.0-138-generic-x86_64-with-glibc2.35",
+    "python": "3.13.13",
+    "x64": true
+  },
+  "metrics": {
+    "280.0": {
+      "efficiency_fraction": 0.07403592877966267,
+      "ff": 0.7956922047499804,
+      "jsc_A_per_cm2": 0.01567173017370767,
+      "pmax_dimensionless": 2.6082984180417434e-07,
+      "voc_V": 0.5342971220537954
+    },
+    "300.0": {
+      "efficiency_fraction": 0.06629231670847485,
+      "ff": 0.7723298413120413,
+      "jsc_A_per_cm2": 0.015681564284417644,
+      "pmax_dimensionless": 2.105877529075257e-07,
+      "voc_V": 0.4925761197486226
+    },
+    "320.0": {
+      "efficiency_fraction": 0.05813153270851958,
+      "ff": 0.747764734126321,
+      "jsc_A_per_cm2": 0.015690436962495707,
+      "pmax_dimensionless": 1.6762492723652796e-07,
+      "voc_V": 0.44587601513265934
+    },
+    "340.0": {
+      "efficiency_fraction": 0.05129081211822387,
+      "ff": 0.7313027162188959,
+      "jsc_A_per_cm2": 0.015698461632467294,
+      "pmax_dimensionless": 1.3504328567055213e-07,
+      "voc_V": 0.4020570188181728
+    }
+  },
+  "voc_slope_mV_per_K": -2.2171020716141525
+}

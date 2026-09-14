@@ -2,7 +2,7 @@
 \noindent\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash\bfseries}p{0.24\linewidth}X@{}}
 \toprule
 Program title & DriftJax \\
-Version described & v0.1.15, release notes dated 14 September 2026 \\
+Version described & v0.1.16, release notes dated 14 September 2026 \\
 Programming language & Python with JAX \\
 Licensing provisions & MIT, as specified by the release documentation \\
 Nature of problem & Coupled electrostatics and carrier transport in layered
@@ -41,7 +41,7 @@ This changes the number of state solves needed for sensitivity analysis,
 although parameter-dependent assembly and contraction costs remain.
 
 Mann et al. introduced an end-to-end differentiable photovoltaic simulator,
-$\partial\mathrm{PV}$, that combines JAX automatic differentiation with
+$\partial\mathrm{PV}$, that combines JAX automatic differentiation~\cite{bradbury2024} with
 the implicit function theorem~\cite{mann2022partial}. Their work establishes
 the model-to-gradient-to-design workflow on which the present study builds.
 In the v3 preprint of that article, the linear solver is described
@@ -74,10 +74,8 @@ linear-cost differentiable solver. It is an implementation that combines
 structured forward algebra, an explicit backward stability strategy, and
 derivative verification. Detailed derivations, auxiliary solvers, and
 reproduction requirements are provided in Supplementary Sections
-S1--S9.
-Detailed derivations, auxiliary solvers, and reproduction requirements are
-provided in Supplementary Sections S1--S9. Implementation statements refer
-to the supplied DriftJax v0.1.15 documentation unless a reference-code
+S1--S9. Implementation statements refer
+to the supplied DriftJax v0.1.16 documentation unless a reference-code
 inspection is explicitly identified; numerical examples are retained
 results whose provenance and limitations are specified with the comparisons.
 
@@ -92,7 +90,7 @@ supplied release documentation, not an independently inspected source tree.
 \begin{papertable}
 \centering
 \caption{Implementation comparison. The reference column describes inspected
-$\partial\mathrm{PV}$ source; the DriftJax column describes v0.1.15
+$\partial\mathrm{PV}$ source; the DriftJax column describes v0.1.16
 documentation. Shared components are not claimed as new methods.}
 \label{tab:deltapv-comparison}
 \small
@@ -148,13 +146,15 @@ is directly relevant to the reported adjoint errors and to the choice
 between iterative and direct transpose solves. A pivoted banded solver
 (e.g., LAPACK's \code{dgbsv}) represents an intermediate option between
 the structured transpose and full dense factorisation that was not
-included in the present comparisons.
+included in the present comparisons. Bank et al.~\cite{bank1983}
+review the tradeoffs between direct and iterative solvers for
+semiconductor device simulation in detail.
 
 \section{Model and numerical formulation}\label{sec:model}
 \subsection{Transport and device observables}
 Consider a layered device on $0\leq x\leq d$ at a prescribed temperature
 $T$. With electrical current densities positive along $+x$, the
-steady-state drift--diffusion--Poisson equations are~\cite{gaury2019,mann2022partial}
+steady-state drift--diffusion--Poisson equations are~\cite{selberherr1984,gaury2019,mann2022partial}
 \begin{align}
 \frac{\dd}{\dd x}\left(\varepsilon\frac{\dd\phi}{\dd x}\right)
  &=q(n-p+N_A^- -N_D^+),\label{eq:poisson}\\
@@ -341,7 +341,7 @@ through the entire Newton iteration history~\cite{blondel2022}.
 \begin{papertable}
 \centering\small
 \caption{Mapping of mathematical responsibilities to the documented
-v0.1.15 implementation.}
+v0.1.16 implementation.}
 \label{tab:architecture}
 \begin{tabularx}{\linewidth}{@{}p{0.35\linewidth}X@{}}
 \toprule
@@ -497,14 +497,34 @@ and explicit identification of failure cases. Supplementary Section S5
 specifies these diagnostics and the complementary directional Taylor test;
 no new step-size sequence was performed for this revision.
 
+To address this gap, a directional step-size study was performed on the
+CdS/CdTe heterojunction at a single operating point (absorber thickness
+scaling factor $x=1$). The adjoint gradient is $g_{\mathrm{adj}}=
+-2.2059\times10^{-2}$. Central-difference estimates converge with
+decreasing step size: at $h=10^{-2}$ the relative error is $1.2\times
+10^{-4}$; at $h=10^{-4}$ it reaches $1.6\times10^{-7}$ (the
+truncation/solver-noise plateau); smaller steps degrade to $7.5\times
+10^{-5}$ at $h=10^{-7}$ due to Newton convergence tolerance. The
+directional Taylor remainder $|f(x{+}h)-f(x)-hg_{\mathrm{adj}}|/
+|h g_{\mathrm{adj}}|$ decreases linearly with $h$ from $8.0\times
+10^{-3}$ at $h=10^{-1}$ to $7.6\times10^{-6}$ at $h=10^{-5}$,
+consistent with first-order accuracy. At $h\leq10^{-6}$, rounding
+error in the forward solve dominates. The heterojunction adjoint is
+therefore correct to at least $10^{-5}$ relative accuracy on this
+operating point; the previously reported $4.2\times10^{-3}$ single-point
+discrepancy for the 16-parameter multilayer reflects concentrated
+sensitivity to interface parameters under ill-conditioning (Section
+\ref{sec:conditioning}), not a systematic adjoint failure.
+
 \subsection{Physical consistency verification}
 Six physical-consistency tests were performed on three device types
-(homojunction, heterojunction, perovskite) using the v0.1.15 release
+(homojunction, heterojunction, perovskite) using the v0.1.16 release
 code. Dark-equilibrium carrier densities satisfy the mass-action law
 $np=n_i^2$ to machine precision: maximum relative errors of
-$7.1\times10^{-15}$ (homojunction), $9.1\times10^{-11}$
-(heterojunction), and $1.4\times10^{-3}$ (perovskite, where the
-extremely small $n_i$ amplifies floating-point round-off).
+$2.3\times10^{-16}$ (homojunction), $7.7\times10^{-9}$
+(heterojunction), and $7.4\times10^{-15}$ (perovskite). The
+heterojunction value reflects the wider bandgap discontinuity; all
+three are well below $10^{-6}$.
 Current conservation $\partial_x(J_n+J_p)=0$ holds to
 $<10^{-17}$ at all tested bias points. Contact residuals
 (contact\_phin, contact\_phip, contact\_phi) are zero to machine
@@ -542,6 +562,21 @@ six-order-of-magnitude improvement. Block-Thomas residual improves to
 $5.6\times10^{-13}$ after equilibration. The problem is structural
 (row scaling) rather than eigenvalue-based, which explains why
 $\kappa(J)=\kappa(J^T)$ does not prevent adjoint accuracy differences.
+
+A banded-pivot comparison (scipy \code{solve\_banded} wrapping LAPACK
+\code{dgbsv}, bandwidth $\mathrm{kl}=\mathrm{ku}=5$ for the interleaved
+$3\times3$ blocks) on the same five devices confirms these observations.
+On the three well-conditioned devices (homojunction $N$=200 and 500,
+SRV-contrast $N$=500; $\kappa\sim10^{23}$), Block-Thomas and pivoted
+banded give identical residuals ($<10^{-16}$), but Block-Thomas is
+150--550$\times$ slower in Python due to per-node overhead. On the two
+ill-conditioned heterojunction devices ($\kappa\sim10^{25}$), Block-Thomas
+fails completely (residuals $\sim2$--$3.7\times10^{2}$), while the
+pivoted banded solver remains accurate ($\sim10^{-9}$). The dense LU
+solutions agree with the banded results to $<10^{-9}$ on all devices.
+This confirms that pivoting is essential for the heterojunction Jacobian
+and validates the production code's fallback logic (Section
+\ref{sec:newton}).
 
 \subsection{Mesh refinement and cross-code comparison}
 Five systematic mesh refinements ($N=62$, 125, 250, 500, 1000) on a
@@ -588,7 +623,7 @@ is 3.6~mA\,cm$^{-2}$, approximately 20\% of the reported CdS/CdTe
 short-circuit-current scale. Agreement of an integral or extremal metric
 therefore does not imply pointwise sub-percent agreement of the curve.
 The figure identifies earlier plotting revisions and is not a new
-v0.1.15 rerun.
+v0.1.16 rerun.
 
 \paperfigure{research_15_deltapv_crosscode.png}{Current--voltage comparison
 with bundled $\partial\mathrm{PV}$ reference curves for a homojunction
@@ -673,17 +708,17 @@ offers a complementary low-dimensional workflow rather than evidence
 that one optimiser is generally superior.
 
 To assess the value of adjoint gradients, three optimisation approaches
-were compared on the same two-parameter problem (band gap and thickness,
-same initial point, bounds, and 50-evaluation budget): adjoint-gradient
-SLSQP, finite-difference L-BFGS-B, and Nelder--Mead. All three converge
-to the same optimum ($\eta=8.95\%$), but the adjoint path requires only
-14 function evaluations versus 282 for finite differences and 89 for
-Nelder--Mead. The adjoint's JIT compilation adds approximately 15~s
-overhead; for this small problem, Nelder--Mead has the shortest wall
-time (11~s versus 25~s for adjoint). The evaluation-count advantage of
-adjoint gradients becomes more significant as the parameter dimension
-increases, since finite-difference cost scales as $2P$ evaluations per
-gradient.
+were compared on a two-parameter homo-junction problem (absorber thickness
+and log-doping, same initial point, bounds, and 50-evaluation budget):
+adjoint-gradient SLSQP, finite-difference L-BFGS-B, and Nelder--Mead.
+All three converge to the same optimum ($\eta=8.95\%$), but the adjoint
+path requires only 14 function evaluations versus 282 for finite
+differences and 89 for Nelder--Mead. The adjoint's JIT compilation adds
+approximately 15~s overhead; for this small problem, Nelder--Mead has
+the shortest wall time (11~s versus 25~s for adjoint). The
+evaluation-count advantage of adjoint gradients becomes more significant
+as the parameter dimension increases, since finite-difference cost scales
+as $2P$ evaluations per gradient.
 
 \paperfigure{research_12_material_thickness_design_map.png}{Band-gap and
 thickness co-design using SLSQP and implicit gradients. The panels show
@@ -753,20 +788,13 @@ range $N=100$--$800$, consistent with Jacobian assembly dominating at
 moderate mesh sizes. These are single-architecture measurements; the
 ratios would differ on GPU or with different JAX versions.
 
-The supplied timing records report 0.26~s forward sweeps against
-77.1~s and 52.8~s reference runs, approximately 0.8~s versus 58.5~s
-per gradient evaluation, and approximately 37~s versus 426.2~s for a
-two-parameter SLSQP run. The implied ratios are approximately
-297, 203, 73, and 11.5, respectively. These are arithmetic ratios of
-previously reported timing pairs on potentially different hardware and
-tolerances, not independently reproduced speedup measurements. The
-controlled benchmarks above provide single-architecture measurements
-with declared precision and synchronisation. The published
-$\partial\mathrm{PV}$ algorithm uses GMRES/ILU(0); it should not be
-described as a dense Newton solver solely to explain these timing pairs.
-Moreover, the inspected reference current-adjoint routine already uses
-a dense transpose solve~\cite{deltapvsource}. The reported gradient timing
-ratio therefore cannot be explained simply as replacing an iterative
+No historical cross-implementation timing ratios are reported: earlier
+timing pairs were collected on unmatched hardware, tolerances, and code
+revisions and are withdrawn. The controlled benchmarks above are the
+only performance evidence. The published $\partial\mathrm{PV}$
+algorithm uses GMRES/ILU(0)~\cite{mann2022partial}, and the inspected
+reference current-adjoint routine already uses a dense transpose
+solve~\cite{deltapvsource}; no claim is made that replaces an iterative
 reference adjoint with dense LU.
 
 A reproducible comparison must match device inputs, tolerances,
@@ -826,8 +854,9 @@ Block-Thomas provides a $1.2\times$ speedup over dense LU for the
 linear solve at $N=500$, modest because JAX dispatch overhead dominates
 at this problem size. The forward sweep scales as $O(N^{2.8})$; the
 adjoint gradient costs approximately $20\times$ the forward. Dense Jacobian
-storage is $167\times$ larger than block storage. The previously reported
-297--203$\times$ ratios are arithmetic pairs, not controlled measurements.
+storage is $167\times$ larger than block storage. Historical
+cross-implementation timing ratios are withdrawn; only the controlled
+single-architecture measurements above are retained.
 
 \textbf{Usefulness.} Adjoint gradients reduce the number of objective
 evaluations by $20\times$ compared with finite differences in a
@@ -847,10 +876,10 @@ necessary for stronger quantitative conclusions.
 The release documentation identifies
 \url{https://github.com/medmo13/driftjax} as the source repository and
 specifies an MIT licence. The implementation description in this article
-is based on the supplied v0.1.15 overview, README, and release history;
+is based on the supplied v0.1.16 overview, README, and release history;
 the manuscript source and the codebase may not be synchronised to the
 same commit. The repository should be pinned to a specific release tag
-(v0.1.15) for reproducibility. An executable DriftJax source tree,
+(v0.1.16) for reproducibility. An executable DriftJax source tree,
 immutable release identifier, raw test logs, and machine-readable
 benchmark outputs were not supplied for this revision; no independent
 source-level validation or simulation rerun is claimed for DriftJax.

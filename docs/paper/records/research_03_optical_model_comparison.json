@@ -1,0 +1,27 @@
+{
+  "figure": "research_03_optical_model_comparison.png",
+  "metadata": {
+    "backend": "cpu",
+    "driftjax": "0.1.16",
+    "jax": "0.10.2",
+    "platform": "Linux-6.8.0-138-generic-x86_64-with-glibc2.35",
+    "python": "3.13.13",
+    "x64": true
+  },
+  "metrics": {
+    "Beer-Lambert": {
+      "efficiency_fraction": 0.09245400106431946,
+      "ff": 0.8424300571375974,
+      "jsc_A_per_cm2": 0.009796751175418866,
+      "pmax_dimensionless": 2.936943721104863e-07,
+      "voc_V": 1.0081197756742306
+    },
+    "TMM": {
+      "efficiency_fraction": 0.08931106052872236,
+      "ff": 0.8418843266712124,
+      "jsc_A_per_cm2": 0.009479751214355644,
+      "pmax_dimensionless": 2.837103374926592e-07,
+      "voc_V": 1.0070667033581322
+    }
+  }
+}

@@ -1,0 +1,1 @@
+EXAMPLE_RESULT research_08 boltzmann_eff=6.6120 boltzmann_voc=0.4935 boltzmann_jsc=15.6816 boltzmann_ff=0.7689 boltzmann_pmax=0.00595029 blakemore_eff=6.6120 blakemore_voc=0.4935 blakemore_jsc=15.6816 blakemore_ff=0.7689 blakemore_pmax=0.00595029 exact_eff=6.6112 exact_voc=0.4934 exact_jsc=15.6817 exact_ff=0.7689 exact_pmax=0.00594953

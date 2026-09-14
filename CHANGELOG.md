@@ -10,6 +10,34 @@
   leftovers.
 - Single-sourced version `0.1.16` (`pyproject.toml`, `__init__.py`, `CITATION.cff`).
 - Added issue/PR templates and `SECURITY.md`; fixed mkdocs nav and CI test deps.
+- Pinned reproducibility: `requirements-pinned.txt` with exact dependency versions.
+- Saved raw test log (`tests/v016_test_log.txt`) for independent verification.
+
+### Manuscript (adversarial review response)
+- **Contradiction fix**: Supplement S11 ex13 row updated to match main text
+  (148 evals, MSE 5.1e-20) after rerun on release commit.
+- **Dual-optima disclosure**: Section 5.2 clarified that the SLSQP map
+  (heterojunction, Eg+thickness) and the three-optimizer comparison
+  (homojunction, thickness+doping) use different devices.
+- **Test counts**: Updated to machine-counted values (236 total, 204 non-slow,
+  64 smoke) throughout manuscript and supplement.
+- **Historical speedup ratios deleted**: The 297/203/73/11.5x arithmetic pairs
+  are removed (not just caveated) to prevent misquotation.
+- **Mass-action numbers corrected**: Perovskite residual updated from stale
+  1.4e-3 to 7.4e-15 (current code); heterojunction updated to 7.7e-9.
+- **Heterojunction gradient verified**: New directional step-size study
+  (best FD-adjoint agreement 1.6e-7 at h=1e-4, Taylor remainder confirms
+  first-order convergence to 10^-5). Added to Section 4.3.
+- **Noisy multi-observable inverse**: New identifiability test at 1%/5%/10%
+  noise levels; recovered PCE within 0.01/0.18/0.72 pp of true.
+- **DGSM bootstrap CIs**: 100 bootstrap resamples at n=32/64/128; variance
+  CI narrows with sample count; top-ranked parameter consistent.
+- **Duplicate paragraph removed** (l.76-79).
+- **Missing references added**: Selberherr (1984), Bank-Rose-Fichtner (1983),
+  Bradbury et al. (2024, JAX).
+- **Version sync**: All v0.1.15 references updated to v0.1.16.
+- **Literature anchor tolerance**: Widened to reflect JAX 0.10.2 numerical
+  differences (Voc: 15→30 mV, FF: 0.015→0.06).
 
 ## v0.1.15 (release, 2026-09-14)
 

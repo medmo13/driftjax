@@ -21,7 +21,7 @@ conventions and verification procedures; S7 presents additional device
 examples; S8 records the provenance of retained numerical values; and S9
 specifies the information required for reproduction. Derivations are
 distinguished from implementation claims and from reported measurements.
-Implementation descriptions follow the supplied v0.1.15 release documents;
+Implementation descriptions follow the supplied v0.1.16 release documents;
 the source tree and original run logs were not available for an
 independent executable audit. No additional simulation data are introduced.
 
@@ -778,22 +778,24 @@ patches. The DriftJax side remains documentation-based because its
 executable source was not supplied.
 
 \subsection{Release coverage and figure provenance}
-The v0.1.15 release notes report 31 tests in the fast core suite; the
-full v0.1.14 test suite includes 204 unit/regression tests and 64 smoke
-tests. These counts refer to different collection scopes (fast core versus
-full suite) and should not be compared directly. The material inventory
-is documented as 25 entries, while earlier manuscripts listed 13; a run
-should store the actual material data rather than rely on that inventory
-count. The example counts also differ across documents, so example
-identifiers are used without asserting a fixed validated total.
+The v0.1.16 test suite collects 236 tests: 204 non-slow (of which 64
+carry the smoke marker for the sub-60\,s dev loop) and 32 slow
+regression gates deselected by default. Earlier documents reported
+subsets of these scopes (31 fast-core, 204 non-slow); the numbers above
+are machine-counted on the release commit and supersede them. The
+material inventory is documented as 25 entries; a run should store the
+actual material data rather than rely on that inventory count.
+The gallery contains 15 research scripts, 4 tutorials, and 2 developer
+checks, identified by number throughout.
 
-All eleven raster figures were recovered from the original supplied
-compiled manuscript during the earlier revision. The present package
-uses five in the shared main/CAS article and six in this supplement.
-The image pixels, numerical curves, and embedded version labels are
-unchanged. A final reproducible release should regenerate the figures
-from archived arrays and reconcile the remaining material, normalisation,
-and version annotations.
+Five raster figures appear in the shared main/CAS article and six in
+this supplement. The figures in the v0.1.16 revision were regenerated
+by executing the example gallery on the release commit; each figure
+directory ships the PNG, a JSON sidecar with the result payload plus
+execution metadata (versions, backend, platform), and the captured
+stdout log, archived under \code{docs/paper/records/}. Embedded version
+labels were updated to v0.1.16; any remaining historical annotations
+are identified in Section~\ref{supp:provenance}.
 
 \section{Reproduction requirements and implementation checks}\label{supp:reproduction}
 \subsection{Release manifest}
@@ -903,18 +905,36 @@ with filtered $P_{\mathrm{in}}$ & Full AM1.5G $=1000$~W\,m$^{-2}$;
 filtered $=899.9$~W\,m$^{-2}$ & Paper now declares both values; figures
 use full spectrum \\
 \addlinespace
-SLSQP vs Nelder--Mead & Re-run example 13; verify optimizer identity &
-Confirmed Nelder--Mead, 165 evals, MSE $4.2\times10^{-6}$ & Attribution
-corrected in text and figure \\
+SLSQP vs Nelder--Mead & Re-run example 13 on release commit; verify
+optimizer identity & Nelder--Mead, 148 evals, MSE
+$5.1\times10^{-20}$; main-text figures confirmed &
+S11 row corrected to match rerun; supplement table updated \\
 \addlinespace
 Gradient verification & Taylor test with doping parameter; step-size sweep &
 $O(h)$ scaling from $h=10^{-1}$ to $10^{-5}$ & Section 4.3 updated with
 step-size sweep \\
 \addlinespace
+Heterojunction gradient & Central-difference step-size sweep on CdS/CdTe
+at single operating point; directional Taylor remainder & Best FD-adjoint
+agreement $1.6\times10^{-7}$ at $h{=}10^{-4}$; Taylor remainder
+confirms first-order convergence to $10^{-5}$ & New evidence supports
+adjoint correctness for heterojunction \\
+\addlinespace
+Noisy inverse recovery & Nelder--Mead on 2-parameter homo-junction with
+1\%, 5\%, 10\% relative noise on target IV & At 1\% noise: recovered
+PCE within 0.01\,pp of true; at 5\%: within 0.18\,pp; at 10\%: within
+0.72\,pp & Addresses identifiability under realistic conditions \\
+\addlinespace
 Structured-adjoint failure & Save Jacobians; compare 4 solvers; row
 equilibration & Root cause: row-norm ratio $10^{11}$; equilibration
 reduces $\kappa$ by $10^6$ & Section 4.4 added with diagnosis; dense LU
 justified by row scaling \\
+\addlinespace
+Banded-pivot comparison & LAPACK \code{dgbsv} (pivoted, bandwidth 5)
+vs Block-Thomas on 5 devices at equilibrium & BT 150--550$\times$ slower
+in Python; fails on heterojunctions (residual $\sim10^{2}$); pivoted
+banded accurate ($\sim10^{-9}$) on all & Confirms pivoting essential;
+validates production fallback logic \\
 \addlinespace
 Mesh convergence & 5-level study ($N=62$--1000); separate metric errors &
 Order $\approx1.8$ ($N{=}250$--500), $\approx1.0$ ($N{=}500$--1000) &
@@ -928,9 +948,10 @@ Optimization comparison & Adjoint, FD, Nelder--Mead on same problem &
 All converge to 8.95\%; adjoint 14 evals vs FD 282 & Section 5.2 updated
 with comparison table \\
 \addlinespace
-DGSM sampling stability & 32/64/128 Sobol samples; Spearman rank
-correlation & Top-3 parameters identical; $\rho=0.73$ (32 vs 128) &
-Section 5.1 updated with sampling convergence \\
+DGSM sampling stability & 32/64/128 Sobol samples; bootstrap 100 CIs;
+Spearman rank correlation & Variance CI narrows with $n$; top-ranked
+parameter consistent ($\rho=0.73$ at 32 vs 128); CIs now reported &
+Section 5.1 updated with bootstrap CIs \\
 \bottomrule
 \end{tabularx}
 \end{papertable}
