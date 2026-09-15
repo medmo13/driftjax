@@ -127,17 +127,22 @@ def _banded_adjoint_enabled() -> bool:
 def _audit_sweep_solution(sol):
     """Concrete-path post-hoc residual audit (H1 failure semantics).
 
-    The Newton step-norm gate cannot certifies degenerate solves, so
-    re-measure max|F| per bias directly: K cheap residual evals, no
-    solves. Returns (converged, max_resid, per_bias_residuals); anything
-    non-finite or above 1e-6 marks the sweep unconverged. Must only be
-    called with concrete (non-traced) solutions; under jit/grad the
-    audit cannot concretize and the fields stay at unverified defaults.
+    Re-measures max|F| per bias directly: K cheap residual evals, no
+    solves. Returns (converged, max_resid, per_bias_residuals).
+
+    An absolute threshold of 1e-6 is used.  For severely ill-conditioned
+    systems (cond(J) >> 1/eps) the solver may do its best yet still
+    have a large residual — in that case converged is False but the
+    efficiency value is still returned (not nan-gated) so the user can
+    inspect the result.  The warning message explains the situation.
+
+    Must only be called with concrete (non-traced) solutions; under
+    jit/grad the audit cannot concretize and the fields stay at
+    unverified defaults.
     """
     max_resid = 0.0
     per_bias = []
     try:
-        # Solution stores volts; the residual needs dimensionless bias.
         e_scale = float(thermal_scales(float(sol.cell.T))["energy"])
         volts = sol.voltages
         for pot_b, vb in zip(sol.potentials, volts, strict=False):

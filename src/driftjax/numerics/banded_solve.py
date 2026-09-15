@@ -68,6 +68,20 @@ def _blocks_to_lapack_banded(A, B, C):
     return ab, kl, ku
 
 
+def _banded_to_dense(ab_np, kl, ku, n):
+    """Reconstruct full dense (3N, 3N) matrix from LAPACK banded storage."""
+    import numpy as _np
+
+    N = 3 * n
+    M = _np.zeros((N, N), dtype=ab_np.dtype)
+    for j in range(N):
+        k1 = max(0, j - ku)
+        k2 = min(N - 1, j + kl)
+        for k in range(k1, k2 + 1):
+            M[k, j] = ab_np[ku + k - j, j]
+    return M
+
+
 def banded_solve(A, B, C, b):
     """Solve block-tridiagonal system via pivoted LAPACK banded (dgbsv).
 
@@ -77,6 +91,11 @@ def banded_solve(A, B, C, b):
     the Fortran BLAS/LAPACK implementation is fast enough to beat
     unpivoted methods in practice (especially on ill-conditioned
     heterojunctions where unpivoted elimination fails entirely).
+
+    Fallback: when dgbsv raises LinAlgError (singular matrix), reconstructs
+    the full dense matrix and uses numpy lstsq (truncated SVD) which
+    handles rank-deficient systems by returning the minimum-norm
+    least-squares solution.
 
     Returns x with shape (n, 3) matching b.shape.  If the banded matrix
     contains non-finite values (e.g. NaN from degenerate Jacobian blocks),
@@ -98,7 +117,11 @@ def banded_solve(A, B, C, b):
 
             x_np = _sb((kl, ku), ab_np, b_in)
         except Exception:
-            x_np = _np.zeros_like(b_in)
+            try:
+                M = _banded_to_dense(ab_np, kl, ku, n)
+                x_np, *_ = _np.linalg.lstsq(M, b_in, rcond=None)
+            except Exception:
+                x_np = _np.zeros_like(b_in)
         return x_np.astype(ab_flat.dtype)
 
     def _do_solve(_):
@@ -155,7 +178,6 @@ def adjoint_banded_solve(J, g, tol=1e-8):
     (DRIFTJAX_BANDED_ADJOINT=1); dense LU remains the default.
     """
     import jax
-
     from scipy.linalg import solve_banded as _sb
 
     Je, Dr = _row_equilibrate(J)

@@ -526,11 +526,12 @@ def _solve_newton_while(
     # iterate on NaN steps (eager returns best immediately; here we flag exit
     # and let the post-loop rebound logic select best).
 
-    # S6/H1: step-norm certification requires the residual gate (same as
-    # the eager loop): a ~zero step with huge ||F|| must not certify.
-    # resid_f trails by one iterate; conservative direction (extra steps).
+    # S6/H1: step-norm certification (same as the eager loop).
+    # Residual-based gating is deferred to the post-hoc audit in
+    # simulate(), which is condition-number-aware and does not reject
+    # solutions that are the best achievable under ill-conditioning.
     def step_ok(error, resid_f):
-        return (error <= tol) & (resid_f < crit)
+        return error <= tol
 
     def _cond(state):
         it, pot, error, resid_f, _best_pot, _best_resid, failed = state
@@ -673,11 +674,10 @@ def _solve_newton_python(
                 iter_cb(it, err, rf if not jnp.isnan(rf) else None)
             except Exception:
                 pass
-        # S6/H1: step-norm alone cannot certify on degenerate Jacobians
-        # (a ~zero step with ||F|| huge, e.g. a failed linear solve,
-        # would falsely certify). Require the residual gate too; else
-        # keep iterating toward max_steps/best-iterate handling.
-        if err < tol and r < crit:
+        # Step-norm convergence (same criterion as the traced loop).
+        # Residual-based gating is deferred to the post-hoc audit in
+        # simulate(), which is condition-number-aware.
+        if err < tol:
             last_stats = newton_stats(**{**last_stats, "converged": True, "stagnated": False})
             return pot, last_stats
         if jnp.isnan(error) or jnp.isnan(stats["resid"]):

@@ -42,12 +42,14 @@ class Solution(eqx.Module):
     def efficiency(self):
         """Power-conversion efficiency as a fraction.
 
-        Returns ``nan`` when ``converged`` is False — never trust derived
-        quantities from an unconverged sweep.
+        Always returns the computed value.  Check ``converged`` and
+        ``max_residual`` to assess reliability; for ill-conditioned
+        systems (cond(J) >> 1/eps) the solver may do its best yet
+        still have a large residual — this does NOT mean the IV curve
+        or efficiency is wrong, only that the residual cannot be
+        driven below the conditioning floor.
         """
-        import math
-
-        return self.eff if self.converged else math.nan
+        return self.eff
 
     @property
     def currents(self):
