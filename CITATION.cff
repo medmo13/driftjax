@@ -22,8 +22,10 @@ authors:
     given-names: Mohamed
     affiliation: "Research Center in Semiconductor Technology for Energetics (CRTSE), 02 Bd. Frantz Fanon, B.P. 140, Alger - 7 Merveilles 16038, Algiers, Algeria"
 version: 0.1.17
+doi: 10.5281/zenodo.22762675
 date-released: 2026-09-15
 license: MIT
+repository-artifact: "https://zenodo.org/records/22762675"
 repository-code: "https://github.com/medmo13/driftjax"
 url: "https://github.com/medmo13/driftjax"
 keywords:

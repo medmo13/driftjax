@@ -4,6 +4,8 @@
 
 - Empty functional delta vs v0.1.17: republished release so the
   Zenodo-GitHub integration mints the software DOI.
+- DOI minted: 10.5281/zenodo.22762675 (https://zenodo.org/records/22762675);
+  wired into CITATION.cff and the paper data-availability section.
 
 ## v0.1.17 (2026-09-15, adversarial-review synchronisation)
 
