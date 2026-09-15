@@ -784,15 +784,18 @@ more detailed calibration before a higher-dimensional optimisation is
 attempted.
 
 An extended study addresses the coordinate and sample-size gaps
-directly (\code{docs/paper/records/dgsm\_extended.json}): the same
+directly (\code{docs/paper/records/dgsm\_extended\_N512.json}, with the
+$N=256$ pilot in \code{dgsm\_extended.json}): the same
 four-parameter problem in standardized dimensionless coordinates
-$z\in[-1,1]^4$ with 256 Sobol samples ranks hole lifetime first
+$z\in[-1,1]^4$ with 512 Sobol samples ranks hole lifetime first
 ($\tau_p>\tau_n>\mu_p>\mu_n$), the leader holding top rank in $100\%$
 of 200 bootstrap resamples, with Spearman $\rho=0.80$ against the
-published 32-sample ordering. The leader is therefore stable under
-resampling and coordinate standardisation; the full ordering remains
+published 32-sample ordering (identical order and bootstrap outcome at
+$N=256$). The leader is therefore stable under resampling, sample-size
+doubling, and coordinate standardisation; the full ordering remains
 indicative, and no comparison against variance-based Sobol total
-indices is claimed.
+indices is claimed. Larger ensembles ($\geq1024$) and total-index
+comparisons exceed the available CPU budget and are left as future work.
 
 \paperfigure{research_14_dgsm_global.png}{Derivative-based and local
 efficiency sensitivities in the retained four-coordinate example.
