@@ -82,6 +82,64 @@ def _banded_to_dense(ab_np, kl, ku, n):
     return M
 
 
+def banded_solve_with_info(A, B, C, b):
+    """banded_solve + provenance: (x, info) with ``used_lstsq``/``used_zeros``.
+
+    ``used_lstsq`` is True when LAPACK dgbsv raised (singular matrix) and the
+    truncated-SVD least-squares fallback produced the step; ``used_zeros`` is
+    True when the banded storage was non-finite and zeros were returned. Both
+    are trace-safe boolean arrays so they can ride a ``lax.while_loop`` carry
+    into Newton statistics (R2 provenance: which solver actually ran).
+    """
+    import jax
+
+    n = A.shape[0]
+    banded, kl, ku = _blocks_to_lapack_banded(A, B, C)
+    b_flat = b.reshape(-1)
+
+    def _solve(ab_flat, b_in):
+        import numpy as _np
+
+        ab_np = ab_flat.reshape(kl + ku + 1, 3 * n)
+        # flag: 0 = dgbsv, 1 = lstsq fallback, 2 = zeros fallback
+        try:
+            from scipy.linalg import solve_banded as _sb
+
+            x_np = _sb((kl, ku), ab_np, b_in)
+            flag_np = _np.int32(0)
+        except Exception:
+            try:
+                M = _banded_to_dense(ab_np, kl, ku, n)
+                x_np, *_ = _np.linalg.lstsq(M, b_in, rcond=None)
+                flag_np = _np.int32(1)
+            except Exception:
+                x_np = _np.zeros_like(b_in)
+                flag_np = _np.int32(2)
+        out = _np.concatenate(
+            [x_np.astype(ab_flat.dtype).reshape(-1), flag_np.reshape(-1).astype(ab_flat.dtype)]
+        )
+        return out
+
+    def _do_solve(_):
+        return jax.pure_callback(
+            _solve,
+            jax.ShapeDtypeStruct((b_flat.shape[0] + 1,), b_flat.dtype),
+            banded.reshape(-1),
+            b_flat,
+            vmap_method="sequential",
+        )
+
+    def _zeros(_):
+        return jnp.concatenate([jnp.zeros_like(b_flat), jnp.full((1,), 2.0, dtype=b_flat.dtype)])
+
+    has_nan = ~jnp.all(jnp.isfinite(banded))
+    out = jax.lax.cond(has_nan, _zeros, _do_solve, None)
+    x = out[:-1].reshape(n, 3)
+    flag = out[-1]
+    info = {"used_lstsq": flag == 1, "used_zeros": (flag == 2) | has_nan}
+    return x, info
+
+
 def banded_solve(A, B, C, b):
     """Solve block-tridiagonal system via pivoted LAPACK banded (dgbsv).
 
@@ -99,8 +157,12 @@ def banded_solve(A, B, C, b):
 
     Returns x with shape (n, 3) matching b.shape.  If the banded matrix
     contains non-finite values (e.g. NaN from degenerate Jacobian blocks),
-    returns zeros — the caller should detect this via the residual check
-    and fall back to a dense pivoted solve.
+    returns zeros — N2 contract: the zeros themselves must NEVER be trusted
+    (a zero step satisfies any step-norm gate with ||F|| huge); the caller
+    detects the failure via the residual check, and the certified detector
+    is the post-hoc absolute audit in simulate() (_audit_sweep_solution),
+    which marks the sweep unconverged and warns.  Prefer
+    banded_solve_with_info when the caller needs the used_zeros flag.
     """
     import jax
 
@@ -185,6 +247,18 @@ def adjoint_banded_solve(J, g, tol=1e-8):
     banded, kl, ku = _blocks_to_lapack_banded(A, B, C)
     # Transposed-band storage of the equilibrated blocks = band storage
     # of (Je^T); solve Je^T y = g then unscale lam = Dr y.
+    # M1 derivation note: with Je = Dr @ J and Dr = diag(1/rowmax(J)),
+    # transposing gives Je^T = J^T @ Dr.  Solving Je^T y = g yields
+    # J^T (Dr y) = g, so lam = Dr @ y exactly — the unscaling below is
+    # solution-preserving by construction, not an approximation.  Note the
+    # asymmetry: Dr equilibrates the ROWS OF J, which appear as the COLUMNS
+    # OF J^T, so the factored matrix is column-scaled (right-equilibrated).
+    # True row-equilibration of J^T would instead use D = diag(1/colmax(J));
+    # whether that conditions the transpose solve better is the open Tier-B
+    # (B4) experiment — it is NOT claimed here.  What IS guaranteed: the
+    # residual gate below checks the ORIGINAL system J^T lam = g, never the
+    # scaled one, so a small scaled residual cannot certify a wrong lam —
+    # any scaling-induced error shows up in resid and routes to dense LU.
     At = jnp.transpose(A, (0, 2, 1))
     Ct = jnp.transpose(C, (0, 2, 1))
     Bt = jnp.transpose(B, (0, 2, 1))

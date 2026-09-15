@@ -1,0 +1,47 @@
+{
+  "environment": {
+    "dtype": "float64",
+    "x64": true
+  },
+  "cases": {
+    "three_layer_perovskite_N15": {
+      "converged": true,
+      "efficiency": 0.017013255161912884,
+      "max_residual": 2.1857109844258815e-08,
+      "fallback_used": [
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "voltages_V": [
+        0.0,
+        0.25,
+        0.5,
+        0.75,
+        1.0
+      ]
+    },
+    "homojunction_N15": {
+      "converged": true,
+      "efficiency": 0.17510152095986609,
+      "max_residual": 1.910308227791989e-15,
+      "fallback_used": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "voltages_V": [
+        0.0,
+        0.25,
+        0.5,
+        0.75,
+        1.0
+      ]
+    }
+  },
+  "wall_s": 44.9
+}

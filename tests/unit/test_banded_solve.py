@@ -3,7 +3,11 @@
 import jax.numpy as jnp
 import numpy as np
 
-from driftjax.numerics.banded_solve import _blocks_to_lapack_banded, banded_solve
+from driftjax.numerics.banded_solve import (
+    _blocks_to_lapack_banded,
+    banded_solve,
+    banded_solve_with_info,
+)
 
 
 def _synthetic_blocks(key_seed=0, n=8):
@@ -74,3 +78,34 @@ def test_lapack_banded_layout_matches_dense():
     for j in range(N):
         for i in range(max(0, j - ku), min(N, j + kl + 1)):
             assert ab_np[ku + i - j, j] == J[i, j]
+
+
+def test_with_info_clean_path_reports_no_fallback():
+    """R2: well-conditioned systems must report used_lstsq=False."""
+    A, B, C, b = _synthetic_blocks(key_seed=5, n=8)
+    x, info = banded_solve_with_info(A, B, C, b)
+    assert bool(info["used_lstsq"]) is False
+    assert bool(info["used_zeros"]) is False
+    J = _dense_from(A, B, C)
+    rel = float(jnp.linalg.norm(J @ x.reshape(-1) - b.reshape(-1)) / (jnp.linalg.norm(b) + 1e-30))
+    assert rel < 1e-12
+
+
+def test_nan_storage_returns_zeros_and_flags():
+    """N2: non-finite banded storage must return zeros AND flag used_zeros.
+
+    The zero step alone would satisfy a step-norm gate with huge ||F||, so
+    the flag (not the values) is what lets callers detect the failure: the
+    Newton loops OR it into last_stats["lstsq"]/rebound handling and the
+    post-hoc audit in simulate() is the certified detector. This test pins
+    both halves of that contract.
+    """
+    A, B, C, b = _synthetic_blocks(key_seed=6, n=6)
+    A = A.at[2].set(jnp.full((3, 3), jnp.nan))
+    x, info = banded_solve_with_info(A, B, C, b)
+    assert bool(info["used_zeros"]) is True
+    assert float(jnp.max(jnp.abs(x))) == 0.0
+    # Legacy entry point preserves the zeros behavior (callers detect via
+    # the residual audit, never via the values themselves).
+    x_legacy = banded_solve(A, B, C, b)
+    assert float(jnp.max(jnp.abs(x_legacy))) == 0.0

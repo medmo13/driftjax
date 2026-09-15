@@ -78,7 +78,7 @@ def test_remat_chain_grads_match_plain(cell, _pot0):
 def test_checkpointed_iv_curve_matches_sweep(cell, _pot0):
     vs = jnp.linspace(0.0, 0.7 / energy, 8)
     jc, _ = checkpointed_iv_curve(cell, _pot0, vs)
-    v, js, _ = sweep(cell, 0.7 / energy, 8)
+    v, js, _, _ = sweep(cell, 0.7 / energy, 8)
     assert float(jnp.max(jnp.abs(jc - js))) < 1e-07
 
 

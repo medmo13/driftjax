@@ -224,7 +224,7 @@ def run(fast: bool = True) -> dict:
     vols, curs_b, pots_b = sweep_batched(cell, 0.6 / units.energy, n_steps=6, tol=1e-6)
     from driftjax.solvers.continuation import sweep
 
-    vols_s, curs_s, pots_s = sweep(cell, 0.6 / units.energy, n_steps=6, tol=1e-8)
+    vols_s, curs_s, pots_s, _ = sweep(cell, 0.6 / units.energy, n_steps=6, tol=1e-8)
     results["l10_batched"] = _gate(
         "batched sweep == serial sweep (current)",
         lambda: float(jnp.max(jnp.abs(curs_b - curs_s))),

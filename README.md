@@ -24,7 +24,7 @@ float64 (`JAX_ENABLE_X64=1`).
 - **Optics** — Beer–Lambert (Tauc α) and coherent Transfer-Matrix Method (TMM); AM1.5G spectrum
 - **Materials** — 25-material database (Si, CdTe, perovskites, CIGS, organics) plus custom materials
 - **Contacts** — Surface-recombination-velocity BCs with flatband work-function control
-- **Solvers** — Newton with analytic block-tridiagonal Jacobian, O(N) Block-Thomas, `@jax.checkpoint` memory-efficient backward passes
+- **Solvers** — Newton with analytic block-tridiagonal Jacobian, pivoted banded LAPACK `dgbsv` (`O(N·bw²)`), with truncated-SVD fallback on singular systems, `@jax.checkpoint` memory-efficient backward passes
 - **Autodiff** — Reverse-mode IFT adjoint; `jax.jit` / `jax.vmap` compatible
 - **Optimization** — SLSQP, multi-start L-BFGS-B, Adam, and derivative-free Nelder-Mead
 

@@ -35,7 +35,7 @@ def test_forward_parity() -> dict:
         )
         cell = init_cell(dev.design(), ls)
         pot_eq = solve_eq(cell, boundary_bias(cell, 0.0), equilibrium_guess(cell).phi)
-        voltages, currents, _ = sweep(cell, 1.2 / energy, n_steps=61, tol=1e-10, init=pot_eq)
+        voltages, currents, _, _ = sweep(cell, 1.2 / energy, n_steps=61, tol=1e-10, init=pot_eq)
 
         V = voltages * energy
         cur_mA = currents * 1e3

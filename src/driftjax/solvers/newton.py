@@ -237,8 +237,10 @@ def _step_newton_impl(cell, bound, x, dense, refinement, analytic, fused):
                 A, B, C = banded_jacobian(cell, bound, pot)
         # Pivoted banded solve (LAPACK dgbsv): works on all devices including
         # ill-conditioned heterojunctions where unpivoted elimination fails.
+        # R2 provenance: with_info reports whether the truncated-SVD (lstsq)
+        # fallback fired; the flag rides into step stats and the loop carry.
         from driftjax.numerics.analytic_jacobian import blockwise_residual
-        from driftjax.numerics.banded_solve import banded_solve
+        from driftjax.numerics.banded_solve import banded_solve_with_info
 
         # Check for non-finite Jacobian blocks (e.g. NaN from bad init).
         blocks_finite = (
@@ -246,21 +248,27 @@ def _step_newton_impl(cell, bound, x, dense, refinement, analytic, fused):
         )
 
         def _do_banded(_):
-            p_b = banded_solve(A, B, C, (-F).reshape(n, 3)).reshape(-1)
+            p_b, _info = banded_solve_with_info(A, B, C, (-F).reshape(n, 3))
+            p_b = p_b.reshape(-1)
             lin_b = jnp.linalg.norm(blockwise_residual(A, B, C, F, p_b)) / (
                 jnp.linalg.norm(F) + 1e-30
             )
-            return p_b, lin_b
+            return p_b, lin_b, _info["used_lstsq"]
 
         def _do_fallback(_):
             Jf = F_jacobian(cell, bound, pot)
             pf = jnp.linalg.solve(Jf, -F)
             lin = jnp.linalg.norm(Jf @ pf + F) / (jnp.linalg.norm(F) + 1e-30)
-            return pf, lin
+            return pf, lin, jnp.array(False)
 
-        p_a, lin_a = jax.lax.cond(blocks_finite, _do_banded, _do_fallback, None)
+        p_a, lin_a, lstsq_a = jax.lax.cond(blocks_finite, _do_banded, _do_fallback, None)
         use_dense = (~jnp.isfinite(lin_a)) | (lin_a > 1e-4)
-        p, linresid = jax.lax.cond(use_dense, _do_fallback, lambda _: (p_a, lin_a), None)
+        p, linresid, _ = jax.lax.cond(
+            use_dense, _do_fallback, lambda _: (p_a, lin_a, lstsq_a), None
+        )
+        # R2: lstsq flag is only meaningful when the banded path was taken and
+        # kept (not overridden by the dense fallback); trace-safe boolean.
+        lstsq_used = lstsq_a & (~use_dense)
         # Use integer code for stats (trace-safe); 0=banded, 2=dense
         backend_code = jnp.where(use_dense, 2, 0)
         dx = logdamp(p)
@@ -272,6 +280,7 @@ def _step_newton_impl(cell, bound, x, dense, refinement, analytic, fused):
             jnp.max(jnp.abs(F)),
             linresid,
             backend_code,
+            lstsq_used,
         )
     else:
         J = F_jacobian(cell, bound, pot)
@@ -287,6 +296,7 @@ def _step_newton_impl(cell, bound, x, dense, refinement, analytic, fused):
     x_new = x + dx
     # backend is a concrete Python str (static branches) — pass an int code
     backend_code = _BACKEND_CODE.get(backend, 9)
+    # R2: dense path never touches the banded lstsq fallback.
     return (
         x_new,
         jnp.max(jnp.abs(dx)),
@@ -294,6 +304,7 @@ def _step_newton_impl(cell, bound, x, dense, refinement, analytic, fused):
         jnp.max(jnp.abs(F)),
         linresid,
         backend_code,
+        jnp.array(False),
     )
 
 
@@ -323,7 +334,7 @@ def step_newton(
     bias steps (fixes the historical per-op dispatch overhead that made
     the un-jitted loop ~4× slower than prime1/previous's `@jit step`).
     """
-    x_new, err, resid, resid_f, linres, backend_code = _step_newton_jit(
+    x_new, err, resid, resid_f, linres, backend_code, lstsq_used = _step_newton_jit(
         cell, bound, pot2vec(pot), dense, refinement, analytic, fused
     )
     pot_new = vec2pot(x_new)
@@ -332,6 +343,9 @@ def step_newton(
         "resid": resid,
         "resid_f": resid_f,
         "linresid": linres,
+        # R2 provenance: True when any banded step in this Newton step used
+        # the truncated-SVD (lstsq) fallback (trace-safe boolean array).
+        "lstsq": lstsq_used,
         # backend label is built statically by the caller (solve_newton); the
         # per-step backend_code is a tracer inside lax.while_loop, so it cannot
         # be int()-ed here. Keep a constant placeholder.
@@ -367,6 +381,15 @@ def solve_newton(
     refinement=True uses the FP32+refinement linear path (NEW).
     f_tol enables the residual gate: stop on max|F| < f_tol too (never
     trust the step norm alone on a degenerate Jacobian).
+
+    Convergence-gating division of labor (N1): the in-loop gate is
+    step-norm-only (``step_ok``: error <= tol) in both the traced and eager
+    loops, because the truncated-SVD (lstsq) fallback exists precisely for
+    systems where step-norm progress decouples from conditioning floors — a
+    residual gate inside the loop would re-break the case the fallback
+    fixes. Residual certification is deferred to the post-hoc absolute
+    (1e-6) audit in ``simulate()``, which warns loudly on unconverged
+    biases. ``last_stats["lstsq"]`` records whether the fallback fired.
 
     iter_cb(it, err, resid): per-iteration observer (0-based it; err = step
     norm, resid = max|F|) — used by console.DebugLog for post-hoc traces.
@@ -534,13 +557,13 @@ def _solve_newton_while(
         return error <= tol
 
     def _cond(state):
-        it, pot, error, resid_f, _best_pot, _best_resid, failed = state
+        it, pot, error, resid_f, _best_pot, _best_resid, failed, _any_lstsq = state
         step_converged = step_ok(error, resid_f)
         resid_converged = (resid_f < f_tol) if f_tol_active else jnp.array(False)
         return (it < max_steps) & (~(step_converged | resid_converged)) & (~failed)
 
     def _body(state):
-        it, pot, error, resid_f, best_pot, best_resid, failed = state
+        it, pot, error, resid_f, best_pot, best_resid, failed, any_lstsq = state
         pot_new, error_new, stats = step_newton(
             cell,
             bound,
@@ -575,6 +598,7 @@ def _solve_newton_while(
             best_pot_new,
             best_resid_new,
             failed | step_failed,
+            any_lstsq | jnp.asarray(stats.get("lstsq", False)),
         )
 
     init = (
@@ -585,8 +609,11 @@ def _solve_newton_while(
         pot_ini,
         jnp.array(jnp.inf, dtype=jnp.float64),
         jnp.array(False),
+        jnp.array(False),
     )
-    it, pot, error, resid_f, best_pot, best_resid, failed = jax.lax.while_loop(_cond, _body, init)
+    it, pot, error, resid_f, best_pot, best_resid, failed, any_lstsq = jax.lax.while_loop(
+        _cond, _body, init
+    )
     step_converged = step_ok(error, resid_f)
     resid_converged = (resid_f < f_tol) if f_tol_active else jnp.array(False)
     converged = step_converged | resid_converged
@@ -624,6 +651,9 @@ def _solve_newton_while(
         converged=converged | rebound | settled,
         stagnated=rebound | (failed & (~converged)),
         fallback=None,
+        # R2 provenance: trace-safe flag — True if any banded step in this
+        # solve used the truncated-SVD (lstsq) fallback.
+        lstsq=any_lstsq,
     )
     return out_pot, last_stats
 
@@ -645,6 +675,8 @@ def _solve_newton_python(
     best_pot = pot_ini
     best_resid = None
     last_stats = {}
+    # R2 provenance: OR-accumulates the per-step lstsq flag into last_stats.
+    any_lstsq = False
     for it in range(max_steps):
         pot_prev = pot
         pot, error, stats = step_newton(
@@ -657,11 +689,16 @@ def _solve_newton_python(
             fused=fused,
             allow_trace=allow_trace,
         )
+        try:
+            any_lstsq = any_lstsq or bool(stats.get("lstsq", False))
+        except Exception:
+            pass
         last_stats = {
             **stats,
             "iters": it,
             "fallback": None,
             "backend": "dense" if dense else ("refined" if refinement else "analytic-banded"),
+            "lstsq": any_lstsq,
         }
         r = float(stats["resid_f"])  # max|F| at pot_prev (the state stepped FROM)
         if best_resid is None or r < best_resid:

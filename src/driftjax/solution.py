@@ -37,6 +37,11 @@ class Solution(eqx.Module):
     max_residual: float = 0.0
     # Per-bias max|F| from the post-hoc audit (empty when unverified).
     per_bias_residuals: list = eqx.field(default_factory=list)
+    # R2 provenance: per-bias truncated-SVD (lstsq) fallback flags from the
+    # serial sweep (True = dgbsv failed and lstsq stepped on that bias;
+    # False = clean banded solves; None entries / empty = unverified, e.g.
+    # under jit/grad/vmap, fused-scan or batched paths).
+    fallback_used: list = eqx.field(default_factory=list)
 
     @property
     def efficiency(self):

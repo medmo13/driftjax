@@ -96,12 +96,12 @@ def test_batched_equals_serial_and_jit():
         n_points=30, layers=[(1e-4, load_material("Si"), 1e16), (1e-4, load_material("Si"), -1e16)]
     )
     cell = init_cell(dev.design(), spectrum(normalize=False))
-    v_s, j_s, _ = sweep(cell, 0.6 / energy, n_steps=5, tol=1e-8, batched=False)
-    v_b, j_b, _ = sweep(cell, 0.6 / energy, n_steps=5, tol=1e-8, batched=True)
+    v_s, j_s, _, _ = sweep(cell, 0.6 / energy, n_steps=5, tol=1e-8, batched=False)
+    v_b, j_b, _, _ = sweep(cell, 0.6 / energy, n_steps=5, tol=1e-8, batched=True)
     assert float(jnp.max(jnp.abs(j_b - j_s))) < 1e-3
     # jit
     jit_batched = jax.jit(lambda c: sweep(c, 0.6 / energy, n_steps=5, tol=1e-8, batched=True))
-    v_jb, j_jb, _ = jit_batched(cell)
+    v_jb, j_jb, _, _ = jit_batched(cell)
     assert float(jnp.max(jnp.abs(j_jb - j_s))) < 1e-3
 
 

@@ -128,10 +128,15 @@ def sweep(
         pots_list = [
             jax.tree_util.tree_map(lambda a, i=i: a[i], pots_b) for i in range(pots_b.phi.shape[0])
         ]
-        return volts_b, curs_b, pots_list
+        # R2: the vmapped batched path carries no per-bias Newton stats, so
+        # fallback usage is unknown here (None = unverified, not False).
+        return volts_b, curs_b, pots_list, [None] * int(n_steps)
     voltages = jnp.linspace(0.0, vmax, n_steps)
     currents: list[jax.Array] = []
     pots: list[Potentials] = []
+    # R2 provenance: per-bias truncated-SVD fallback flags (True/False on the
+    # concrete serial path; True means dgbsv failed and lstsq stepped).
+    fallbacks: list = []
     init_pots = None
     if init is not None:
         if hasattr(init, "potentials"):
@@ -153,6 +158,8 @@ def sweep(
 
     for i, v in enumerate(voltages):
         bound = boundary_bias(cell, v)
+        # R2: per-bias fallback flag for this bias (OR over main + sub-steps).
+        bias_lstsq = False
         if init_pots is not None and i < len(init_pots) and init_pots[i] is not None:
             guess = init_pots[i]
         elif i == 0:
@@ -215,6 +222,10 @@ def sweep(
                 and jnp.all(jnp.isfinite(pot.phi_n))
                 and jnp.all(jnp.isfinite(pot.phi_p))
             )
+            try:
+                bias_lstsq = bias_lstsq or bool(stats.get("lstsq", False))
+            except Exception:
+                pass
             # i >= 1: halving re-approaches v_i from the previous converged
             # state; at i == 0 there is no prior state to sub-step from.
             if not _conv and i >= 1:
@@ -235,6 +246,10 @@ def sweep(
                             allow_trace=allow_trace,
                             loop=loop,
                         )
+                        try:
+                            bias_lstsq = bias_lstsq or bool(st_s.get("lstsq", False))
+                        except Exception:
+                            pass
                         if bool(st_s.get("converged", False)) and bool(
                             jnp.all(jnp.isfinite(pot_s.phi))
                             and jnp.all(jnp.isfinite(pot_s.phi_n))
@@ -266,11 +281,14 @@ def sweep(
                                 error=_n2,
                                 stagnated=False,
                                 backend=None,
+                                lstsq=bias_lstsq,
                             ),
                         )
                         break
         pots.append(pot)
         currents.append(total_current(cell, pot))
+        # R2: record this bias's fallback flag alongside the state.
+        fallbacks.append(bias_lstsq if not allow_trace else None)
         if progress is not None and (not allow_trace):
             resid = stats.get("resid")
             info = {
@@ -293,7 +311,9 @@ def sweep(
                     progress(i, info)
             except Exception:
                 pass  # reporting must never break the sweep
-    return voltages, jnp.array(currents), pots
+    # R2: 4-tuple — the 4th element is the per-bias truncated-SVD fallback
+    # flags (True/False concrete serial; None entries when unverified).
+    return voltages, jnp.array(currents), pots, fallbacks
 
 
 def find_voc(voltages, currents) -> jax.Array:

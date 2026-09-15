@@ -324,7 +324,7 @@ def _forward(
         sweep_init = [pot_eq] + [None] * max(protocol.n_steps - 1, 0)
 
     vmax_dim = protocol.vmax / sc["energy"]
-    voltages_dim, currents_dim, pots = _continuation_sweep(
+    voltages_dim, currents_dim, pots, _sweep_fallbacks = _continuation_sweep(
         cell,
         vmax_dim,
         protocol.n_steps,
@@ -338,6 +338,13 @@ def _forward(
         progress=progress,
         init=sweep_init,
     )
+    # R2 provenance: per-bias lstsq flags ride alongside the sweep states.
+    # The serial concrete path reports True/False; fused-scan, batched and
+    # traced paths report None entries (unverified, not "clean").
+    try:
+        _sweep_fallbacks = list(_sweep_fallbacks)
+    except Exception:
+        _sweep_fallbacks = [None] * len(pots)
     voc_dim = find_voc(voltages_dim, currents_dim)
     jsc_dim = jnp.abs(currents_dim[0])
     pmax_dim, _ = _mpp(voltages_dim, currents_dim)
@@ -363,6 +370,9 @@ def _forward(
         eq_pot=pot_eq,
         protocol="sweep",
         P_in=ls.P_in,
+        # R2 provenance: per-bias lstsq flags (True/False concrete serial;
+        # None entries when unverified: traced, fused-scan, batched paths).
+        fallback_used=list(_sweep_fallbacks),
     ), (voltages_dim, currents_dim, pots)
 
 
@@ -383,7 +393,7 @@ def _simulate_sweep(
         and not getattr(protocol, "batched", False)
     ):
         try:
-            pot_eq, cell, ls2, sc, vd, cd, pa = _forward_fused_scan(
+            pot_eq, cell, ls2, sc, vd, cd, pa, fb_arr = _forward_fused_scan(
                 design, solver, optics, protocol, ls, statistics
             )
             # The whole-sweep scan compiles to one XLA program whose Newton
@@ -418,6 +428,8 @@ def _simulate_sweep(
                 eq_pot=pot_eq,
                 protocol="sweep",
                 P_in=ls2.P_in,
+                # R2: fused-scan per-bias lstsq flags (concrete bools).
+                fallback_used=[bool(x) for x in list(fb_arr)],
             )
         warnings.warn(
             "Fused forward sweep produced non-finite currents (Newton divergence "
@@ -520,7 +532,7 @@ def _forward_fused_scan(design, solver, optics, protocol, ls, statistics):
             def scan_body(pot_prev, v):
                 bound = boundary_bias(cell, v)
                 # f_tol=rtol: residual gate (see _forward newton_kw note).
-                pot_new, _ = _solve_newton_fused(
+                pot_new, st_ = _solve_newton_fused(
                     cell,
                     bound,
                     pot_prev,
@@ -531,16 +543,21 @@ def _forward_fused_scan(design, solver, optics, protocol, ls, statistics):
                     max_steps=max_steps,
                 )
                 cur = _tc(cell, pot_new)
-                return pot_new, (v, cur, pot_new)
+                # R2: per-bias lstsq flag rides the scan outputs (tracer
+                # bool; concretized by the eager jit call below, never
+                # bool()-converted inside the trace).
+                return pot_new, (v, cur, pot_new, st_.get("lstsq", False))
 
-            _, (voltages_dim, currents_dim, pots_arr) = jax.lax.scan(scan_body, pot_eq, vs)
-            return pot_eq, cell, sc, voltages_dim, currents_dim, pots_arr
+            _, (voltages_dim, currents_dim, pots_arr, lstsq_arr) = jax.lax.scan(
+                scan_body, pot_eq, vs
+            )
+            return pot_eq, cell, sc, voltages_dim, currents_dim, pots_arr, lstsq_arr
 
         if key is not None:
             _SCAN_JIT_CACHE[key] = fn
 
-    pot_eq, cell, sc, voltages_dim, currents_dim, pots_arr = fn(design)
-    return pot_eq, cell, ls, sc, voltages_dim, currents_dim, pots_arr
+    pot_eq, cell, sc, voltages_dim, currents_dim, pots_arr, lstsq_arr = fn(design)
+    return pot_eq, cell, ls, sc, voltages_dim, currents_dim, pots_arr, lstsq_arr
 
 
 def _sweep_fwd(design, solver, optics, protocol, progress, ls, statistics, init=None, fused=False):
@@ -553,7 +570,7 @@ def _sweep_fwd(design, solver, optics, protocol, progress, ls, statistics, init=
         and not _is_tracer(design)
     ):
         try:
-            pot_eq, cell, ls2, sc, vd, cd, pa = _forward_fused_scan(
+            pot_eq, cell, ls2, sc, vd, cd, pa, fb_arr = _forward_fused_scan(
                 design, solver, optics, protocol, ls, statistics
             )
             # Same divergence guard as _simulate_sweep: validate the compiled
@@ -592,6 +609,9 @@ def _sweep_fwd(design, solver, optics, protocol, progress, ls, statistics, init=
                 eq_pot=pot_eq,
                 protocol="sweep",
                 P_in=ls2.P_in,
+                # R2: fused-scan per-bias lstsq flags (concrete bools from the
+                # eager jit call; True = dgbsv failed and lstsq stepped).
+                fallback_used=[bool(x) for x in list(fb_arr)],
             )
             residuals = (design, cell, pot_arr, vd, cd, ls2.P_in, fused)
             return sol, residuals
@@ -924,10 +944,19 @@ def simulate(
                 )
             import equinox as _eqx
 
+            # R2: keep construction-time fallback flags when present (serial
+            # concrete path); otherwise mark every bias unverified (None) so
+            # "unknown" is never confused with "clean" (False).
+            _fb = getattr(res, "fallback_used", []) or [None] * len(res.potentials)
             res = _eqx.tree_at(
-                lambda s: (s.converged, s.max_residual, s.per_bias_residuals),
+                lambda s: (
+                    s.converged,
+                    s.max_residual,
+                    s.per_bias_residuals,
+                    s.fallback_used,
+                ),
                 res,
-                (_conv, _mr, _per_bias),
+                (_conv, _mr, _per_bias, list(_fb)),
             )
         return res
     finally:

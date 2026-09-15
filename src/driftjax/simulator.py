@@ -610,7 +610,7 @@ def sweep(
 
             prog = _CallableProgress(progress)  # plain callable fn(i, info)
 
-    voltages, currents, pots = _sweep(
+    voltages, currents, pots, _fb = _sweep(
         cell,
         vmax_dim,
         n_steps,
@@ -621,6 +621,7 @@ def sweep(
         init=init,
         v_scale=sc["energy"],
     )
+    del _fb  # R2 per-bias fallback flags live on Solution (simulate path)
     if prog is not None and hasattr(prog, "close"):
         try:
             prog.close()
