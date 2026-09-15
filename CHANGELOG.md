@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.1.17-post2 (2026-09-15, authorship correction; no functional change)
+
+- Byline corrected: Benaissa first + corresponding, Maoudj second,
+  Noua third (CAS, CITATION.cff, contributions). Republished so the
+  Zenodo record carries the correct author order.
+
 ## v0.1.17-post1 (2026-09-15, Zenodo archiving trigger; no code change)
 
 - Empty functional delta vs v0.1.17: republished release so the
