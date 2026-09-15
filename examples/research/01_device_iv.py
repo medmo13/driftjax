@@ -103,6 +103,26 @@ def main():
             color=style.GRAY,
             label="reference slope $O(N^{-2})$ --- not a fit",
         )
+        # Annotate local observed order p_obs between consecutive mesh pairs
+        # using Eq. S5.1: p_obs = log[e(h)/e(h/r)] / log(r)
+        for i in range(len(resolutions) - 2):
+            n_h = resolutions[i]
+            n_r = resolutions[i + 1]
+            e_h = max(results[i]["relative_efficiency_error"], 1e-16)
+            e_r = max(results[i + 1]["relative_efficiency_error"], 1e-16)
+            import math
+
+            p_obs = math.log(e_h / e_r) / math.log(n_r / n_h) if e_r > 0 else float("nan")
+            mid_x = (n_h * n_r) ** 0.5
+            mid_y = (e_h * e_r) ** 0.5
+            axes[1].annotate(
+                f"$p_{{\\mathrm{{obs}}}}={p_obs:.1f}$",
+                xy=(mid_x, mid_y),
+                fontsize=7,
+                color=style.BLUE,
+                ha="center",
+                va="bottom",
+            )
         axes[1].legend(frameon=False, loc="lower left", fontsize=8, handlelength=1.2)
     # Dark-equilibrium band diagram and carrier densities at the finest mesh.
     # A separate dark solve (no illumination) ensures thermal equilibrium:

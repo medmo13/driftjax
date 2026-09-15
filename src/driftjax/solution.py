@@ -35,11 +35,19 @@ class Solution(eqx.Module):
     converged: bool = True
     # max|F| over biases from the post-hoc audit (0.0 when unverified).
     max_residual: float = 0.0
+    # Per-bias max|F| from the post-hoc audit (empty when unverified).
+    per_bias_residuals: list = eqx.field(default_factory=list)
 
     @property
     def efficiency(self):
-        """Power-conversion efficiency as a fraction."""
-        return self.eff
+        """Power-conversion efficiency as a fraction.
+
+        Returns ``nan`` when ``converged`` is False — never trust derived
+        quantities from an unconverged sweep.
+        """
+        import math
+
+        return self.eff if self.converged else math.nan
 
     @property
     def currents(self):

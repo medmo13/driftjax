@@ -127,14 +127,15 @@ def _banded_adjoint_enabled() -> bool:
 def _audit_sweep_solution(sol):
     """Concrete-path post-hoc residual audit (H1 failure semantics).
 
-    The Newton step-norm gate cannot certify degenerate solves, so
+    The Newton step-norm gate cannot certifies degenerate solves, so
     re-measure max|F| per bias directly: K cheap residual evals, no
-    solves. Returns (converged, max_resid); anything non-finite or
-    above 1e-6 marks the sweep unconverged. Must only be called with
-    concrete (non-traced) solutions; under jit/grad the audit cannot
-    concretize and the fields stay at their unverified defaults.
+    solves. Returns (converged, max_resid, per_bias_residuals); anything
+    non-finite or above 1e-6 marks the sweep unconverged. Must only be
+    called with concrete (non-traced) solutions; under jit/grad the
+    audit cannot concretize and the fields stay at unverified defaults.
     """
     max_resid = 0.0
+    per_bias = []
     try:
         # Solution stores volts; the residual needs dimensionless bias.
         e_scale = float(thermal_scales(float(sol.cell.T))["energy"])
@@ -142,14 +143,15 @@ def _audit_sweep_solution(sol):
         for pot_b, vb in zip(sol.potentials, volts, strict=False):
             bound = boundary_bias(sol.cell, float(vb) / e_scale)
             r_b = float(jnp.max(jnp.abs(comp_F(sol.cell, bound, pot_b))))
+            per_bias.append(r_b)
             if not jnp.isfinite(r_b):
-                return False, float("inf")
+                return False, float("inf"), per_bias
             max_resid = max(max_resid, r_b)
     except Exception:
-        return False, float("inf")
+        return False, float("inf"), per_bias
     if max_resid > 1e-6:
-        return False, max_resid
-    return True, max_resid
+        return False, max_resid, per_bias
+    return True, max_resid, per_bias
 
 
 def _iter_cb_for(progress, phase):
@@ -907,7 +909,7 @@ def simulate(
         # sweep paths (serial, fused-scan, batched). Concrete path only;
         # under jit/grad/vmap the fields stay at unverified defaults.
         if not isinstance(protocol, Equilibrium) and not _is_tracer(res.voltages):
-            _conv, _mr = _audit_sweep_solution(res)
+            _conv, _mr, _per_bias = _audit_sweep_solution(res)
             if not _conv:
                 warnings.warn(
                     f"DriftJax sweep did not converge (max|F|={_mr:.3e}); "
@@ -917,7 +919,11 @@ def simulate(
                 )
             import equinox as _eqx
 
-            res = _eqx.tree_at(lambda s: (s.converged, s.max_residual), res, (_conv, _mr))
+            res = _eqx.tree_at(
+                lambda s: (s.converged, s.max_residual, s.per_bias_residuals),
+                res,
+                (_conv, _mr, _per_bias),
+            )
         return res
     finally:
         if progress is not None and hasattr(progress, "close"):

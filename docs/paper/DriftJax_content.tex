@@ -159,6 +159,8 @@ effects of additional physical models (Supplementary Section S9).
 
 Thermodynamically consistent flux discretisations for degenerate
 carrier statistics have been developed independently~\cite{farrell2021};
+convergence theory for the Scharfetter--Gummel scheme under
+degeneracy is established in~\cite{brezzi1989}.
 DriftJax uses the standard Scharfetter--Gummel scheme with Boltzmann
 closure as its default and provides numerical Fermi--Dirac evaluation as
 an option without claiming thermodynamic consistency of the resulting
@@ -488,7 +490,7 @@ steeply varying. A low linear residual does not remove that distinction.
 \begin{papertable}
 \centering\small
 \caption{Selected verification outcomes retained from the existing
-numerical record. Original test logs were not available for independent
+numerical record.$^{\dagger}$ Original test logs were not available for independent
 reruns. FD denotes central finite differences.}
 \label{tab:verification}
 \begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{0.31\linewidth}>{\raggedright\arraybackslash}p{0.23\linewidth}>{\raggedright\arraybackslash}X@{}}
@@ -496,8 +498,7 @@ reruns. FD denotes central finite differences.}
 Quantity & Reported outcome & Scope \\
 \midrule
 Analytical versus AD Jacobian & Order $10^{-12}$ discrepancy (historical
-record; superseded by the controlled saved-matrix comparison of
-Section~\ref{sec:conditioning}, $<5\times10^{-17}$) & Same
+record$^{\dagger}$) & Same
 residual and state ordering; norm and scaling must be recorded \\
 Banded linear solve & Relative residual $<10^{-14}$ & Backward-error
 check, not a uniform forward-error bound \\
@@ -514,6 +515,8 @@ $4.2\times10^{-3}$ & Concentrated in heterojunction-sensitive parameters
 and finite-difference step-size effects \\
 \bottomrule
 \end{tabularx}
+\vspace{2pt}
+\footnotesize{$^{\dagger}$This value is the earlier retained record (original log unavailable); Section~\ref{sec:conditioning} reports a new controlled saved-matrix comparison at ${<}5{\times}10^{-17}$ under the norm of Eq.~(S2.11).}
 \end{papertable}
 
 For a parameter coordinate $z_a$, central differences are evaluated as
@@ -621,7 +624,7 @@ for all tested quantities. Under zero illumination, net
 recombination vanishes to $<10^{-34}$. These tests establish that the
 implemented residual represents the stated physical model; they do not
 independently verify the numerical accuracy of the Newton convergence
-or the derivative computation.
+or the derivative computation~\cite{kerkhoven1988}.
 
 \subsection{Structured-solver diagnosis and the v0.1.17 switch}\label{sec:conditioning}
 A systematic comparison of the former unpivoted block-Thomas solver,
@@ -723,8 +726,9 @@ Section~S8.
 
 \paperfigure{research_01_device_iv.png}{Homojunction refinement example
 at five meshes ($N=62$--$1000$):
-current--voltage curves, observed convergence with a reference slope
-(not a claimed rate), dark-equilibrium
+current--voltage curves, observed convergence with local order annotations
+$p_{\mathrm{obs}}$ between consecutive mesh pairs (Eq.~S5.1) and a reference
+slope (not a claimed rate), dark-equilibrium
 bands, and carrier densities. Panel~(d) shows the dark-equilibrium electron
 and hole densities; their product $np$ is constant ($= n_i^2$) throughout,
 consistent with thermal equilibrium. A separate zero-illumination solve is
@@ -750,7 +754,10 @@ relative $L_2$ of $1.3\%$ (CdS/CdTe); state fields $n(x)$, $p(x)$,
 $\phi(x)$ are unavailable in the bundled references, so no state-field
 norms are claimed. Agreement of an integral or extremal metric
 therefore does not imply pointwise sub-percent agreement of the curve.
-The figure is a retained comparison against bundled reference curves,
+The 100$\times$ difference between the N=500 value ($4.2\times10^{-5}$)
+and the N=200 pointwise study ($4.0\times10^{-3}$) reflects the strong
+mesh sensitivity of the cross-code difference; both are retained for
+transparency. The figure is a retained comparison against bundled reference curves,
 not a controlled same-revision rerun of both codes.
 
 \paperfigure{research_15_deltapv_crosscode.png}{Current--voltage comparison
