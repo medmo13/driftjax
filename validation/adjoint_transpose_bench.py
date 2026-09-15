@@ -1,13 +1,15 @@
 """Dense vs equilibrated-banded transpose adjoint benchmark (Steps 6/12/13).
 
-Compares the production dense-LU transpose solve against the opt-in
-equilibrated banded transpose (adjoint_banded_solve, DRIFTJAX_BANDED_ADJOINT=1)
-on saved device Jacobians, measuring wall time, backward residual, and
-forward error against the longdouble reference from solver_causality.
+Phase-A decomposed timing (per the benchmark critique): each stage of the
+banded backend is timed separately — dense-to-block extraction, row
+equilibration, LAPACK band packing, the raw SciPy dgbsv kernel (prebuilt
+band storage, no JAX), the full JAX wrapper, the blocks-direct API (no
+dense extraction), and the residual check — against bare dense NumPy.
+Timings are median+IQR over reps (warmup discarded), never min-only.
 
 Devices: homojunction N=100, CdS/CdTe heterojunction N=100 (V=0.5 V),
-3-layer perovskite N=15 (V=0.25 V; rank-deficient — expected to route to
-the dense fallback or report honestly if it cannot).
+3-layer perovskite N=15 (V=0.25 V; rank-deficient — both paths report
+status FAILED rather than a zeros solution masquerading as a result).
 
 Writes docs/paper/records/adjoint_transpose_bench.json.
 """
@@ -27,7 +29,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import solver_causality as sc_mod
 
 import driftjax as dj
-from driftjax.numerics.banded_solve import adjoint_banded_solve
+from driftjax.numerics.banded_solve import (
+    _blocks_to_lapack_banded,
+    adjoint_banded_solve,
+    adjoint_banded_solve_blocks,
+    extract_blocks,
+)
 from examples.support import ex2_device
 
 RECORD = (
@@ -96,11 +103,35 @@ def _perovskite3():
     )
 
 
-def bench_case(Jn, g, label, reps=5):
+def _stats(ts):
+    """Median + IQR over reps (warmup already discarded by caller)."""
+    a = np.asarray(ts, dtype=float)
+    return {
+        "median_s": float(np.median(a)),
+        "iqr_s": float(np.percentile(a, 75) - np.percentile(a, 25)),
+        "n": int(a.size),
+        "all_s": [float(x) for x in a],
+    }
+
+
+def _time_fn(fn, reps=9):
+    fn()  # warmup, discarded
+    ts = []
+    for _ in range(reps):
+        t0 = time.perf_counter()
+        fn()
+        ts.append(time.perf_counter() - t0)
+    return _stats(ts)
+
+
+def bench_case(Jn, g, label, reps=9):
+    from scipy.linalg import solve_banded as _sb
+
     n = Jn.shape[0]
+    gn = np.asarray(g, dtype=float)
     JeT, DrT = sc_mod.equilibrate(Jn.T)
     try:
-        lam_ref, ref_floor = sc_mod.lu_longdouble(JeT, DrT @ np.asarray(g))
+        lam_ref, ref_floor = sc_mod.lu_longdouble(JeT, DrT @ gn)
         lam_ref = np.asarray(lam_ref, dtype=float)
         ref_ok = True
     except Exception as e:  # singular transpose: no reference computable
@@ -115,73 +146,112 @@ def bench_case(Jn, g, label, reps=5):
 
     def bwd_res(lam):
         lam = np.asarray(lam, dtype=float)
-        gg = np.asarray(g, dtype=float)
-        return float(np.linalg.norm(Jn.T @ lam - gg) / (np.linalg.norm(gg) + 1e-30))
+        return float(np.linalg.norm(Jn.T @ lam - gn) / (np.linalg.norm(gn) + 1e-30))
 
-    # Dense production path (timed, best of reps after warmup).
-    t_dense, lam_dense, dense_ok = None, None, True
-    try:
-        for _ in range(reps + 1):
-            t0 = time.perf_counter()
-            lam_dense = np.linalg.solve(Jn.T, np.asarray(g))
-            dt = time.perf_counter() - t0
-            t_dense = dt if t_dense is None else min(t_dense, dt)
-    except Exception as e:
-        dense_ok, dense_error = False, f"{type(e).__name__}: {e}"
-
-    # Opt-in equilibrated banded transpose (timed likewise).
-    t_band, lam_band, used_fb = None, None, None
-    try:
-        for _ in range(reps + 1):
-            t0 = time.perf_counter()
-            lam_j, fb = adjoint_banded_solve(jnp.asarray(Jn), jnp.asarray(np.asarray(g)), tol=1e-8)
-            dt = time.perf_counter() - t0
-            if t_band is None or dt < t_band:
-                t_band, lam_band, used_fb = dt, np.asarray(lam_j), bool(fb)
-        band_ok = True
-    except Exception as e:
-        band_ok, band_error = False, f"{type(e).__name__}: {e}"
-
-    return {
+    rec = {
         "label": label,
         "n": n,
         "cond": float(np.linalg.cond(Jn)),
         "ref_floor_adj": ref_floor,
         "ref_ok": ref_ok,
         **({} if ref_ok else {"ref_error": ref_error}),
-        "dense": {
-            "ok": dense_ok,
-            **({} if dense_ok else {"error": dense_error}),
-            **(
-                {
-                    "wall_s": t_dense,
-                    "backward": bwd_res(lam_dense),
-                    "forward_err": fwd_err(lam_dense),
-                }
-                if dense_ok
-                else {}
-            ),
-        },
-        "banded_equil": {
-            "ok": band_ok,
-            **({} if band_ok else {"error": band_error}),
-            **(
-                {
-                    "wall_s": t_band,
-                    "backward": bwd_res(lam_band),
-                    "forward_err": fwd_err(lam_band),
-                    "used_fallback": used_fb,
-                }
-                if band_ok
-                else {}
-            ),
-        },
-        "speedup_dense_over_banded": (
-            (t_dense / t_band)
-            if (t_dense is not None and t_band is not None and t_band > 0)
-            else None
-        ),
     }
+
+    # --- dense NumPy (bare kernel; the production CPU equivalent) ---
+    try:
+        lam_dense = np.linalg.solve(Jn.T, gn)
+        rec["dense"] = {
+            "status": "OK",
+            "timing": _time_fn(lambda: np.linalg.solve(Jn.T, gn), reps),
+            "backward": bwd_res(lam_dense),
+            "forward_err": fwd_err(lam_dense),
+        }
+    except Exception as e:
+        rec["dense"] = {"status": "FAILED", "error": f"{type(e).__name__}: {e}"}
+
+    # --- Phase-A decomposition of the banded backend (numpy blocks) ---
+    A_np, B_np, C_np = (np.asarray(t) for t in extract_blocks(jnp.asarray(Jn)))
+    decomp = {}
+    decomp["extract_dense_to_blocks"] = _time_fn(lambda: extract_blocks(jnp.asarray(Jn)), reps)
+    s = np.max(np.abs(Jn), axis=1)
+    s[~np.isfinite(s) | (s == 0)] = 1.0
+    decomp["equilibrate_dense"] = _time_fn(lambda: np.diag(1.0 / s), reps)
+    # Prebuilt band storage of the TRANSPOSE, then the RAW LAPACK kernel
+    # alone (no JAX, no packing, no residual): the intrinsic dgbsv number.
+    At = A_np.transpose(0, 2, 1)
+    Ct = C_np.transpose(0, 2, 1)
+    Bt = B_np.transpose(0, 2, 1)
+    ab_t = np.asarray(
+        _blocks_to_lapack_banded(jnp.asarray(At), jnp.asarray(Ct), jnp.asarray(Bt))[0]
+    )
+    decomp["pack_bands_jax"] = _time_fn(
+        lambda: _blocks_to_lapack_banded(jnp.asarray(At), jnp.asarray(Ct), jnp.asarray(Bt)), reps
+    )
+    try:
+        lam_raw = _sb((5, 5), ab_t, gn)
+        decomp["raw_lapack_dgbsv"] = _time_fn(lambda: _sb((5, 5), ab_t, gn), reps)
+        decomp["raw_lapack_backward"] = bwd_res(lam_raw)
+        decomp["raw_lapack_forward_err"] = fwd_err(lam_raw)
+    except Exception as e:
+        decomp["raw_lapack_dgbsv"] = {"status": "FAILED", "error": f"{type(e).__name__}: {e}"}
+    if rec["dense"].get("status") == "OK":
+        lam_d = np.linalg.solve(Jn.T, gn)
+        decomp["residual_dense_check"] = _time_fn(lambda: Jn.T @ lam_d - gn, reps)
+    else:
+        decomp["residual_dense_check"] = None
+    rec["decomposition"] = decomp
+
+    # --- full JAX wrapper (legacy dense-J API) ---
+    try:
+        lam_j, fb = adjoint_banded_solve(jnp.asarray(Jn), jnp.asarray(gn), tol=1e-8)
+        lam_j = np.asarray(lam_j)
+        fb = bool(fb)
+        t_wrap = _time_fn(
+            lambda: adjoint_banded_solve(jnp.asarray(Jn), jnp.asarray(gn), tol=1e-8), reps
+        )
+        rec["banded_wrapper"] = {
+            "status": "FAILED" if fb else "OK",
+            "timing": t_wrap,
+            "used_fallback": fb,
+            **(
+                {"backward": bwd_res(lam_j), "forward_err": fwd_err(lam_j)}
+                if not fb
+                else {"note": "fallback zeros are a failure marker, not a solution"}
+            ),
+        }
+    except Exception as e:
+        rec["banded_wrapper"] = {"status": "FAILED", "error": f"{type(e).__name__}: {e}"}
+
+    # --- Phase-B blocks-direct API (no dense extraction) ---
+    try:
+        lam_b, fbb = adjoint_banded_solve_blocks(
+            jnp.asarray(A_np), jnp.asarray(B_np), jnp.asarray(C_np), jnp.asarray(gn), tol=1e-8
+        )
+        lam_b = np.asarray(lam_b)
+        fbb = bool(fbb)
+        t_blocks = _time_fn(
+            lambda: adjoint_banded_solve_blocks(
+                jnp.asarray(A_np),
+                jnp.asarray(B_np),
+                jnp.asarray(C_np),
+                jnp.asarray(gn),
+                tol=1e-8,
+            ),
+            reps,
+        )
+        rec["banded_blocks_direct"] = {
+            "status": "FAILED" if fbb else "OK",
+            "timing": t_blocks,
+            "used_fallback": fbb,
+            **(
+                {"backward": bwd_res(lam_b), "forward_err": fwd_err(lam_b)}
+                if not fbb
+                else {"note": "fallback zeros are a failure marker, not a solution"}
+            ),
+        }
+    except Exception as e:
+        rec["banded_blocks_direct"] = {"status": "FAILED", "error": f"{type(e).__name__}: {e}"}
+    return rec
 
 
 def _device_at_bias_light(dev_fn, v, n_steps=6):
@@ -203,6 +273,29 @@ def _device_at_bias_light(dev_fn, v, n_steps=6):
     return J
 
 
+def _summarize_case(c):
+    d, w, b = c["dense"], c["banded_wrapper"], c["banded_blocks_direct"]
+    parts = [f"{c['label']} cond={c['cond']:.2e}"]
+    parts.append(
+        f"dense[{d.get('status')}]="
+        + (
+            f"{d['timing']['median_s'] * 1e3:.2f}ms fwd={d['forward_err']:.2e}"
+            if d.get("status") == "OK"
+            else f"{d.get('error')}"
+        )
+    )
+    for name, r in (("wrap", w), ("blocks", b)):
+        parts.append(
+            f"{name}[{r.get('status')}]="
+            + (
+                f"{r['timing']['median_s'] * 1e3:.2f}ms fwd={r['forward_err']} fb={r['used_fallback']}"
+                if r.get("status") == "OK"
+                else f"{r.get('error', r.get('note'))}"
+            )
+        )
+    return " ".join(parts)
+
+
 def main():
     import jax
 
@@ -218,69 +311,70 @@ def main():
         t0 = time.perf_counter()
         out["cases"][label] = bench_case(J, g, label)
         out["cases"][label]["total_wall_s"] = round(time.perf_counter() - t0, 1)
-        c = out["cases"][label]
-        d, b = c["dense"], c["banded_equil"]
-        print(
-            f"{label} cond={c['cond']:.2e} "
-            f"dense_ok={d['ok']} "
-            + (
-                f"dense_t={d['wall_s'] * 1e3:.2f}ms fwd={d['forward_err']:.2e} | "
-                if d["ok"]
-                else f"dense_err={d.get('error')} | "
-            )
-            + f"band_ok={b['ok']} "
-            + (
-                f"band_t={b['wall_s'] * 1e3:.2f}ms fwd={b['forward_err']} fb={b['used_fallback']}"
-                if b["ok"]
-                else f"band_err={b.get('error')}"
-            ),
-            flush=True,
-        )
-    # N-scaling arm: where does O(N^3) dense lose to the banded transpose?
-    # (lighter n_steps=6 extraction; accuracy already established above,
-    # here only wall times + fallback flags are recorded).
+        print(_summarize_case(out["cases"][label]), flush=True)
+    # N-scaling arm (lighter extraction; wall times + fallback flags).
     out["scaling"] = {}
-    for label, fn, v, _nn in (
-        ("homojunction_N200", lambda: _homo(n_points=200), 0.5, 200),
-        ("homojunction_N400", lambda: _homo(n_points=400), 0.5, 400),
-        ("heterojunction_N200", lambda: ex2_device(n_points=200), 0.5, 200),
+    for label, fn, v in (
+        ("homojunction_N200", lambda: _homo(n_points=200), 0.5),
+        ("homojunction_N400", lambda: _homo(n_points=400), 0.5),
+        ("heterojunction_N200", lambda: ex2_device(n_points=200), 0.5),
     ):
         t0 = time.perf_counter()
         Jn = _device_at_bias_light(fn, v)
         gn = np.ones(Jn.shape[0])
-        td, dok = None, True
+        A_np, B_np, C_np = (np.asarray(t) for t in extract_blocks(jnp.asarray(Jn)))
         try:
-            for _ in range(4):
-                t1 = time.perf_counter()
-                np.linalg.solve(Jn.T, gn)
-                dt = time.perf_counter() - t1
-                td = dt if td is None else min(td, dt)
+            td = _time_fn(lambda Jn=Jn, gn=gn: np.linalg.solve(Jn.T, gn), 5)
+            dense_rec = {"status": "OK", "timing": td}
         except Exception as e:
-            dok, derr = False, f"{type(e).__name__}"
-        tb, fb, bok = None, None, True
+            dense_rec = {"status": "FAILED", "error": f"{type(e).__name__}"}
         try:
-            for _ in range(4):
-                t1 = time.perf_counter()
-                lam_j, fbj = adjoint_banded_solve(jnp.asarray(Jn), jnp.asarray(gn), tol=1e-8)
-                dt = time.perf_counter() - t1
-                if tb is None or dt < tb:
-                    tb, fb = dt, bool(fbj)
+            lam_j, fbj = adjoint_banded_solve(jnp.asarray(Jn), jnp.asarray(gn), tol=1e-8)
+            tw = _time_fn(
+                lambda Jn=Jn, gn=gn: adjoint_banded_solve(
+                    jnp.asarray(Jn), jnp.asarray(gn), tol=1e-8
+                ),
+                5,
+            )
+            wrap_rec = {"status": "FAILED" if bool(fbj) else "OK", "timing": tw}
         except Exception as e:
-            bok, berr = False, f"{type(e).__name__}"
-        rec = {
+            wrap_rec = {"status": "FAILED", "error": f"{type(e).__name__}"}
+        try:
+            lam_b, fbb = adjoint_banded_solve_blocks(
+                jnp.asarray(A_np), jnp.asarray(B_np), jnp.asarray(C_np), jnp.asarray(gn), tol=1e-8
+            )
+            tb = _time_fn(
+                lambda A_np=A_np, B_np=B_np, C_np=C_np, gn=gn: adjoint_banded_solve_blocks(
+                    jnp.asarray(A_np),
+                    jnp.asarray(B_np),
+                    jnp.asarray(C_np),
+                    jnp.asarray(gn),
+                    tol=1e-8,
+                ),
+                5,
+            )
+            blocks_rec = {
+                "status": "FAILED" if bool(fbb) else "OK",
+                "timing": tb,
+                "used_fallback": bool(fbb),
+            }
+        except Exception as e:
+            blocks_rec = {"status": "FAILED", "error": f"{type(e).__name__}"}
+        out["scaling"][label] = {
             "n": int(Jn.shape[0]),
             "cond": float(np.linalg.cond(Jn)),
             "total_wall_s": round(time.perf_counter() - t0, 1),
-            "dense": {"ok": dok, **({"wall_s": td} if dok else {"error": derr})},
-            "banded_equil": {
-                "ok": bok,
-                **({"wall_s": tb, "used_fallback": fb} if bok else {"error": berr}),
-            },
+            "dense": dense_rec,
+            "banded_wrapper": wrap_rec,
+            "banded_blocks_direct": blocks_rec,
         }
-        if dok and bok and tb and tb > 0:
-            rec["speedup_dense_over_banded"] = td / tb
-        out["scaling"][label] = rec
-        print(f"{label} cond={rec['cond']:.2e} dense={rec['dense']} banded={rec['banded_equil']}", flush=True)
+        print(
+            f"{label} cond={out['scaling'][label]['cond']:.2e} "
+            f"dense={dense_rec.get('timing', {}).get('median_s')} "
+            f"wrap={wrap_rec.get('timing', {}).get('median_s')} "
+            f"blocks={blocks_rec.get('timing', {}).get('median_s')}",
+            flush=True,
+        )
     RECORD.write_text(json.dumps(out, indent=1, default=float))
     print(f"wrote {RECORD}")
 

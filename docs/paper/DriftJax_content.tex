@@ -1061,25 +1061,35 @@ overhead exceed dense LU below the crossover. Dense LU therefore remains
 the default; the banded adjoint is available for larger systems where
 the $O(N^3)$--$O(N)$ gap dominates. A saved-Jacobian transpose benchmark
 (\code{validation/adjoint\_transpose\_bench.py},
-\code{docs/paper/records/adjoint\_transpose\_bench.json}) locates that
-crossover instead of gesturing at it. On identical matrices with
-longdouble references: at $N=100$, homojunction
+\code{docs/paper/records/adjoint\_transpose\_bench.json}) decomposes that
+gap instead of reporting a single wrapper-to-wrapper ratio. On identical
+matrices with longdouble references: at $N=100$, homojunction
 ($\kappa=6.2\times10^{11}$), dense LU takes 1.9~ms with forward error
-$5.3\times10^{-14}$ vs banded $287$~ms at $2.1\times10^{-14}$ (no
-fallback); heterojunction ($\kappa=1.8\times10^{17}$), dense 1.3~ms at
-$2.2\times10^{-28}$ vs banded $295$~ms at $2.3\times10^{-27}$. Accuracy
-is equivalent; the $\sim$150$\times$ wall-time gap is pure host-callback
-and equilibration overhead at this size. Extending along $N$ (homojunction
-$N=200/400$, heterojunction $N=200$), dense times grow $8\times$ per
-doubling ($1.7\to8.0\to65$~ms, cubic as expected) while banded stays
-nearly flat ($185\to205\to254$~ms, overhead-dominated); fitting
-$T_{\mathrm{dense}}=aN^3$ against the banded line places the crossover
-at $N\approx620$. Production meshes ($N\leq500$) therefore sit below
-crossover, which justifies the dense default quantitatively rather than
-by habit. On the rank-deficient 3-layer perovskite transpose
+$5.3\times10^{-14}$; the full banded wrapper takes $324$~ms at
+$2.1\times10^{-14}$ (no fallback); heterojunction
+($\kappa=1.8\times10^{17}$), dense 1.3~ms at $2.2\times10^{-28}$ vs
+banded $295$~ms at $2.3\times10^{-27}$. Accuracy is equivalent---but the
+stage timings show the $\sim$150$\times$ gap is not the linear algebra:
+the raw LAPACK \code{dgbsv} kernel on prebuilt band storage costs
+$0.10$--$0.22$~ms ($\sim$10--$20\times$ \emph{faster} than dense LU),
+while JAX band packing costs $91$--$150$~ms, dense-to-block extraction
+$7$--$9$~ms, and the host callback plus residual check the remainder.
+A blocks-direct API (\code{adjoint\_banded\_solve\_blocks}, taking the
+analytic blocks with no dense intermediate) cuts the wrapper to
+$184$--$314$~ms with identical accuracy, confirming extraction was
+$\sim$40\% of the overhead. The previously reported $N\approx620$
+crossover is therefore retracted as stated: it was a crossover of backend
+\emph{wrappers}, not of the algorithms. Extending the wrappers along $N$
+(homojunction $N=200/400$, heterojunction $N=200$), dense times grow
+$8\times$ per doubling (cubic as expected) while both banded wrappers
+stay nearly flat (overhead-dominated). The honest conclusion is the
+decomposition itself: the structured transpose kernel already wins, and
+the remaining work is execution overhead (packing, callback), not
+numerics. On the rank-deficient 3-layer perovskite transpose
 ($\kappa\sim4\times10^{45}$) dense LU raises a singular-matrix error
-while the banded path returns with \code{used\_fallback} set---an honest
-negative result bounding the structured transpose to nonsingular systems.
+while both banded paths report status FAILED with \code{used\_fallback}
+set---fallback zeros are recorded as a failure marker, never as a
+solution, bounding the structured transpose to nonsingular systems.
 
 \section{Conclusions}\label{sec:conclusions}
 This article addresses three questions about a block-structured

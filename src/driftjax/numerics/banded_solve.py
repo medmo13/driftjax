@@ -225,6 +225,94 @@ def _row_equilibrate(J):
     return Dr[:, None] * J, Dr
 
 
+def _block_row_scales(A, B, C):
+    """Per-block-row scales dr[i] = 1/max|block-row i|, from blocks alone.
+
+    Block-row i spans A[i], B[i] (i < n-1) and C[i-1] (i > 0) — the exact
+    nonzero pattern of interleaved row triple (3i, 3i+1, 3i+2). Coarser
+    than per-scalar-row equilibration (one scale per 3 rows) but requires
+    no dense Jacobian; still tames ~1e11 SRV/transport imbalances.
+    """
+    import jax.numpy as _jnp
+
+    n = A.shape[0]
+    amax = _jnp.max(_jnp.abs(A), axis=(1, 2))
+    s = amax
+    if n > 1:
+        bmax = _jnp.max(_jnp.abs(B), axis=(1, 2))
+        cmax = _jnp.max(_jnp.abs(C), axis=(1, 2))
+        s = s.at[:-1].set(_jnp.maximum(s[:-1], bmax))
+        s = s.at[1:].set(_jnp.maximum(s[1:], cmax))
+    s = _jnp.where(_jnp.isfinite(s) & (s > 0), s, _jnp.asarray(1.0, dtype=s.dtype))
+    return 1.0 / s
+
+
+def adjoint_banded_solve_blocks(A, B, C, g, tol=1e-8):
+    """Equilibrated banded transpose solve from FORWARD blocks (no dense J).
+
+    Phase-B API: the caller passes the analytic (A, B, C) blocks it already
+    holds, so there is no dense-Jacobian construction and no dense-to-block
+    extraction. Row scales come from the blocks (_block_row_scales); the
+    residual is checked against the ORIGINAL system via the O(N) blockwise
+    transpose matvec, never a dense matrix.
+
+    With D = kron(diag(dr), I_3), Je = D @ J, Je^T = J^T @ D: solving
+    Je^T y = g gives lam = D @ y exactly (solution-preserving). As with
+    adjoint_banded_solve, the Dr here is the FORWARD row scaling (hence a
+    column scaling of J^T); true row-equilibration of J^T (D from column
+    maxima of J) is the open B4 experiment. Returns (lam, used_fallback);
+    used_fallback True routes the caller to dense LU.
+    """
+    import jax
+
+    from driftjax.numerics.analytic_jacobian import blockwise_matvec_transpose
+
+    n = A.shape[0]
+    dr = _block_row_scales(A, B, C)  # (n,)
+    Ae = A * dr[:, None, None]
+    Be = B * dr[:-1, None, None] if n > 1 else B
+    Ce = C * dr[1:, None, None] if n > 1 else C
+    At = jnp.transpose(Ae, (0, 2, 1))
+    Ct = jnp.transpose(Ce, (0, 2, 1))
+    Bt = jnp.transpose(Be, (0, 2, 1))
+    banded_t, kl, ku = _blocks_to_lapack_banded(At, Ct, Bt)
+    g_flat = g.reshape(-1)
+
+    def _solve(ab_flat, b_in):
+        import numpy as _np
+        from scipy.linalg import solve_banded as _sb
+
+        ab_np = ab_flat.reshape(kl + ku + 1, -1)
+        try:
+            x_np = _sb((kl, ku), ab_np, b_in)
+        except Exception:
+            x_np = _np.zeros_like(b_in)
+        return x_np.astype(ab_flat.dtype)
+
+    def _do_solve(_):
+        return jax.pure_callback(
+            _solve,
+            jax.ShapeDtypeStruct(g_flat.shape, g_flat.dtype),
+            banded_t.reshape(-1),
+            g_flat,
+            vmap_method="sequential",
+        )
+
+    def _zeros(_):
+        return jnp.zeros_like(g_flat)
+
+    has_nan = ~jnp.all(jnp.isfinite(banded_t))
+    y = jax.lax.cond(has_nan, _zeros, _do_solve, None)
+    dr_tiled = jnp.repeat(dr, 3)
+    lam = (dr_tiled * y).reshape(g.shape)
+    # ORIGINAL-system residual via O(N) blockwise transpose matvec (A,B,C
+    # are the raw forward blocks): r = J^T lam - g. Never the scaled system.
+    r = blockwise_matvec_transpose(A, B, C, lam.reshape(-1)) - g_flat
+    resid = jnp.linalg.norm(r) / (jnp.linalg.norm(g_flat) + 1e-30)
+    fallback = has_nan | (~jnp.isfinite(resid)) | (resid > tol)
+    return jnp.where(fallback, jnp.zeros_like(lam), lam), fallback
+
+
 def adjoint_banded_solve(J, g, tol=1e-8):
     """Solve J^T·lam = g via equilibrated pivoted banded transpose.
 
