@@ -348,6 +348,10 @@ def _forward(
     voc_dim = find_voc(voltages_dim, currents_dim)
     jsc_dim = jnp.abs(currents_dim[0])
     pmax_dim, _ = _mpp(voltages_dim, currents_dim)
+    # NOTE: implicit-Voc secant refinement runs once at the public-simulate
+    # choke point (all paths: serial, fused-scan, batched), not here, so
+    # every path reports the same refined root and bracket status.
+    voc_bracketed: bool = False
     ff = jnp.where(jnp.isfinite(voc_dim), pmax_dim / (voc_dim * jsc_dim + 1e-30), jnp.nan)
     v_volts = voltages_dim * sc["energy"]
     j_phys = currents_dim * sc["current"]
@@ -373,6 +377,7 @@ def _forward(
         # R2 provenance: per-bias lstsq flags (True/False concrete serial;
         # None entries when unverified: traced, fused-scan, batched paths).
         fallback_used=list(_sweep_fallbacks),
+        voc_bracketed=bool(voc_bracketed),
     ), (voltages_dim, currents_dim, pots)
 
 
@@ -988,15 +993,45 @@ def simulate(
             # concrete path); otherwise mark every bias unverified (None) so
             # "unknown" is never confused with "clean" (False).
             _fb = getattr(res, "fallback_used", []) or [None] * len(res.potentials)
+            # Implicit-Voc refinement at the single choke point (all paths:
+            # serial, fused-scan, batched). When the sweep brackets a sign
+            # change, secant-refine J(Voc) = 0 on converged evaluations
+            # instead of trusting the coarse interpolation; on failure (or
+            # no bracket) keep the interpolation and report voc_bracketed.
+            _voc_val = res.voc
+            _voc_bracketed = bool(getattr(res, "voc_bracketed", False))
+            try:
+                from driftjax.solvers.continuation import refine_voc as _refine_voc
+                from driftjax.solvers.continuation import voc_bracket as _voc_bracket
+
+                _e_scale = float(thermal_scales(float(res.cell.T))["energy"])
+                _vd = [float(v) / _e_scale for v in res.voltages]
+                _cd = [float(j) for j in res.current]
+                _va, _vb, _found = _voc_bracket(_vd, _cd)
+                _voc_bracketed = bool(_found)
+                if _found:
+                    _ia = int(
+                        min(
+                            range(len(res.potentials)),
+                            key=lambda i: abs(_vd[i] - _va),
+                        )
+                    )
+                    _vr, _sok = _refine_voc(res.cell, _va, _vb, res.potentials[_ia])
+                    if bool(_sok) and _vr == _vr:
+                        _voc_val = _vr * _e_scale
+            except Exception:
+                pass
             res = _eqx.tree_at(
                 lambda s: (
                     s.converged,
                     s.max_residual,
                     s.per_bias_residuals,
                     s.fallback_used,
+                    s.voc,
+                    s.voc_bracketed,
                 ),
                 res,
-                (_conv, _mr, _per_bias, list(_fb)),
+                (_conv, _mr, _per_bias, list(_fb), float(_voc_val), _voc_bracketed),
             )
         return res
     finally:

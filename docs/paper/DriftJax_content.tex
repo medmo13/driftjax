@@ -251,7 +251,18 @@ P_{\max}=\max_V[-VJ(V)].\label{eq:metrics}
 $P_{\mathrm{in}}$ must be computed from the same incident spectrum used
 for generation. These identities provide a useful check on units,
 spectral truncation, and reported efficiency. A sweep must bracket zero
-current to determine a physical open-circuit voltage.
+current to determine a physical open-circuit voltage. When it does, the
+reported $V_{\mathrm{oc}}$ is secant-refined on the implicit root
+$J(V_{\mathrm{oc}})=0$ with true converged current evaluations
+(warm-started, bracket-clamped, best-$|J|$ tracking; no bracket gives NaN
+with a \code{voc\_bracketed} flag rather than a value). The refinement
+additionally exposed branch dependence: on one homojunction sweep,
+independent converged solves at $0.96$~V and $1.04$~V both satisfy
+$|J|<10^{-7}$, i.e.\ the Newton continuation history selects the root.
+$P_{\max}$ is already a continuous local root (analytic stationary point
+of the per-segment PCHIP cubic, verified $dP/dV\approx0$), but
+cross-segment selection jumps remain; both observables carry status
+flags rather than silent values.
 
 \subsection{Discrete residual and structured Newton step}\label{sec:newton}
 After scaling and discretisation, the problem is

@@ -46,6 +46,10 @@ class Solution(eqx.Module):
     # False = clean banded solves; None entries / empty = unverified, e.g.
     # under jit/grad/vmap, fused-scan or batched paths).
     fallback_used: list = eqx.field(default_factory=list)
+    # Implicit-Voc status: True when the sweep bracketed a current sign
+    # change (J(Voc) = 0 refined by secant on converged evaluations);
+    # False means Voc is NaN (above sweep range) or unverified (traced).
+    voc_bracketed: bool = False
 
     @property
     def efficiency(self):

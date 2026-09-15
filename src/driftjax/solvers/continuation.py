@@ -354,3 +354,84 @@ def find_voc(voltages, currents) -> jax.Array:
     # guards, Solution vmax fallback, console "> vmax" rendering). Never
     # silently substitute vmax here: that masks truncation as a real Voc.
     return jnp.where(found, voc, jnp.nan)
+
+
+def voc_bracket(voltages, currents):
+    """First sign-change bracket (v_a, v_b, found) mirroring find_voc.
+
+    Concrete-path helper for secant refinement: returns Python floats and
+    a bool. Shares find_voc's denormal guard so bracket existence agrees
+    exactly with a finite find_voc value.
+    """
+    import numpy as _np
+
+    c = _np.asarray(currents, dtype=float)
+    v = _np.asarray(voltages, dtype=float)
+    for i in range(len(c) - 1):
+        if c[i] * c[i + 1] < 0.0:
+            dI = c[i + 1] - c[i]
+            tiny = abs(dI) < 1e-30 * max(max(abs(c[i]), abs(c[i + 1])), 1e-100)
+            if not tiny:
+                return float(v[i]), float(v[i + 1]), True
+    return float("nan"), float("nan"), False
+
+
+def refine_voc(cell, v_a, v_b, pot_a, tol=1e-10, max_iter=3):
+    """Secant-refine the implicit root J(Voc) = 0 inside a bracket.
+
+    Uses the sweep's own bracket-leg currents (no re-solve: re-solving a
+    leg from a foreign guess can land on a different Newton branch, which
+    is exactly what broke naive secant here — branch dependence is real
+    on stiff devices). Fresh evaluations are secant proposals CLAMPED to
+    [v_a, v_b], each warm-started from the nearest evaluated state; the
+    best |J| seen wins. Returns (voc, slope_ok); on any failure
+    (non-convergence, out-of-bracket proposal, no improvement over the
+    legs) returns (nan, False) and the caller keeps the interpolation.
+    slope_ok additionally requires |dJ/dV| above the resolvability floor
+    the implicit sensitivity dVoc/dtheta = -J_theta/J_V needs.
+    """
+    from driftjax.solvers.newton import solve_newton
+
+    def _current_at(vv, guess):
+        pot, st = solve_newton(cell, boundary_bias(cell, vv), guess, tol=tol)
+        if not bool(st.get("converged", False)):
+            return None, None
+        return float(total_current(cell, pot)), pot
+
+    j_a, pot_a2 = _current_at(v_a, pot_a)
+    if j_a is None:
+        return float("nan"), False
+    j_b, pot_b = _current_at(v_b, pot_a2)
+    if j_b is None:
+        return float("nan"), False
+    if j_a * j_b >= 0.0:
+        # Legs re-solved onto the same branch side: the sweep bracket does
+        # not reproduce under re-solve (branch dependence). Keep sweep
+        # interpolation rather than chasing a ghost root.
+        return float("nan"), False
+    lo, hi = (v_a, v_b) if v_a < v_b else (v_b, v_a)
+    best_v, best_j = v_a, j_a
+    if abs(j_b) < abs(best_j):
+        best_v, best_j = v_b, j_b
+    v_prev, j_prev = v_a, j_a
+    v_cur, j_cur, pot_cur = v_b, j_b, pot_b
+    for _ in range(max_iter):
+        denom = j_cur - j_prev
+        if denom == 0.0:
+            break
+        v_next = v_cur - j_cur * (v_cur - v_prev) / denom
+        # Clamp to bracket: never extrapolate (branch jumps live outside).
+        v_next = min(max(v_next, lo), hi)
+        j_next, pot_next = _current_at(v_next, pot_cur)
+        if j_next is None:
+            break
+        if abs(j_next) < abs(best_j):
+            best_v, best_j = v_next, j_next
+        if abs(j_next) == 0.0:
+            break
+        v_prev, j_prev = v_cur, j_cur
+        v_cur, j_cur, pot_cur = v_next, j_next, pot_next
+    if abs(best_j) >= min(abs(j_a), abs(j_b)):
+        return float("nan"), False
+    slope = abs((j_cur - j_prev) / (v_cur - v_prev)) if v_cur != v_prev else 0.0
+    return float(best_v), bool(slope > 1e-30)
