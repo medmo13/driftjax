@@ -261,6 +261,15 @@ def _step_newton_impl(cell, bound, x, dense, refinement, analytic, fused):
             lin = jnp.linalg.norm(Jf @ pf + F) / (jnp.linalg.norm(F) + 1e-30)
             return pf, lin, jnp.array(False)
 
+        # P0-solver contract (why a zeros/nonfinite banded step can NEVER
+        # masquerade as a valid Newton step): a zero step yields relative
+        # linear residual EXACTLY 1.0 (||F||/||F|| for F != 0), which always
+        # trips the use_dense gate (1.0 > 1e-4), so the dense fallback
+        # engages; if dense also fails the step is NaN and the NaN/
+        # best-iterate machinery handles it. The only zeros-kept case is
+        # F == 0 (already at the root), which is correct convergence.
+        # No separate failure flag is needed: the gate IS the detector
+        # (pinned by test_failed_linear_solve_never_certifies).
         p_a, lin_a, lstsq_a = jax.lax.cond(blocks_finite, _do_banded, _do_fallback, None)
         use_dense = (~jnp.isfinite(lin_a)) | (lin_a > 1e-4)
         p, linresid, _ = jax.lax.cond(

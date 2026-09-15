@@ -109,3 +109,64 @@ def test_nan_storage_returns_zeros_and_flags():
     # the residual audit, never via the values themselves).
     x_legacy = banded_solve(A, B, C, b)
     assert float(jnp.max(jnp.abs(x_legacy))) == 0.0
+
+
+def test_failed_linear_solve_never_certifies():
+    """P0-solver: a zeros/nonfinite banded step must NEVER satisfy the
+    step-norm gate directly. Mechanism (pinned here): a zero step yields
+    relative linear residual EXACTLY 1.0 (||F||/||F|| for F != 0), which
+    always trips the ``use_dense`` gate (1.0 > 1e-4), so the dense fallback
+    engages; if dense also fails the step is NaN and the NaN/best-iterate
+    machinery handles it. The only zeros-kept case is F == 0 (already at
+    the root). Forces the zeros path by stubbing banded_solve_with_info,
+    then checks (a) the kept step reroutes to dense rescue (backend 2),
+    never a direct banded certification, and (b) the full solve either
+    converges legitimately (small residual) or reports converged=False.
+    """
+    import driftjax.numerics.banded_solve as _bs
+
+    A0, B0, C0, b0 = _synthetic_blocks(key_seed=7, n=6)
+    real = _bs.banded_solve_with_info
+
+    def _stub(A, B, C, b):
+        x, info = real(A, B, C, b)
+        return jnp.zeros_like(x), {"used_lstsq": False, "used_zeros": jnp.array(True)}
+
+    _bs.banded_solve_with_info = _stub
+    try:
+        import driftjax as dj
+        from driftjax.science.contacts import boundary_bias
+        from driftjax.science.spectrum import spectrum as _spec
+        from driftjax.simulator import init_cell
+
+        mat = dj.material(Eg=1.4, Chi=3.0, eps=10.0, Nc=1e18, Nv=1e18,
+                          mn=130.0, mp=160.0, A=2e4)
+        dev = dj.Device(n_points=8, layers=[(1e-4, mat, 1e17), (1e-4, mat, -1e17)],
+                        Snl=1e7, Snr=0.0, Spl=0.0, Spr=1e7)
+        cell = init_cell(dev.design(), _spec(normalize=False))
+        bound = boundary_bias(cell, 0.1)
+        from driftjax.solvers.continuation import equilibrium_guess
+        from driftjax.solvers.newton import solve_eq, solve_newton
+
+        pot0 = solve_eq(cell, boundary_bias(cell, 0.0), equilibrium_guess(cell).phi)
+        # (a) direct impl call (no jit cache): stubbed zeros on a
+        # NON-converged state -> dense rescue (backend code 2), finite
+        # error, never a banded certification of a zero step.
+        from driftjax.fields import pot2vec
+        from driftjax.solvers.newton import _step_newton_impl
+
+        out = _step_newton_impl(cell, bound, pot2vec(pot0), False, False, True, False)
+        _xn, _xe, _xr, _xrf, _xl, _xbc, _xls = out
+        assert int(_xbc) == 2  # dense rescue engaged
+        assert float(_xe) < float("inf")
+        # (b) full solve with stub: converges legitimately via dense rescue
+        # or reports honestly; either way no false certification with huge
+        # ||F||.
+        pot, last = solve_newton(cell, bound, pot0, max_steps=50)
+        from driftjax.numerics.residual import comp_F
+
+        r_final = float(jnp.max(jnp.abs(comp_F(cell, bound, pot))))
+        if bool(last.get("converged", False)):
+            assert r_final < 1e-6, (r_final, last)
+    finally:
+        _bs.banded_solve_with_info = real
