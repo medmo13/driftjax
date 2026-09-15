@@ -748,10 +748,12 @@ def _sweep(*args, **kwargs):
     return _continuation_sweep(*args, **kwargs)
 
 
-def _mpp(voltages, currents):
-    from driftjax.numerics.spline import calcPmax_cubic
+def _mpp(voltages, currents, tau=None):
+    from driftjax.numerics.spline import calcPmax_cubic, calcPmax_smooth
 
-    return calcPmax_cubic(jnp.asarray(voltages), jnp.asarray(currents))
+    if tau is None:
+        return calcPmax_cubic(jnp.asarray(voltages), jnp.asarray(currents))
+    return calcPmax_smooth(jnp.asarray(voltages), jnp.asarray(currents), tau)
 
 
 # ---------------------------------------------------------------------------

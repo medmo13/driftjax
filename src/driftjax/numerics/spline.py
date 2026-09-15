@@ -76,6 +76,53 @@ def calcPmax_cubic(v, j):
     return y.flatten()[idx], v[seg] + off
 
 
+def calcPmax_smooth(v, j, tau):
+    """Soft-maximum MPP: smooth in (v, j), no segment-selection jump.
+
+    Same PCHIP candidate values as calcPmax_cubic, but the maximum over
+    candidates is replaced by log-sum-exp with temperature tau (power
+    units): pmax_soft = tau*log(sum(exp(y/tau))), Vmpp_soft =
+    softmax-weighted candidate voltages. Satisfies
+    0 <= pmax_soft - max(y) <= tau*log(#candidates); -inf-masked invalid
+    candidates contribute exactly zero weight. The default hard selection
+    is unchanged; opt in via Sweep(mpp_tau=...) when a globally smooth
+    efficiency objective is needed for differentiation. tau is a physical
+    modeling choice (document it): smaller tau tracks the hard MPP more
+    closely but concentrates weight (stiffer gradients).
+    """
+    p = v * j
+    a, b, c, d = pchip_coefs(v, p)
+    h = jnp.diff(v)
+
+    def _cands(a_, b_, c_, h_):
+        aa = jnp.where(a_ == 0, 1.0, a_)
+        disc = 4.0 * b_**2 - 4.0 * (3.0 * aa) * c_
+        sqrt = jnp.sqrt(jnp.maximum(disc, 1e-24))
+        r1 = (-2.0 * b_ + sqrt) / (6.0 * aa)
+        r2 = (-2.0 * b_ - sqrt) / (6.0 * aa)
+        q2 = (disc > 0.0) & (a_ != 0.0)
+        r1 = jnp.where(q2 & (r1 > 0.0) & (r1 < h_), r1, -1.0)
+        r2 = jnp.where(q2 & (r2 > 0.0) & (r2 < h_), r2, -1.0)
+        r3 = jnp.where(b_ == 0.0, -1.0, -c_ / (2.0 * b_ + 1e-24))
+        r3 = jnp.where((a_ == 0.0) & (r3 > 0.0) & (r3 < h_), r3, -1.0)
+        return jnp.stack([jnp.zeros_like(h_), h_, r1, r2, r3])
+
+    dx = vmap(_cands)(a, b, c, h)
+    y = a[:, None] * dx**3 + b[:, None] * dx**2 + c[:, None] * dx + d[:, None]
+    valid = (dx >= 0.0) & (dx <= h[:, None])
+    y = jnp.where(valid, y, -jnp.inf)
+    # Candidate values + voltages: segment base v[:-1] plus offsets.
+    yf = y.flatten()
+    vf = (v[:-1, None] + dx).flatten()
+    # Shift by max for exp-range safety (all-tracer, no concretization).
+    m = jnp.max(jnp.where(jnp.isfinite(yf), yf, -jnp.inf))
+    e = jnp.exp(jnp.where(jnp.isfinite(yf), (yf - m) / tau, -jnp.inf))
+    Z = jnp.sum(e) + 1e-300
+    w = e / Z
+    pmax_soft = m + tau * jnp.log(Z)
+    return pmax_soft, jnp.sum(w * vf)
+
+
 @jax.jit
 def _qspline_coefs(x, y):
     """Quadratic spline coefficients (a, b, c per segment) solved as one

@@ -25,6 +25,12 @@ class Sweep(AbstractProblem):
     refinement: bool = False
     fused: bool = True
     batched: bool = False
+    # Soft-maximum MPP temperature (power units, None = hard selection).
+    # Opt-in for globally smooth efficiency objectives: replaces the
+    # discrete winning-segment argmax (whose gradient jumps at switches)
+    # with log-sum-exp over PCHIP candidates. Bias bounded by
+    # tau*log(#candidates); report tau alongside any result using it.
+    mpp_tau: float | None = None
 
     def __post_init__(self):
         # L2/M10: degenerate schedules break find_voc (empty sign-change

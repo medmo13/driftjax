@@ -347,7 +347,7 @@ def _forward(
         _sweep_fallbacks = [None] * len(pots)
     voc_dim = find_voc(voltages_dim, currents_dim)
     jsc_dim = jnp.abs(currents_dim[0])
-    pmax_dim, _ = _mpp(voltages_dim, currents_dim)
+    pmax_dim, _ = _mpp(voltages_dim, currents_dim, getattr(protocol, "mpp_tau", None))
     # Implicit-Voc refinement (concrete paths only; traced paths keep the
     # interpolation with voc_JV NaN, which selects the coarse secant in
     # the VJP). Runs at each Solution-building site so the refined root,
@@ -426,7 +426,7 @@ def _simulate_sweep(
         if fast_ok:
             voc_dim = find_voc(vd, cd)
             jsc_dim = jnp.abs(cd[0])
-            pmax_dim, _ = _mpp(vd, cd)
+            pmax_dim, _ = _mpp(vd, cd, getattr(protocol, "mpp_tau", None))
             ff = jnp.where(jnp.isfinite(voc_dim), pmax_dim / (voc_dim * jsc_dim + 1e-30), jnp.nan)
             v_volts = vd * sc["energy"]
             j_phys = cd * sc["current"]
@@ -627,7 +627,7 @@ def _sweep_fwd(design, solver, optics, protocol, progress, ls, statistics, init=
             pot_arr = jax.vmap(pot2vec)(pa)
             voc_dim = find_voc(vd, cd)
             jsc_dim = jnp.abs(cd[0])
-            pmax_dim, _ = _mpp(vd, cd)
+            pmax_dim, _ = _mpp(vd, cd, getattr(protocol, "mpp_tau", None))
             # AUDIT: NaN-safe ff (matches the serial _forward guard) — beyond
             # the sweep range voc_dim is NaN and must propagate as NaN, not
             # as NaN/eps noise.
@@ -765,7 +765,7 @@ def _sweep_bwd(solver, optics, protocol, progress, ls, statistics, init, fused, 
         voc_d = jnp.where(jnp.isfinite(voc_raw), voc_raw, vdim[-1])
         voc_d_stopped = jax.lax.stop_gradient(voc_d)
         jsc_d = jnp.abs(cdim[0])
-        pmax_d, _ = _mpp(vdim, cdim)
+        pmax_d, _ = _mpp(vdim, cdim, getattr(protocol, "mpp_tau", None))
         ff_d = pmax_d / (voc_d_stopped * jsc_d + 1e-30)
         eff_d = pmax_d * scx["energy"] * scx["current"] * 1e4 / jnp.sum(P_in)
         return (
@@ -969,7 +969,7 @@ def _sweep_bwd(solver, optics, protocol, progress, ls, statistics, init, fused, 
     _C_star = per_bias(pot2vec(_best_u), _Vr, 1.0)
     _Jtheta = vjp_cell(_C_star)[0]
     # Combined Voc scalar: ct_voc directly + ct_ff via dff/dVoc = -ff/Voc.
-    _pmax_fwd, _ = _mpp(v, c)
+    _pmax_fwd, _ = _mpp(v, c, getattr(protocol, "mpp_tau", None))
     _E_fwd = jax.lax.stop_gradient(thermal_scales(cell.T)["energy"])
     _voc_volts_fwd = _Vr * _E_fwd
     _ff_fwd = _pmax_fwd / (_voc_volts_fwd * jnp.abs(c[0]) + 1e-30)

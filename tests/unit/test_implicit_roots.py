@@ -1,10 +1,51 @@
 """Implicit Voc/MPP roots: secant-refined Voc + stationary MPP verification."""
 
+import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
 
 import driftjax as dj
+
+
+def test_mpp_soft_bound_and_fd(homo_dev):
+    """Soft-maximum MPP: bounded bias vs hard selection, FD-tight gradient.
+
+    0 <= soft - hard <= tau*log(#candidates); and because the soft
+    objective has no segment-selection jump, its adjoint gradient must
+    match central FD closely (unlike the hard objective near a switch).
+    """
+
+    from driftjax.simulator import _mpp
+
+    sol = dj.simulate(homo_dev, dj.Sweep(n_steps=12, vmax=1.2))
+    v = np.asarray(sol.voltages, dtype=float)
+    j = np.asarray(sol.current, dtype=float)
+    p_hard, _ = _mpp(v, j)
+    tau = 1e-4
+    p_soft, v_soft = _mpp(v, j, tau=tau)
+    n_cand = 5 * (len(v) - 1)
+    assert 0.0 <= float(p_soft - p_hard) <= tau * np.log(n_cand) + 1e-12
+    assert float(v[0]) <= float(v_soft) <= float(v[-1])
+
+    # Adjoint vs FD on the soft objective through an Eg rebuild knob.
+    def _e(eg):
+        m = dj.material(Eg=eg, Chi=3.0, eps=10.0, Nc=1e18, Nv=1e18, mn=130.0, mp=160.0, A=2e4)
+        dev = dj.Device(
+            n_points=15,
+            layers=[(1e-4, m, 1e17), (1e-4, m, -1e17)],
+            Snl=1e7,
+            Snr=0.0,
+            Spl=0.0,
+            Spr=1e7,
+        )
+        return dj.simulate(dev, dj.Sweep(n_steps=8, vmax=1.2, mpp_tau=1e-4)).efficiency
+
+    g_adj = float(jax.grad(_e)(1.4))
+    h = 1e-4
+    g_fd = (float(_e(1.4 + h)) - float(_e(1.4 - h))) / (2 * h)
+    rel = abs(g_adj - g_fd) / (abs(g_fd) + 1e-30)
+    assert rel < 0.05, (g_adj, g_fd, rel)
 
 
 @pytest.fixture(scope="module")
@@ -86,7 +127,6 @@ def test_voc_implicit_gradient_vs_fd():
     vmax-substitution path is stopped, so this number comes purely from
     -J_theta/J_V contracted through the existing adjoint.
     """
-    import jax
 
     def voc_of_eg(eg):
         m = dj.material(Eg=eg, Chi=3.0, eps=10.0, Nc=1e18, Nv=1e18, mn=130.0, mp=160.0, A=2e4)

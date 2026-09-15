@@ -272,7 +272,11 @@ finite nonzero $J_V$ (verified against central finite differences).
 $P_{\max}$ is already a continuous local root (analytic stationary point
 of the per-segment PCHIP cubic, verified $dP/dV\approx0$), but
 cross-segment selection jumps remain; both observables carry status
-flags rather than silent values. The refinement additionally exposed
+flags rather than silent values. For globally smooth efficiency
+objectives, \code{Sweep(mpp\_tau=...)} replaces the winning-segment
+argmax with a log-sum-exp soft maximum over PCHIP candidates
+(\code{calcPmax\_smooth}, bias bounded by $\tau\log(\#\mathrm{candidates})$,
+FD-verified gradient); the hard selection stays the default. The refinement additionally exposed
 branch dependence: warm-started re-solves can land on a spurious
 near-zero-current branch coexisting with the physical continuation
 branch, so all root evaluations warm-start from continuation history
@@ -1196,14 +1200,19 @@ $0.1$~ms raw LAPACK), and the forward Newton path runs correctly
 end-to-end under the \code{DRIFTJAX\_NATIVE\_BANDED} opt-in with
 fallback provenance preserved. But under the vmapped plus checkpointed
 backward the same scan costs $\sim$440~ms flat regardless of size
-($222\times$ for $2\times$ work at $N=30$), independent of scatter
-style---an XLA CPU batching cliff for loop-carried dynamic updates, not
-a numerics failure. End-to-end native gradients therefore cost $\sim$25~s
-vs $1.1$~s dense. The native solver is kept as a proven serial/jit
-backend and benchmark reference; eliminating dense from the backward
-additionally requires either a vmap-safe scan formulation or the
-compiled-kernel (FFI) route, both recorded as future work with these
-numbers as the acceptance baseline.
+($222\times$ for $2\times$ work at $N=30$), and a masked-update rewrite
+(eliminating every dynamic scatter, verified zero
+\code{dynamic\_update\_slice} in HLO) changed nothing: the HLO is
+compact (80\,KB, 2 whiles), so the cliff is XLA CPU while-loop batching
+itself, not our indexing. Batch-size scaling ($483/537/930$~ms for
+batch $1/2/6$) confirms a large fixed cost per vmapped invocation.
+End-to-end native gradients therefore cost $\sim$25~s vs $1.1$~s dense:
+the native formulation is proven for serial/jit use but structurally
+blocked under vmap on CPU. The remaining outs are a vmap-free scan
+formulation (e.g.\ associative prefix, unproven) or a compiled FFI
+kernel calling LAPACK directly (whose batch dims are native to the
+handler), both recorded as future work with these numbers as the
+acceptance baseline.
 
 \section{Conclusions}\label{sec:conclusions}
 This article addresses three questions about a block-structured
