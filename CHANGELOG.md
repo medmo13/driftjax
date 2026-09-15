@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.1.17-post1 (2026-09-15, Zenodo archiving trigger; no code change)
+
+- Empty functional delta vs v0.1.17: republished release so the
+  Zenodo-GitHub integration mints the software DOI.
+
 ## v0.1.17 (2026-09-15, adversarial-review synchronisation)
 
 ### Solver (breaking change, documented)
