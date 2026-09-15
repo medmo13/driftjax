@@ -376,62 +376,94 @@ def voc_bracket(voltages, currents):
     return float("nan"), float("nan"), False
 
 
-def refine_voc(cell, v_a, v_b, pot_a, tol=1e-10, max_iter=3):
-    """Secant-refine the implicit root J(Voc) = 0 inside a bracket.
+def refine_voc(cell, v_a, v_b, pot_a, tol=1e-10, max_iter=4):
+    """Bracketed bisection refinement of the implicit root J(Voc) = 0.
+    Returns (voc_dimless, slope_ok, jv_tight_dimless) with NaNs on failure.
 
-    Uses the sweep's own bracket-leg currents (no re-solve: re-solving a
-    leg from a foreign guess can land on a different Newton branch, which
-    is exactly what broke naive secant here — branch dependence is real
-    on stiff devices). Fresh evaluations are secant proposals CLAMPED to
-    [v_a, v_b], each warm-started from the nearest evaluated state; the
-    best |J| seen wins. Returns (voc, slope_ok); on any failure
-    (non-convergence, out-of-bracket proposal, no improvement over the
-    legs) returns (nan, False) and the caller keeps the interpolation.
-    slope_ok additionally requires |dJ/dV| above the resolvability floor
-    the implicit sensitivity dVoc/dtheta = -J_theta/J_V needs.
+    Secant was tried first and failed diagnostically: warm-started
+    re-solves can land on a different Newton branch (a spurious
+    near-zero-current branch coexists with the physical continuation
+    branch — verified by two converged roots with |J| < 1e-7 at different
+    voltages on one homojunction sweep), so secant proposals chased ghost
+    roots outside the bracket. Bisection instead: legs are re-solved from
+    continuation-history guesses, midpoints warm-started from the nearest
+    evaluated state, and a midpoint only narrows the straddle when it
+    preserves the sign change (a lost straddle means a branch jump: stop
+    and keep the current bracket). Returns (voc, slope_ok) by linear
+    interpolation of the final straddle; on any failure returns
+    (nan, False) and the caller keeps the sweep interpolation. slope_ok
+    additionally requires |dJ/dV| above the resolvability floor the
+    implicit sensitivity dVoc/dtheta = -J_theta/J_V needs.
     """
     from driftjax.solvers.newton import solve_newton
 
     def _current_at(vv, guess):
-        pot, st = solve_newton(cell, boundary_bias(cell, vv), guess, tol=tol)
+        try:
+            pot, st = solve_newton(cell, boundary_bias(cell, vv), guess, tol=tol)
+        except Exception:
+            return None, None
         if not bool(st.get("converged", False)):
             return None, None
         return float(total_current(cell, pot)), pot
 
     j_a, pot_a2 = _current_at(v_a, pot_a)
     if j_a is None:
-        return float("nan"), False
+        return float("nan"), False, float("nan")
+    # Far leg warm-started from the near-leg converged state
+    # (continuation history stays on-branch).
     j_b, pot_b = _current_at(v_b, pot_a2)
-    if j_b is None:
-        return float("nan"), False
-    if j_a * j_b >= 0.0:
-        # Legs re-solved onto the same branch side: the sweep bracket does
-        # not reproduce under re-solve (branch dependence). Keep sweep
-        # interpolation rather than chasing a ghost root.
-        return float("nan"), False
-    lo, hi = (v_a, v_b) if v_a < v_b else (v_b, v_a)
-    best_v, best_j = v_a, j_a
-    if abs(j_b) < abs(best_j):
-        best_v, best_j = v_b, j_b
-    v_prev, j_prev = v_a, j_a
-    v_cur, j_cur, pot_cur = v_b, j_b, pot_b
+    if j_b is None or j_a * j_b >= 0.0:
+        return float("nan"), False, float("nan")
+    a, ja, pa = v_a, j_a, pot_a2
+    b, jb, pb = v_b, j_b, pot_b
+    best_pot = pa if abs(j_a) <= abs(j_b) else pb
+    best_j = min(abs(j_a), abs(j_b))
     for _ in range(max_iter):
-        denom = j_cur - j_prev
-        if denom == 0.0:
+        mid = 0.5 * (a + b)
+        jm, pm = _current_at(mid, pa if abs(mid - a) < abs(mid - b) else pb)
+        if jm is None:
             break
-        v_next = v_cur - j_cur * (v_cur - v_prev) / denom
-        # Clamp to bracket: never extrapolate (branch jumps live outside).
-        v_next = min(max(v_next, lo), hi)
-        j_next, pot_next = _current_at(v_next, pot_cur)
-        if j_next is None:
-            break
-        if abs(j_next) < abs(best_j):
-            best_v, best_j = v_next, j_next
-        if abs(j_next) == 0.0:
-            break
-        v_prev, j_prev = v_cur, j_cur
-        v_cur, j_cur, pot_cur = v_next, j_next, pot_next
-    if abs(best_j) >= min(abs(j_a), abs(j_b)):
-        return float("nan"), False
-    slope = abs((j_cur - j_prev) / (v_cur - v_prev)) if v_cur != v_prev else 0.0
-    return float(best_v), bool(slope > 1e-30)
+        if abs(jm) < best_j:
+            best_j, best_pot = abs(jm), pm
+        if ja * jm <= 0.0:
+            b, jb, pb = mid, jm, pm
+        elif jb * jm <= 0.0:
+            a, ja, pa = mid, jm, pm
+        else:
+            break  # lost straddle (branch jump): keep current bracket
+    if ja * jb >= 0.0:
+        return float("nan"), False, float("nan"), None
+    voc = a - ja * (b - a) / (jb - ja)
+    slope = abs((jb - ja) / (b - a)) if b != a else 0.0
+    if not (min(v_a, v_b) <= voc <= max(v_a, v_b)):
+        return float("nan"), False, float("nan"), None
+    if not slope > 1e-30:
+        return float("nan"), False, float("nan"), None
+    # Best state: converged evaluation closest to the root (for exact
+    # tangent/adjoint evaluation downstream).
+    return float(voc), True, float((jb - ja) / (b - a)), best_pot
+
+
+def maybe_refine_voc(cell, voltages_dim, currents_dim, pots, e_scale):
+    """One-call implicit-Voc refinement for Solution builders (concrete only).
+
+    Takes dimensionless sweep voltages/currents, per-bias potentials, and
+    the volts-per-dimensionless energy scale. Returns
+    (voc_volts_or_nan, bracketed_bool, jv_tight_or_nan, pot_best_or_None)
+    with jv in dimensionless current per dimensionless volt; pot_best is
+    the converged state at the final straddle point (for exact tangent /
+    adjoint evaluation in the VJP). Concrete-path only: performs eager
+    Newton solves; callers must guard tracing themselves.
+    """
+    import numpy as _np
+
+    vd = [float(v) for v in _np.asarray(voltages_dim, dtype=float)]
+    cd = [float(j) for j in _np.asarray(currents_dim, dtype=float)]
+    va, vb, found = voc_bracket(vd, cd)
+    if not found:
+        return float("nan"), False, float("nan"), None
+    ia = int(min(range(len(pots)), key=lambda i: abs(vd[i] - va)))
+    vr, sok, jv, pot_best = refine_voc(cell, va, vb, pots[ia])
+    if not sok or vr != vr or jv != jv:
+        return float("nan"), True, float("nan"), None
+    return float(vr * e_scale), True, float(jv), pot_best

@@ -47,9 +47,14 @@ class Solution(eqx.Module):
     # under jit/grad/vmap, fused-scan or batched paths).
     fallback_used: list = eqx.field(default_factory=list)
     # Implicit-Voc status: True when the sweep bracketed a current sign
-    # change (J(Voc) = 0 refined by secant on converged evaluations);
+    # change (J(Voc) = 0 refined by bisection on converged evaluations);
     # False means Voc is NaN (above sweep range) or unverified (traced).
     voc_bracketed: bool = False
+    # Tight secant slope dJ/dV at the refined root (dimensionless current
+    # per dimensionless volt; NaN when unrefined/unverified). Feeds the
+    # VJP implicit term dVoc/dtheta = -J_theta/J_V; NaN selects the coarse
+    # bracket-secant fallback there.
+    voc_JV: float = float("nan")
 
     @property
     def efficiency(self):

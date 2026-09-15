@@ -255,14 +255,22 @@ current to determine a physical open-circuit voltage. When it does, the
 reported $V_{\mathrm{oc}}$ is secant-refined on the implicit root
 $J(V_{\mathrm{oc}})=0$ with true converged current evaluations
 (warm-started, bracket-clamped, best-$|J|$ tracking; no bracket gives NaN
-with a \code{voc\_bracketed} flag rather than a value). The refinement
-additionally exposed branch dependence: on one homojunction sweep,
-independent converged solves at $0.96$~V and $1.04$~V both satisfy
-$|J|<10^{-7}$, i.e.\ the Newton continuation history selects the root.
+with a \code{voc\_bracketed} flag rather than a value). The backward pass
+differentiates the same root exactly: a traced bisection locates the root
+state $u^*$, then $J_V$ comes from the tangent-linear system
+$J(u^*)u_V=-F_V$ (one banded/dense solve, no Newton loop) and
+$J_\theta(V_{\mathrm{oc}})$ from a single adjoint solve at $u^*$,
+giving $dV_{\mathrm{oc}}/d\theta=-J_\theta/J_V$ gated on bracket,
+preserved straddle, converged midpoint solves, root reduction, and
+finite nonzero $J_V$ (verified against central finite differences).
 $P_{\max}$ is already a continuous local root (analytic stationary point
 of the per-segment PCHIP cubic, verified $dP/dV\approx0$), but
 cross-segment selection jumps remain; both observables carry status
-flags rather than silent values.
+flags rather than silent values. The refinement additionally exposed
+branch dependence: warm-started re-solves can land on a spurious
+near-zero-current branch coexisting with the physical continuation
+branch, so all root evaluations warm-start from continuation history
+and straddle loss aborts the refinement.
 
 \subsection{Discrete residual and structured Newton step}\label{sec:newton}
 After scaling and discretisation, the problem is

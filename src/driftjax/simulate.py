@@ -348,10 +348,24 @@ def _forward(
     voc_dim = find_voc(voltages_dim, currents_dim)
     jsc_dim = jnp.abs(currents_dim[0])
     pmax_dim, _ = _mpp(voltages_dim, currents_dim)
-    # NOTE: implicit-Voc secant refinement runs once at the public-simulate
-    # choke point (all paths: serial, fused-scan, batched), not here, so
-    # every path reports the same refined root and bracket status.
+    # Implicit-Voc refinement (concrete paths only; traced paths keep the
+    # interpolation with voc_JV NaN, which selects the coarse secant in
+    # the VJP). Runs at each Solution-building site so the refined root,
+    # bracket flag, AND tight JV travel together into residuals for bwd.
     voc_bracketed: bool = False
+    voc_JV: float = float("nan")
+    if not allow_trace and bool(jnp.isfinite(voc_dim)):
+        try:
+            from driftjax.solvers.continuation import maybe_refine_voc as _mrv
+
+            _vr, _br, _jv = _mrv(cell, voltages_dim, currents_dim, pots, float(sc["energy"]))
+            voc_bracketed = bool(_br)
+            if _vr == _vr:  # nan-safe: keep interpolation on refine failure
+                voc_dim = jnp.asarray(_vr / float(sc["energy"]), dtype=jnp.float64)
+            if _jv == _jv:
+                voc_JV = float(_jv)
+        except Exception:
+            pass
     ff = jnp.where(jnp.isfinite(voc_dim), pmax_dim / (voc_dim * jsc_dim + 1e-30), jnp.nan)
     v_volts = voltages_dim * sc["energy"]
     j_phys = currents_dim * sc["current"]
@@ -378,6 +392,7 @@ def _forward(
         # None entries when unverified: traced, fused-scan, batched paths).
         fallback_used=list(_sweep_fallbacks),
         voc_bracketed=bool(voc_bracketed),
+        voc_JV=float(voc_JV),
     ), (voltages_dim, currents_dim, pots)
 
 
@@ -420,6 +435,28 @@ def _simulate_sweep(
             pots_list = [
                 jax.tree_util.tree_map(lambda a, i=i: a[i], pa) for i in range(pa.phi.shape[0])
             ]
+            # Implicit-Voc refinement (concrete: fast_ok already concretized).
+            _voc_bracketed_f: bool = False
+            _voc_JV_f: float = float("nan")
+            _voc_ref_f: float = float("nan")
+            if bool(jnp.isfinite(voc_dim)):
+                try:
+                    from driftjax.solvers.continuation import maybe_refine_voc as _mrv3
+
+                    _voc_b, _br_b, _jv_b, _ = _mrv3(cell, vd, cd, pots_list, float(sc["energy"]))
+                    _voc_bracketed_f = bool(_br_b)
+                    if _voc_b == _voc_b:
+                        voc_dim = jnp.asarray(_voc_b / float(sc["energy"]), dtype=jnp.float64)
+                        ff = jnp.where(
+                            jnp.isfinite(voc_dim),
+                            pmax_dim / (voc_dim * jsc_dim + 1e-30),
+                            jnp.nan,
+                        )
+                        _voc_ref_f = float(_voc_b / float(sc["energy"]))
+                    if _jv_b == _jv_b:
+                        _voc_JV_f = float(_jv_b)
+                except Exception:
+                    pass
             return Solution(
                 voltages=v_volts,
                 current=j_phys,
@@ -435,6 +472,8 @@ def _simulate_sweep(
                 P_in=ls2.P_in,
                 # R2: fused-scan per-bias lstsq flags (concrete bools).
                 fallback_used=[bool(x) for x in list(fb_arr)],
+                voc_bracketed=bool(_voc_bracketed_f),
+                voc_JV=float(_voc_JV_f),
             )
         warnings.warn(
             "Fused forward sweep produced non-finite currents (Newton divergence "
@@ -601,6 +640,28 @@ def _sweep_fwd(design, solver, optics, protocol, progress, ls, statistics, init=
             pots_list = [
                 jax.tree_util.tree_map(lambda a, i=i: a[i], pa) for i in range(pa.phi.shape[0])
             ]
+            # Implicit-Voc refinement (concrete: fast_ok concretized above).
+            _voc_bracketed_f: bool = False
+            _voc_JV_f: float = float("nan")
+            _voc_ref_f: float = float("nan")
+            if bool(jnp.isfinite(voc_dim)):
+                try:
+                    from driftjax.solvers.continuation import maybe_refine_voc as _mrv3
+
+                    _voc_b, _br_b, _jv_b, _ = _mrv3(cell, vd, cd, pots_list, float(sc["energy"]))
+                    _voc_bracketed_f = bool(_br_b)
+                    if _voc_b == _voc_b:
+                        voc_dim = jnp.asarray(_voc_b / float(sc["energy"]), dtype=jnp.float64)
+                        ff = jnp.where(
+                            jnp.isfinite(voc_dim),
+                            pmax_dim / (voc_dim * jsc_dim + 1e-30),
+                            jnp.nan,
+                        )
+                        _voc_ref_f = float(_voc_b / float(sc["energy"]))
+                    if _jv_b == _jv_b:
+                        _voc_JV_f = float(_jv_b)
+                except Exception:
+                    pass
             sol = Solution(
                 voltages=v_volts,
                 current=j_phys,
@@ -617,8 +678,18 @@ def _sweep_fwd(design, solver, optics, protocol, progress, ls, statistics, init=
                 # R2: fused-scan per-bias lstsq flags (concrete bools from the
                 # eager jit call; True = dgbsv failed and lstsq stepped).
                 fallback_used=[bool(x) for x in list(fb_arr)],
+                voc_bracketed=bool(_voc_bracketed_f),
+                voc_JV=float(_voc_JV_f),
             )
-            residuals = (design, cell, pot_arr, vd, cd, ls2.P_in, fused)
+            residuals = (
+                design,
+                cell,
+                pot_arr,
+                vd,
+                cd,
+                ls2.P_in,
+                fused,
+            )
             return sol, residuals
         warnings.warn(
             "Fused forward sweep produced non-finite currents (Newton divergence "
@@ -659,7 +730,7 @@ def _warn_uncertified_primal_if(max_resid):
 
 
 def _sweep_bwd(solver, optics, protocol, progress, ls, statistics, init, fused, residuals, g_sol):
-    design, cell, pot_arr, voltages_dim, currents_dim, P_in, fused_val = residuals
+    (design, cell, pot_arr, voltages_dim, currents_dim, P_in, fused_val) = residuals
     alpha_mode = optics.alpha_mode
     # P0-5: the custom VJP must not differentiate silently through an
     # uncertified primal. Recompute max|F| per bias from the forward
@@ -684,18 +755,26 @@ def _sweep_bwd(solver, optics, protocol, progress, ls, statistics, init, fused, 
     def postprocess_full(design_d, vdim, cdim):
         scx = thermal_scales(design_d.T)
         voc_raw = find_voc(vdim, cdim)
-        # NaN-safe wrapper: when the IV curve never crosses zero (Voc beyond
-        # the swept range) ``find_voc`` returns NaN. Wrapping it in
-        # ``where(isfinite, x, vmax)`` keeps the VJP finite (zero on the NaN
-        # branch) so differentiating eff/voc/ff is well-defined even for
-        # devices whose Voc lies outside the sweep (e.g. some 3-layer stacks).
-        # The forward-facing ``Solution.voc`` still reports the true NaN.
+        # Implicit-Voc contract: the V_oc cotangent is handled EXPLICITLY
+        # below via dVoc/dtheta = -J_theta/J_V (gated on bracket + slope),
+        # so the interpolation path here is stopped: differentiating the
+        # discrete sign-change scan (or the old vmax-substitution guard for
+        # unbracketed curves) is not the derivative of J(Voc,theta) = 0.
+        # ff keeps its pmax/jsc legs; its voc leg rejoins via the same
+        # implicit term (see combined scalar below).
         voc_d = jnp.where(jnp.isfinite(voc_raw), voc_raw, vdim[-1])
+        voc_d_stopped = jax.lax.stop_gradient(voc_d)
         jsc_d = jnp.abs(cdim[0])
         pmax_d, _ = _mpp(vdim, cdim)
-        ff_d = pmax_d / (voc_d * jsc_d + 1e-30)
+        ff_d = pmax_d / (voc_d_stopped * jsc_d + 1e-30)
         eff_d = pmax_d * scx["energy"] * scx["current"] * 1e4 / jnp.sum(P_in)
-        return (eff_d, voc_d * scx["energy"], ff_d, jsc_d * scx["current"], cdim * scx["current"])
+        return (
+            eff_d,
+            voc_d_stopped * scx["energy"],
+            ff_d,
+            jsc_d * scx["current"],
+            cdim * scx["current"],
+        )
 
     ct_eff = g_sol.eff if g_sol.eff is not None else 0.0
     ct_voc = g_sol.voc if g_sol.voc is not None else 0.0
@@ -789,6 +868,119 @@ def _sweep_bwd(solver, optics, protocol, progress, ls, statistics, init, fused, 
     t_cell = jax.tree.map(lambda leaf: jnp.sum(leaf, axis=0), t_cell)
     g_design = vjp_cell(t_cell)[0]
     g_design = jax.tree.map(lambda a, b: a + b, g_design, g_design_from_sc)
+
+    # ---- implicit-Voc term: dVoc/dtheta = -J_theta(Voc)/J_V (exact) ----
+    # The interpolation legs above are stopped, so this is the ONLY Voc
+    # path. Both factors are evaluated AT the refined root state u*:
+    # J_V via the tangent-linear system J(u*) u_V = -F_V (one banded /
+    # dense solve, no Newton loop), J_theta(Voc) via a SINGLE adjoint
+    # solve at u* through the same per_bias kernel (gcb=1). A traced
+    # bisection (fixed iters, where-selected straddle, sweep-state
+    # warm starts) locates u*; secant slopes across wide brackets are
+    # NOT used (measured 80x off on steep diode knees). Validity requires
+    # bracket + preserved straddle + converged midpoint solves + root
+    # reduction (|J_best| < 0.5 leg scale, rejecting flat-branch stalls)
+    # + finite nonzero JV; otherwise zero contribution (no defined
+    # observable -> no gradient). T-dependence of the V->volts scale is
+    # held fixed (documented approximation).
+    c = jnp.asarray(currents_dim)
+    v = jnp.asarray(voltages_dim)
+    _cond = c[..., :-1] * c[..., 1:] < 0.0
+    _idx = jnp.argmax(_cond, axis=-1)
+    _found_any = jnp.any(_cond, axis=-1)
+    _idx = jnp.where(_found_any, _idx, 0)
+    _idx = jnp.clip(_idx, 0, c.shape[-1] - 2)
+    _I1 = jnp.take_along_axis(c, _idx[..., None], axis=-1)[..., 0]
+    _I2 = jnp.take_along_axis(c, (_idx + 1)[..., None], axis=-1)[..., 0]
+    _V1 = jnp.take_along_axis(v, _idx[..., None], axis=-1)[..., 0]
+    _V2 = jnp.take_along_axis(v, (_idx + 1)[..., None], axis=-1)[..., 0]
+    _dI = _I2 - _I1
+    _tiny = jnp.abs(_dI) < 1e-30 * jnp.maximum(jnp.maximum(jnp.abs(_I1), jnp.abs(_I2)), 1e-100)
+    _bracketed = _found_any & (~_tiny)
+    _leg_scale = jnp.maximum(jnp.abs(_I1), jnp.abs(_I2))
+    _pa0 = vec2pot(jnp.take(pot_arr, _idx, axis=0))
+    _pb0 = vec2pot(jnp.take(pot_arr, _idx + 1, axis=0))
+    _a, _ja, _pa = _V1, _I1, _pa0
+    _b, _jb, _pb = _V2, _I2, _pb0
+    _best_u, _best_j = _pa0, jnp.abs(_I1)
+    for _ in range(4):
+        _mid = 0.5 * (_a + _b)
+        _gpot = jax.tree.map(
+            lambda x, y, _m=_mid, _aa=_a, _bb=_b: jnp.where(
+                jnp.abs(_m - _aa) < jnp.abs(_m - _bb), x, y
+            ),
+            _pa,
+            _pb,
+        )
+        _jm_pot, _jm_st = solve_newton(
+            cell,
+            boundary_bias(cell, _mid),
+            _gpot,
+            tol=1e-10,
+            allow_trace=True,
+            loop="while",
+        )
+        _jm = total_current(cell, _jm_pot)
+        # No Python bool() on tracers: pure jnp logic throughout.
+        _jm_fin = jnp.isfinite(_jm) & jnp.asarray(_jm_st.get("converged", False))
+        _take_b = _jm_fin & (_ja * _jm <= 0.0)
+        _take_a = _jm_fin & (~_take_b) & (_jb * _jm <= 0.0)
+        _improved = _jm_fin & (jnp.abs(_jm) < _best_j)
+        _best_u = jax.tree.map(
+            lambda old, new, _imp=_improved: jnp.where(_imp, new, old), _best_u, _jm_pot
+        )
+        _best_j = jnp.where(_improved, jnp.abs(_jm), _best_j)
+        _b = jnp.where(_take_b, _mid, _b)
+        _jb = jnp.where(_take_b, _jm, _jb)
+        _pb = jax.tree.map(lambda old, new, _tb=_take_b: jnp.where(_tb, new, old), _pb, _jm_pot)
+        _a = jnp.where(_take_a, _mid, _a)
+        _ja = jnp.where(_take_a, _jm, _ja)
+        _pa = jax.tree.map(lambda old, new, _ta=_take_a: jnp.where(_ta, new, old), _pa, _jm_pot)
+    _straddle = _bracketed & (_ja * _jb < 0.0)
+    _root_ok = _straddle & (_best_j < 0.5 * _leg_scale) & jnp.isfinite(_best_j)
+    _Vr = _a - _ja * (_b - _a) / ((_jb - _ja) + 1e-300)
+    _in_range = (_Vr >= jnp.minimum(_V1, _V2)) & (_Vr <= jnp.maximum(_V1, _V2))
+    # Tangent JV at the best state: J(u*) u_V = -F_V, JV = dJ/du . u_V.
+    _bound_star = boundary_bias(cell, _Vr)
+    if _analytic_ok:
+        from driftjax.numerics.analytic_jacobian import banded_jacobian as _bj2
+        from driftjax.numerics.banded_solve import banded_solve as _bs2
+
+        _Ab, _Bb, _Cb = _bj2(cell, _bound_star, _best_u)
+        _nn = _Ab.shape[0]
+        _, _F_V = jax.jvp(
+            lambda _vb: comp_F(cell, boundary_bias(cell, _vb), _best_u), (_Vr,), (1.0,)
+        )
+        _du = _bs2(_Ab, _Bb, _Cb, (-_F_V).reshape(_nn, 3)).reshape(-1)
+    else:
+        _Jd = F_jacobian(cell, _bound_star, _best_u)
+        _, _F_V = jax.jvp(
+            lambda _vb: comp_F(cell, boundary_bias(cell, _vb), _best_u), (_Vr,), (1.0,)
+        )
+        _du = jnp.linalg.solve(_Jd, -_F_V)
+    _JV_exact = jax.jvp(
+        lambda _x: total_current(cell, vec2pot(_x)),
+        (pot2vec(_best_u),),
+        (_du,),
+    )[1]
+    _jv_ok = _root_ok & jnp.isfinite(_JV_exact) & (jnp.abs(_JV_exact) > 0.0) & _in_range
+    # J_theta at the best state: single per_bias call (gcb=1), full
+    # direct-minus-implicit channel through the configured kernel.
+    _C_star = per_bias(pot2vec(_best_u), _Vr, 1.0)
+    _Jtheta = vjp_cell(_C_star)[0]
+    # Combined Voc scalar: ct_voc directly + ct_ff via dff/dVoc = -ff/Voc.
+    _pmax_fwd, _ = _mpp(v, c)
+    _E_fwd = jax.lax.stop_gradient(thermal_scales(cell.T)["energy"])
+    _voc_volts_fwd = _Vr * _E_fwd
+    _ff_fwd = _pmax_fwd / (_voc_volts_fwd * jnp.abs(c[0]) + 1e-30)
+    _ct_voc = 0.0 if ct_voc is None else ct_voc
+    _ct_ff = 0.0 if ct_ff is None else ct_ff
+    _S_volts = _ct_voc + _ct_ff * jnp.where(_jv_ok, -_ff_fwd / (_voc_volts_fwd + 1e-30), 0.0)
+    _k = jnp.where(_jv_ok, -_S_volts * _E_fwd / (_JV_exact + 1e-300), 0.0)
+    # Gate the channel itself (not just the scale): without a valid root
+    # the adjoint state is meaningless, and NaN*0 would poison the gradient.
+    _Jtheta_g = jax.tree.map(lambda leaf: jnp.where(_jv_ok, leaf, jnp.zeros_like(leaf)), _Jtheta)
+    g_design = jax.tree.map(lambda a, b: a + b * _k, g_design, _Jtheta_g)
     return (g_design,)
 
 
@@ -991,47 +1183,19 @@ def simulate(
 
             # R2: keep construction-time fallback flags when present (serial
             # concrete path); otherwise mark every bias unverified (None) so
-            # "unknown" is never confused with "clean" (False).
+            # "unknown" is never confused with "clean" (False). Voc fields
+            # (refined root, bracket flag, tight JV) already travel on the
+            # Solution from their build site; nothing to recompute here.
             _fb = getattr(res, "fallback_used", []) or [None] * len(res.potentials)
-            # Implicit-Voc refinement at the single choke point (all paths:
-            # serial, fused-scan, batched). When the sweep brackets a sign
-            # change, secant-refine J(Voc) = 0 on converged evaluations
-            # instead of trusting the coarse interpolation; on failure (or
-            # no bracket) keep the interpolation and report voc_bracketed.
-            _voc_val = res.voc
-            _voc_bracketed = bool(getattr(res, "voc_bracketed", False))
-            try:
-                from driftjax.solvers.continuation import refine_voc as _refine_voc
-                from driftjax.solvers.continuation import voc_bracket as _voc_bracket
-
-                _e_scale = float(thermal_scales(float(res.cell.T))["energy"])
-                _vd = [float(v) / _e_scale for v in res.voltages]
-                _cd = [float(j) for j in res.current]
-                _va, _vb, _found = _voc_bracket(_vd, _cd)
-                _voc_bracketed = bool(_found)
-                if _found:
-                    _ia = int(
-                        min(
-                            range(len(res.potentials)),
-                            key=lambda i: abs(_vd[i] - _va),
-                        )
-                    )
-                    _vr, _sok = _refine_voc(res.cell, _va, _vb, res.potentials[_ia])
-                    if bool(_sok) and _vr == _vr:
-                        _voc_val = _vr * _e_scale
-            except Exception:
-                pass
             res = _eqx.tree_at(
                 lambda s: (
                     s.converged,
                     s.max_residual,
                     s.per_bias_residuals,
                     s.fallback_used,
-                    s.voc,
-                    s.voc_bracketed,
                 ),
                 res,
-                (_conv, _mr, _per_bias, list(_fb), float(_voc_val), _voc_bracketed),
+                (_conv, _mr, _per_bias, list(_fb)),
             )
         return res
     finally:

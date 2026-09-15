@@ -21,8 +21,11 @@ def homo_dev():
 
 
 def test_voc_bracketed_and_root(homo_dev):
-    """Coarse sweep Voc is secant-refined: bracketed flag set and an
-    independent Newton solve at the reported Voc gives |J| ~ 0."""
+    """Coarse sweep Voc is bisection-refined on the sweep branch: bracketed
+    flag set, value inside the bracket, and an independent Newton solve
+    warm-started from the NEAREST SWEEP state (continuation history stays
+    on-branch; foreign guesses can collapse onto a spurious near-zero
+    branch) gives |J| ~ 0 with a converged residual."""
     from driftjax.science.contacts import boundary_bias
     from driftjax.solvers.continuation import total_current
     from driftjax.solvers.newton import solve_newton
@@ -32,16 +35,16 @@ def test_voc_bracketed_and_root(homo_dev):
     assert bool(sol.voc_bracketed) is True
     assert bool(jnp.isfinite(sol.voc))
     e = float(thermal_scales(float(sol.cell.T))["energy"])
+    vv = [float(v) for v in sol.voltages]
+    assert min(vv) <= float(sol.voc) <= max(vv)
+    ia = int(min(range(len(vv)), key=lambda i: abs(vv[i] - float(sol.voc))))
     pot, st = solve_newton(
-        sol.cell, boundary_bias(sol.cell, float(sol.voc) / e), sol.potentials[-1]
+        sol.cell, boundary_bias(sol.cell, float(sol.voc) / e), sol.potentials[ia]
     )
     assert bool(st.get("converged", False)) is True
     j = abs(float(total_current(sol.cell, pot)))
     jscale = max(abs(float(x)) for x in sol.current) + 1e-30
     assert j / jscale < 1e-4, (j, jscale)
-    # Refined value lies inside the sweep bracket.
-    vv = [float(v) for v in sol.voltages]
-    assert min(vv) <= float(sol.voc) <= max(vv)
 
 
 def test_voc_unbracketed_nan_and_flag(homo_dev):
@@ -74,3 +77,35 @@ def test_mpp_stationary_on_interpolant(homo_dev):
         dp = 3 * a[i] * dx**2 + 2 * b[i] * dx + c[i]
         scale = abs(pmax) / max(v[-1] - v[0], 1e-30) + 1e-30
         assert abs(dp) / scale < 1e-6, (dp, scale, vmpp)
+
+
+def test_voc_implicit_gradient_vs_fd():
+    """VJP through the implicit root: dVoc/dEg (adjoint) vs central FD.
+
+    Exercises the gated implicit term (bracketed homo sweep): the old
+    vmax-substitution path is stopped, so this number comes purely from
+    -J_theta/J_V contracted through the existing adjoint.
+    """
+    import jax
+
+    def voc_of_eg(eg):
+        m = dj.material(Eg=eg, Chi=3.0, eps=10.0, Nc=1e18, Nv=1e18, mn=130.0, mp=160.0, A=2e4)
+        dev = dj.Device(
+            n_points=15,
+            layers=[(1e-4, m, 1e17), (1e-4, m, -1e17)],
+            Snl=1e7,
+            Snr=0.0,
+            Spl=0.0,
+            Spr=1e7,
+        )
+        return dj.simulate(dev, dj.Sweep(n_steps=8, vmax=1.2)).voc
+
+    eg0 = 1.4
+    g_adj = float(jax.grad(voc_of_eg)(eg0))
+    h = 1e-4
+    vp = float(voc_of_eg(eg0 + h))
+    vm = float(voc_of_eg(eg0 - h))
+    g_fd = (vp - vm) / (2 * h)
+    assert abs(vp - vm) > 0.0  # FD actually moves (bracketed both sides)
+    rel = abs(g_adj - g_fd) / (abs(g_fd) + 1e-30)
+    assert rel < 0.05, (g_adj, g_fd, rel)
