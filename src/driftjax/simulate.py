@@ -124,6 +124,34 @@ def _banded_adjoint_enabled() -> bool:
     return os.environ.get("DRIFTJAX_BANDED_ADJOINT", "0") == "1"
 
 
+def _audit_sweep_solution(sol):
+    """Concrete-path post-hoc residual audit (H1 failure semantics).
+
+    The Newton step-norm gate cannot certify degenerate solves, so
+    re-measure max|F| per bias directly: K cheap residual evals, no
+    solves. Returns (converged, max_resid); anything non-finite or
+    above 1e-6 marks the sweep unconverged. Must only be called with
+    concrete (non-traced) solutions; under jit/grad the audit cannot
+    concretize and the fields stay at their unverified defaults.
+    """
+    max_resid = 0.0
+    try:
+        # Solution stores volts; the residual needs dimensionless bias.
+        e_scale = float(thermal_scales(float(sol.cell.T))["energy"])
+        volts = sol.voltages
+        for pot_b, vb in zip(sol.potentials, volts, strict=False):
+            bound = boundary_bias(sol.cell, float(vb) / e_scale)
+            r_b = float(jnp.max(jnp.abs(comp_F(sol.cell, bound, pot_b))))
+            if not jnp.isfinite(r_b):
+                return False, float("inf")
+            max_resid = max(max_resid, r_b)
+    except Exception:
+        return False, float("inf")
+    if max_resid > 1e-6:
+        return False, max_resid
+    return True, max_resid
+
+
 def _iter_cb_for(progress, phase):
     """Wrap ``progress.iter`` into a Newton ``iter_cb`` (per Newton step)."""
     if progress is None or not hasattr(progress, "iter"):
@@ -803,7 +831,9 @@ def simulate(
         every calculation prints per-bias / per-Newton-step progress so long
         runs are inspectable.
     statistics : str
-        Carrier-statistics model for the cell ("boltzmann" | "fd" | "blakemore").
+        Carrier-statistics model for the cell ("boltzmann" | "fd" |
+        "blakemore", where "blakemore" is a legacy A-B-only approximation
+        with known ~60% degenerate error, never a production choice).
     T : float
         Override the device temperature (K); ``None`` uses ``device.T``.
     ls : LightSource
@@ -848,9 +878,11 @@ def simulate(
         # tests/unit/test_statistics.py). It is kept for A-B checks only —
         # use statistics="exact" (or "fd") for real degenerate physics.
         warnings.warn(
-            'statistics="blakemore" is a legacy provenance approximation, not '
-            'an accurate Fermi–Dirac model; use statistics="exact" for '
-            "degenerate Newton solves.",
+            'statistics="blakemore" is a legacy provenance approximation with '
+            "~60% error at degeneracy eta=1 and a discontinuity at eta=0 "
+            "(envelope pinned in tests/unit/test_statistics.py); it is kept "
+            "for A-B checks only and is NOT a validated degenerate model. "
+            'Use statistics="exact" for degenerate Newton solves.',
             UserWarning,
             stacklevel=2,
         )
@@ -871,6 +903,21 @@ def simulate(
             res = _simulate_sweep(
                 design, solver, optics, protocol, progress, ls, statistics, init=init, fused=fused
             )
+        # H1: post-hoc residual audit at the single choke point covering all
+        # sweep paths (serial, fused-scan, batched). Concrete path only;
+        # under jit/grad/vmap the fields stay at unverified defaults.
+        if not isinstance(protocol, Equilibrium) and not _is_tracer(res.voltages):
+            _conv, _mr = _audit_sweep_solution(res)
+            if not _conv:
+                warnings.warn(
+                    f"DriftJax sweep did not converge (max|F|={_mr:.3e}); "
+                    f"eff/voc/ff are unreliable.",
+                    UserWarning,
+                    stacklevel=2,
+                )
+            import equinox as _eqx
+
+            res = _eqx.tree_at(lambda s: (s.converged, s.max_residual), res, (_conv, _mr))
         return res
     finally:
         if progress is not None and hasattr(progress, "close"):

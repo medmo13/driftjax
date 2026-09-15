@@ -130,8 +130,7 @@ def _banded_t_of(M, rhs, unscale):
     from driftjax.numerics.banded_solve import banded_transpose as _bt2
 
     AB, BB, CB = (np.asarray(t) for t in extract_blocks(jnp.asarray(M)))
-    y = np.asarray(_bt2(jnp.asarray(AB), jnp.asarray(BB), jnp.asarray(CB),
-                        jnp.asarray(rhs)))
+    y = np.asarray(_bt2(jnp.asarray(AB), jnp.asarray(BB), jnp.asarray(CB), jnp.asarray(rhs)))
     return unscale * y
 
 
@@ -152,16 +151,21 @@ def run_case(Jn, g, label):
     be = Dr @ bn  # scaled rhs: Je x = be <=> J x = bn
 
     def metrics(x):
+        # (backward normwise, forward vs longdouble ref, Skeel componentwise)
         x = np.asarray(x, dtype=float)
-        backward = np.linalg.norm(Jn @ x - bn) / (np.linalg.norm(bn) + 1e-30)
+        r = Jn @ x - bn
+        backward = np.linalg.norm(r) / (np.linalg.norm(bn) + 1e-30)
         forward = np.linalg.norm(x - x_ref) / (np.linalg.norm(x_ref) + 1e-30)
-        return backward, forward
+        skeel = float(np.max(np.abs(r) / (np.abs(Jn) @ np.abs(x) + np.abs(bn) + 1e-300)))
+        return backward, forward, skeel
 
     def metrics_t(lam):
         lam = np.asarray(lam, dtype=float)
-        backward = np.linalg.norm(Jn.T @ lam - bn) / (np.linalg.norm(bn) + 1e-30)
+        rt = Jn.T @ lam - bn
+        backward = np.linalg.norm(rt) / (np.linalg.norm(bn) + 1e-30)
         forward = np.linalg.norm(lam - lam_ref) / (np.linalg.norm(lam_ref) + 1e-30)
-        return backward, forward
+        skeel = float(np.max(np.abs(rt) / (np.abs(Jn.T) @ np.abs(lam) + np.abs(bn) + 1e-300)))
+        return backward, forward, skeel
 
     rec = {"label": label, "cond": float(np.linalg.cond(Jn)), "ref_floor": rec_floor}
     rec["fwd_bt_raw"] = metrics(bt_solve_numpy(A, B, C, bn.reshape(n, 3)).reshape(-1))
@@ -193,8 +197,9 @@ def run_case(Jn, g, label):
     def _banded_of(M, rhs):
         AB, BB, CB = (np.asarray(t) for t in extract_blocks(jnp.asarray(M)))
         return np.asarray(
-            banded_solve(jnp.asarray(AB), jnp.asarray(BB), jnp.asarray(CB),
-                         jnp.asarray(rhs).reshape(n, 3))
+            banded_solve(
+                jnp.asarray(AB), jnp.asarray(BB), jnp.asarray(CB), jnp.asarray(rhs).reshape(n, 3)
+            )
         ).reshape(-1)
 
     rec["fwd_banded_col"] = metrics(Dc @ _banded_of(Jn @ Dc, bn))

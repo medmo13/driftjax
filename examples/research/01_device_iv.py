@@ -94,7 +94,16 @@ def main():
     # coupled-solver order is non-asymptotic (see manuscript Section 4.4).
     if len(resolutions) >= 2:
         err = max(results[0]["relative_efficiency_error"], 1e-16)
-        slope_guide(axes[1], resolutions[0], err, decades=2.0, slope=-2.0, color=style.GRAY)
+        slope_guide(
+            axes[1],
+            resolutions[0],
+            err,
+            decades=2.0,
+            slope=-2.0,
+            color=style.GRAY,
+            label="reference slope $O(N^{-2})$ --- not a fit",
+        )
+        axes[1].legend(frameon=False, loc="lower left", fontsize=8, handlelength=1.2)
     # Dark-equilibrium band diagram and carrier densities at the finest mesh.
     # A separate dark solve (no illumination) ensures thermal equilibrium:
     # np = ni^2 everywhere, consistent with the mass-action law.

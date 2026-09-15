@@ -7,10 +7,12 @@
 A differentiable 1-D drift–diffusion–Poisson photovoltaic simulator in [JAX](https://github.com/jax-ml/jax).
 
 DriftJax solves the Van Roosbroeck system with Scharfetter–Gummel
-discretization, an analytically assembled block-tridiagonal Jacobian, and an
-O(N) Block-Thomas direct solver. Exact design gradients flow through
-`jax.grad(simulate)` via an implicit-function-theorem adjoint
-(`custom_vjp`) — no manual adjoint code, no unrolled Newton loop.
+discretization, an analytically assembled block-tridiagonal Jacobian, and a
+pivoted banded direct solver (LAPACK `dgbsv`). Implicit-function-theorem
+design gradients flow through `jax.grad(simulate)` via a `custom_vjp`
+adjoint — verified against finite differences on selected configurations
+(see the paper); gradients are certified only when the returned
+`Solution.converged` is True.
 
 **Precision note:** carrier densities (~1e19 cm⁻³) and Nc·Nv (~1e38) overflow
 float32. DriftJax enables JAX 64-bit mode on import; everything must run in

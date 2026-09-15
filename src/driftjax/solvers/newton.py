@@ -511,10 +511,12 @@ def _solve_newton_while(
     a near-degenerate Jacobian kick the iterate out after the residual bottomed
     out at the machine floor), the loop stops and returns the best iterate,
     certifying convergence; a settled tail comparable to best is returned as
-    converged, exactly as the eager exhaustion branch does. Converged-in-step-norm
-    solves return the final iterate exactly as before, so previously-good
-    trajectories are bit-identical. NaN steps freeze the iterate and exit via
-    the rebound branch instead of poisoning the carry.
+    converged, exactly as the eager exhaustion branch does. Step-norm
+    certification additionally requires the residual gate (S6/H1), so
+    previously-good trajectories are bit-identical whenever the residual
+    was already below criterion at step convergence (the normal case).
+    NaN steps freeze the iterate and exit via the rebound branch instead
+    of poisoning the carry.
     """
     crit = _rebound_criterion(f_tol)
     f_tol_active = f_tol is not None
@@ -524,9 +526,15 @@ def _solve_newton_while(
     # iterate on NaN steps (eager returns best immediately; here we flag exit
     # and let the post-loop rebound logic select best).
 
+    # S6/H1: step-norm certification requires the residual gate (same as
+    # the eager loop): a ~zero step with huge ||F|| must not certify.
+    # resid_f trails by one iterate; conservative direction (extra steps).
+    def step_ok(error, resid_f):
+        return (error <= tol) & (resid_f < crit)
+
     def _cond(state):
         it, pot, error, resid_f, _best_pot, _best_resid, failed = state
-        step_converged = error <= tol
+        step_converged = step_ok(error, resid_f)
         resid_converged = (resid_f < f_tol) if f_tol_active else jnp.array(False)
         return (it < max_steps) & (~(step_converged | resid_converged)) & (~failed)
 
@@ -578,7 +586,7 @@ def _solve_newton_while(
         jnp.array(False),
     )
     it, pot, error, resid_f, best_pot, best_resid, failed = jax.lax.while_loop(_cond, _body, init)
-    step_converged = error <= tol
+    step_converged = step_ok(error, resid_f)
     resid_converged = (resid_f < f_tol) if f_tol_active else jnp.array(False)
     converged = step_converged | resid_converged
     # Rebound / settled certification (mirrors the eager exhaustion/NaN
@@ -665,7 +673,11 @@ def _solve_newton_python(
                 iter_cb(it, err, rf if not jnp.isnan(rf) else None)
             except Exception:
                 pass
-        if err < tol:
+        # S6/H1: step-norm alone cannot certify on degenerate Jacobians
+        # (a ~zero step with ||F|| huge, e.g. a failed linear solve,
+        # would falsely certify). Require the residual gate too; else
+        # keep iterating toward max_steps/best-iterate handling.
+        if err < tol and r < crit:
             last_stats = newton_stats(**{**last_stats, "converged": True, "stagnated": False})
             return pot, last_stats
         if jnp.isnan(error) or jnp.isnan(stats["resid"]):

@@ -382,8 +382,10 @@ def mark_iv_points(ax, solution, show=("jsc", "mpp", "voc"), color="0.35", annot
     return ax
 
 
-def slope_guide(ax, x0, y0, decades=2.0, slope=-2.0, color="0.55"):
-    """Reference power-law segment on a log-log axes (demonstrates the slope)."""
+def slope_guide(ax, x0, y0, decades=2.0, slope=-2.0, color="0.55", label=None):
+    """Reference power-law segment on log-log axes (reference slope, NOT a fit)."""
+    if label is not None:
+        ax.plot([], [], linestyle="--", lw=1.1, color=color, label=label)
     import math
 
     # move `decades` down in y along the slope: dy/dlog10(x) = slope, so going
@@ -608,22 +610,30 @@ def plot_layer_bars(ax, solution, fontsize=7.0):
     return ax
 
 
-def ex1_material():
-    """The deltapv ex1_np_junction benchmark absorber (Eg=1.5 "Si-like").
+def synthetic_homo_material():
+    """Synthetic 1.5 eV homojunction absorber (NOT silicon: real Si Eg=1.12 eV).
 
-    Single source of truth shared by 01, 06, 17 (and ex1_device below).
+    Named after the deltapv ex1_np_junction benchmark geometry whose device
+    layout it reproduces; the "Si-like" label is retired to avoid implying
+    a calibrated silicon model. Single source of truth shared by 01, 06,
+    17 (and ex1_device below).
     """
     return dj.material(
         Chi=3.9, Eg=1.5, eps=9.4, Nc=8e17, Nv=1.8e19, mn=100, mp=100, Et=0, tn=1e-8, tp=1e-8, A=2e4
     )
 
 
+# Backwards-compatibility alias (v0.1.16 and earlier name).
+ex1_material = synthetic_homo_material
+
+
 def ex1_device(n_points: int = 500):
-    """The deltapv ex1_np_junction benchmark device (Eg=1.5 "Si-like",
-    2 x 1 um, 1e17/-1e17, Snr = Spl = 0).  Published benchmark:
-    Jsc ~ 20.2 mA/cm2, Voc ~ 1.05 V, FF ~ 0.88, PCE ~ 20%.
+    """The deltapv ex1_np_junction benchmark device (synthetic Eg=1.5 eV
+    homojunction, NOT silicon; 2 x 1 um, 1e17/-1e17, Snr = Spl = 0).
+    Published benchmark: Jsc ~ 20.2 mA/cm2, Voc ~ 1.05 V, FF ~ 0.88,
+    PCE ~ 20%.
     """
-    mat = ex1_material()
+    mat = synthetic_homo_material()
     return dj.Device(
         n_points=n_points,
         layers=[(1e-4, mat, 1e17), (1e-4, mat, -1e17)],

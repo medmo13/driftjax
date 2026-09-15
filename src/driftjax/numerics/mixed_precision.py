@@ -36,6 +36,19 @@ from driftjax.numerics.linalg import row_equilibrate
 MAX_REFINE = 8
 REFINE_TOL = 1e-13  # relative residual target (≈ FP64 floor for κ ~ 1e4)
 COND_ROUGH = 5e6  # rough κ threshold where FP32 refinement becomes dubious
+# MW2: a-priori gate on the RAW (pre-equilibration) row-norm ratio. The
+# documented heterojunction failure mode shows ratios ~1e11 from SRV
+# contact rows; above ROW_RATIO_SKIP the FP32 core is skipped outright
+# (refinement cannot converge there: u_lo * ratio >> 1). The
+# a-posteriori refinement gate below remains as backstop.
+ROW_RATIO_SKIP = 1e10
+
+
+def _raw_row_ratio(J):
+    """max|row| / min|row| of the raw matrix (O(N^2), trace-safe)."""
+    rn = jnp.max(jnp.abs(J), axis=-1)
+    rn = jnp.where(jnp.isfinite(rn) & (rn > 0), rn, jnp.asarray(1.0, dtype=rn.dtype))
+    return jnp.max(rn) / jnp.min(rn)
 
 
 def _dense_solve_f32(Je, be):
@@ -55,26 +68,47 @@ def solve_refined(J, b, tol: float = REFINE_TOL, max_refine: int = MAX_REFINE):
     tensor cores. ``converged`` is a JAX bool array when traced,
     else a Python bool.
     """
+    skip_fp32 = _raw_row_ratio(J) > ROW_RATIO_SKIP
     Je, be, _ = row_equilibrate(J, b)
     nrm_b = jnp.linalg.norm(be)
     safe_nrm = jnp.where(nrm_b == 0, jnp.asarray(1.0, dtype=nrm_b.dtype), nrm_b)
-    x0 = _dense_solve_f32(Je, be)
-    rel0 = jnp.linalg.norm(be - Je @ x0) / safe_nrm
 
-    def _cond(state):
-        _, rel, i = state
-        return (i < max_refine) & (rel >= tol)
+    def _refined(_):
+        x0 = _dense_solve_f32(Je, be)
+        rel0 = jnp.linalg.norm(be - Je @ x0) / safe_nrm
 
-    def _body(state):
-        x, _, i = state
-        r = be - Je @ x
-        d = _dense_solve_f32(Je, r)
-        x_new = x + d
-        rel_new = jnp.linalg.norm(be - Je @ x_new) / safe_nrm
-        return (x_new, rel_new, i + 1)
+        def _cond(state):
+            _, rel, i = state
+            return (i < max_refine) & (rel >= tol)
 
-    x, rel, n_ref = jax.lax.while_loop(_cond, _body, (x0, rel0, jnp.asarray(0, dtype=jnp.int32)))
-    conv = rel < tol
+        def _body(state):
+            x, _, i = state
+            r = be - Je @ x
+            d = _dense_solve_f32(Je, r)
+            x_new = x + d
+            rel_new = jnp.linalg.norm(be - Je @ x_new) / safe_nrm
+            return (x_new, rel_new, i + 1)
+
+        x, rel, n_ref = jax.lax.while_loop(
+            _cond, _body, (x0, rel0, jnp.asarray(0, dtype=jnp.int32))
+        )
+        return x, rel, n_ref, rel < tol
+
+    def _direct(_):
+        # MW2 a-priori gate: extreme raw row imbalance skips FP32 entirely
+        # (refinement cannot converge there); straight FP64 dense solve.
+        x_dense = jnp.linalg.solve(J, b)
+        rel_dense = jnp.linalg.norm(b - J @ x_dense) / (
+            jnp.linalg.norm(b) + jnp.asarray(1.0, dtype=nrm_b.dtype)
+        )
+        return (
+            x_dense,
+            rel_dense,
+            jnp.asarray(0, dtype=jnp.int32),
+            rel_dense < tol,
+        )
+
+    x, rel, n_ref, conv = jax.lax.cond(skip_fp32, _direct, _refined, None)
     if _is_tracer_mp(conv):
         return x, rel, n_ref, conv
     return x, rel, int(n_ref), bool(conv)

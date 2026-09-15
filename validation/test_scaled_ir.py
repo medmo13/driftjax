@@ -88,8 +88,12 @@ lam_d_np = np.array(lam_d)
 lam_banded_np = np.array(lam_banded)
 print("\n--- Gradient FD error (X0, N=120, V=0.5) ---")
 print(
-    f"|lam_banded - lam_dense|_max = {np.max(np.abs(lam_banded_np - lam_d_np)):.2e} (negligible vs FD error 5.56e-7)"
+    f"|lam_banded - lam_dense|_max = {np.max(np.abs(lam_banded_np - lam_d_np)):.2e}: "
+    "banded and dense adjoints DISAGREE here. The correct reference is FD "
+    "(dense-vs-FD ~5e-7 per the hetero gradient evidence), so banded-vs-truth "
+    "is ~0.4 on this device -- six orders worse than dense. Dense stays default."
 )
 print(
-    "Conclusion: Scaled sparse worsens residual (1.8e-07 vs 6e-12), banded+IR recovers to 8e-12; dense/sparse/banded all viable at N=120."
+    "Conclusion: Scaled sparse worsens residual (1.8e-07 vs 6e-12), banded+IR recovers to 8e-12; "
+    "dense/sparse viable at N=120, banded transpose is NOT (see disagreement above)."
 )

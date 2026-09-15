@@ -111,10 +111,13 @@ def main():
     real_dev(dev_h, "Homojunction (n_points=15) -- well-conditioned")
     real_dev(dev_3, "3-layer perovskite (n_points=15) -- ill-conditioned target")
     print()
-    print("Conclusion (v0.1.17): pivoted banded forward + transpose solves are")
-    print("stable on clean, homojunction AND perovskite Jacobians. The historical")
-    print("unpivoted-transpose instability above motivated both the dense production")
-    print("adjoint and the dgbsv forward default.")
+    print("Conclusion: pivoted banded FORWARD solves are stable on clean,")
+    print("homojunction AND perovskite Jacobians (forward rows above). The")
+    print("pivoted banded TRANSPOSE is stable on clean and homojunction")
+    print("systems but REMAINS UNSTABLE on the ill-conditioned 3-layer")
+    print("perovskite (see <-- UNSTABLE flags), justifying the production")
+    print("dense-LU adjoint. The historical unpivoted-transpose instability")
+    print("motivated both the dense adjoint and the dgbsv forward default.")
 
 
 if __name__ == "__main__":

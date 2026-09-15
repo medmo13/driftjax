@@ -28,6 +28,13 @@ class Solution(eqx.Module):
     eq_pot: Potentials  # equilibrium potential
     P_in: Float[Array, "nlam"]  # incident power per wavelength (W/m^2)  # noqa: F821
     protocol: str = eqx.field(static=True, default="sweep")
+    # H1 failure semantics: True only when every bias residual was
+    # verified (concrete path); True-unverified under jit/grad tracing,
+    # where the audit cannot concretize. Never trust eff/voc/ff when
+    # converged is False.
+    converged: bool = True
+    # max|F| over biases from the post-hoc audit (0.0 when unverified).
+    max_residual: float = 0.0
 
     @property
     def efficiency(self):
