@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased (referee round 2 response; no solver change)
+
+- Manuscript integrity: two missing section labels added; all three
+  documents build with zero undefined references/citations; withdrawn
+  cross-implementation ratios removed from the supplement timing table.
+- Terminology: "exact gradients" replaced in the abstract; extended
+  capabilities marked preliminary (validated model = steady-state
+  Boltzmann); consistency checks renamed; conclusions framed as
+  numerical/software verification.
+- New evidence, all archived under docs/paper/records/ with scripts
+  under validation/: extended scaling to N=1600 + FD/adjoint wall-time
+  break-even near P~6-7 (scaling_breakeven.py); four-way solver
+  causality with longdouble-refined reference (solver_causality.py);
+  pointwise cross-code norms (pointwise_crosscode.py); N=2000 mesh +
+  Richardson (mesh_extended.py); standardized 256-sample DGSM with
+  bootstrap (dgsm_extended.py); 8-realization 5%-noise inverse probe
+  (inverse_noise.py).
+- Derivative verification matrix table with explicit not-performed cells.
+- Cover letter drafted (docs/paper/cover_letter.txt).
+
 ## v0.1.17-post2 (2026-09-15, authorship correction; no functional change)
 
 - Byline corrected: Benaissa first + corresponding, Maoudj second,

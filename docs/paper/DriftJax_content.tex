@@ -81,7 +81,11 @@ accuracy and execution conditions are matched?
 design task?  (Section~\ref{sec:applications}.)
 \end{enumerate}
 The contribution is not a new adjoint principle or a uniformly
-linear-cost differentiable solver. It is an implementation that combines
+linear-cost differentiable solver. Implicit differentiation, JAX
+integration, analytical Jacobians, and dense adjoints are inherited
+concepts, established for photovoltaic simulation by
+$\partial\mathrm{PV}$~\cite{mann2022partial}; they are used here, not
+introduced. The contribution is an implementation that combines
 structured forward algebra, an explicit backward stability strategy, and
 derivative verification. Detailed derivations, auxiliary solvers, and
 reproduction requirements are provided in Supplementary Sections
@@ -225,7 +229,7 @@ for generation. These identities provide a useful check on units,
 spectral truncation, and reported efficiency. A sweep must bracket zero
 current to determine a physical open-circuit voltage.
 
-\subsection{Discrete residual and structured Newton step}
+\subsection{Discrete residual and structured Newton step}\label{sec:newton}
 After scaling and discretisation, the problem is
 \begin{equation}
 \res(\state,\design;V)=\boldsymbol{0},\qquad
@@ -424,8 +428,12 @@ objective can be lost when the selected maximum-power interval changes,
 a current crossing disappears, or a clipping branch becomes
 active~\cite{jaxfaq}.
 
-\subsection{Extended model capabilities}
-The documented database contains 25 material entries, while user-defined
+\subsection{Extended model capabilities (preliminary)}
+The validated scientific model of this article is the steady-state
+Boltzmann drift--diffusion--Poisson system with Beer--Lambert generation
+and SRH/radiative/Auger recombination. Everything in this subsection is
+a preliminary software capability, not an established validated model:
+the documented database contains 25 material entries, while user-defined
 materials provide an alternative to the database defaults. Availability
 of an entry establishes software coverage rather than calibration of a
 particular device. Optical inputs and material parameters should therefore
@@ -541,7 +549,40 @@ concentrated sensitivity to interface parameters under
 ill-conditioning (Section~\ref{sec:conditioning}), not a systematic
 adjoint failure.
 
-\subsection{Physical consistency verification}
+Table~\ref{tab:gradmatrix} summarises the derivative evidence by
+objective, device, and check. Coverage is local, not end-to-end:
+fixed-bias power is verified on two meshes; envelope-gated maximum-power
+derivatives are covered by the P4 gate
+(\code{tests/gradient/test\_inverse\_design\_grad.py}); interpolated
+$V_{\mathrm{oc}}$, full-sweep PCE, and interface-affinity directions
+have no dedicated step-size study and are marked as such.
+\begin{papertable}
+\centering\small
+\caption{Derivative verification matrix. Status is per cell: performed
+results are reported; empty cells are explicitly not performed.}
+\label{tab:gradmatrix}
+\begin{tabularx}{\linewidth}{@{}llllX@{}}
+\toprule
+Objective & Device & Check & Scope & Outcome \\
+\midrule
+Fixed-bias power & CdS/CdTe & FD + Taylor & 3 dirs, $N$=200/500 &
+FD $\sim10^{-8}$, Taylor $O(h)$, mesh-stable $1$--$4\%$ \\
+Fixed-bias power & CdS/CdTe & FD (single point) & 1 dir, 1 mesh &
+$1.6\times10^{-7}$ at $h=10^{-4}$ \\
+MPP power (envelope) & Two-layer junction & FD & P4 gate &
+$\sim1\%$ agreement \\
+Full-sweep PCE & Homojunction & FD & 8 params, $N$=100 &
+$\leq7.3\times10^{-4}$ (break-even study) \\
+16-param efficiency & Multilayer & FD (single point) & 1 eval &
+$4.2\times10^{-3}$ max (interface params) \\
+$V_{\mathrm{oc}}$ (interpolated) & --- & --- & --- & Not performed \\
+Full-sweep PCE & Heterojunction & --- & --- & Not performed \\
+Interface affinity & Heterojunction & --- & --- & Not performed \\
+\bottomrule
+\end{tabularx}
+\end{papertable}
+
+\subsection{Algebraic and physical-model consistency checks}
 Six physical-consistency tests were performed on three device types
 (homojunction, heterojunction, perovskite) using the v0.1.16 release
 code; these assert residual identities (mass action, conservation,
@@ -566,7 +607,7 @@ implemented residual represents the stated physical model; they do not
 independently verify the numerical accuracy of the Newton convergence
 or the derivative computation.
 
-\subsection{Structured-solver diagnosis and the v0.1.17 switch}
+\subsection{Structured-solver diagnosis and the v0.1.17 switch}\label{sec:conditioning}
 A systematic comparison of the former unpivoted block-Thomas solver,
 pivoted banded (\code{dgbsv}), and dense-LU solves on identical
 saved Jacobians and right-hand sides from five test devices (homojunction
@@ -610,6 +651,25 @@ This confirms that pivoting is essential for the heterojunction Jacobian
 and motivated the v0.1.17 production default (Section~\ref{sec:newton});
 the dense fallback is retained for singular or non-finite blocks.
 
+A four-arm causality study on identical saved Jacobians (homojunction
+and heterojunction, $N=100$, $V=0.5$~V) separates the roles of scaling
+and algorithm: unpivoted block-Thomas vs pivoted banded, each raw and
+row-equilibrated, plus dense LU, with forward errors measured against a
+longdouble-residual refined reference
+(\code{docs/paper/records/solver\_causality.json}). At this
+non-degenerate bias all arms agree (forward errors $10^{-13}$--$10^{-27}$,
+backward residuals $10^{-13}$--$10^{-8}$): row scaling alone does not
+separate the solvers here, bounding the failure regime to the
+equilibrium-adjacent degenerate states above rather than all biases.
+Equilibration changes the banded backward residual by orders of
+magnitude on the homojunction ($5.1\times10^{-12}$ raw vs
+$8.7\times10^{-8}$ equilibrated) while leaving forward errors at
+$10^{-14}$--$10^{-15}$---further evidence that backward residuals do
+not certify solution accuracy. Row imbalance is therefore established
+as a major numerical amplifier, not an isolated sole cause; the
+remaining candidates (transpose assembly, right-hand-side construction,
+state mismatch, contraction cancellation) are listed as open.
+
 \subsection{Mesh refinement and cross-code comparison}
 Five systematic mesh refinements ($N=62$, 125, 250, 500, 1000) on a
 homojunction device demonstrate monotonic convergence. The efficiency
@@ -624,7 +684,14 @@ do not establish a clean $O(N^{-2})$ asymptotic rate for the coupled
 device problem; the $O(N^{-2})$ guide shown in the figure is an
 illustrative reference slope~\cite{salari2000,oberkampf2002}.
 Nonlinear iteration effects, interface placement, and output extraction
-sensitivity all contribute to the observed rates.
+sensitivity all contribute to the observed rates. An extended refinement
+on the matched Si-like homojunction to $N=2000$
+(\code{docs/paper/records/mesh\_extended.json}) gives PCE $20.0002\%$,
+$20.0240\%$, $20.0378\%$ at $N=500$, $1000$, $2000$ (each $\sim7$~s wall
+time), with observed order $\approx0.79$; Richardson extrapolation from
+these levels lands at $20.019\%$, below the finest-grid value,
+confirming the non-asymptotic regime rather than correcting it. No
+clean coupled-solver order is claimed.
 This configuration is designated as a synthetic homojunction because the
 original material identification and band-gap specification are
 inconsistent across the archived records (the label states silicon but the
@@ -652,7 +719,14 @@ differences of 0.09 percentage points for the homojunction and less than
 current-density differences are $4.2\times10^{-5}$ and
 $3.6\times10^{-3}$~A\,cm$^{-2}$ (Figure~\ref{fig:crosscode}). The latter
 is 3.6~mA\,cm$^{-2}$, approximately 20\% of the reported CdS/CdTe
-short-circuit-current scale. Agreement of an integral or extremal metric
+short-circuit-current scale. An independent pointwise-norm study on a
+common 200-point grid
+(\code{docs/paper/records/pointwise\_crosscode.json}) gives
+$\|{\Delta J}\|_\infty=4.0\times10^{-3}$ and relative $L_2$ of $2.5\%$
+(homojunction), and $\|{\Delta J}\|_\infty=1.6\times10^{-3}$ with
+relative $L_2$ of $1.3\%$ (CdS/CdTe); state fields $n(x)$, $p(x)$,
+$\phi(x)$ are unavailable in the bundled references, so no state-field
+norms are claimed. Agreement of an integral or extremal metric
 therefore does not imply pointwise sub-percent agreement of the curve.
 The figure is a retained comparison against bundled reference curves,
 not a controlled same-revision rerun of both codes.
@@ -704,6 +778,17 @@ reporting parameter scales are necessary to establish a converged global
 ranking. In practice, the calculation can identify parameters deserving
 more detailed calibration before a higher-dimensional optimisation is
 attempted.
+
+An extended study addresses the coordinate and sample-size gaps
+directly (\code{docs/paper/records/dgsm\_extended.json}): the same
+four-parameter problem in standardized dimensionless coordinates
+$z\in[-1,1]^4$ with 256 Sobol samples ranks hole lifetime first
+($\tau_p>\tau_n>\mu_p>\mu_n$), the leader holding top rank in $100\%$
+of 200 bootstrap resamples, with Spearman $\rho=0.80$ against the
+published 32-sample ordering. The leader is therefore stable under
+resampling and coordinate standardisation; the full ordering remains
+indicative, and no comparison against variance-based Sobol total
+indices is claimed.
 
 \paperfigure{research_14_dgsm_global.png}{Derivative-based and local
 efficiency sensitivities in the retained four-coordinate example.
@@ -788,6 +873,18 @@ measurement noise, and model discrepancy, and may require additional
 observables. The adjoint formulation remains useful for such objectives,
 even when the illustrated search uses a derivative-free local optimiser.
 
+A practical-identifiability probe quantifies the fragility directly
+(\code{docs/paper/records/inverse\_noise.json}): eight independent
+$5\%$-noise realizations of the same two-parameter problem, refit from
+the published start on a reduced mesh ($N=200$, 21 biases) with a capped
+budget, recover thickness within $5\%$ of truth only once (mean
+$1.82\pm0.32$~$\mu$m against $1.80$~$\mu$m truth; most runs exhaust the
+budget unconverged). Reduced resolution and budget confound the noise
+effect here, so this is a stress probe rather than a production-fit
+statistic---but it demonstrates empirically that matched-model recovery
+at zero noise does not imply robustness at realistic noise, exactly the
+structural-vs-practical identifiability gap above.
+
 \paperfigure{research_13_target_iv_structure.png}{Synthetic inverse
 recovery using a target and fitting model with the same physical
 assumptions. The panels compare target, initial, and fitted curves and
@@ -810,18 +907,33 @@ Controlled benchmarks of the shipped v0.1.17 code on an x86-64 CPU
 (Linux 6.8.0, Python 3.13.13, JAX 0.10.2, float64; machine-readable
 record in \code{docs/paper/records/bench\_v017\_dgbsv.json}) yield the
 following. A full single-bias Newton solve (tolerance $10^{-10}$,
-$\leq30$ steps, warm, mean of 10) costs 30.7~ms at $N=50$, 35.2~ms at
-$N=100$, 37.2~ms at $N=200$, and 47.8~ms at $N=400$: near-flat scaling
-consistent with fixed JIT/host-callback overhead dominating the
-$O(N\cdot\mathrm{kl}\cdot\mathrm{ku})$ factorisation at these sizes.
-A complete forward sweep at $N=100$ takes 57.6~ms (10 biases) and
-111.8~ms (20 biases) warm. The adjoint gradient (forward plus backward)
-at $N=100$ with 10 biases takes $\sim$1.0~s warm, approximately
-$17\times$ the corresponding forward sweep, consistent with the
-$O(KN^3)$ dense-adjoint accounting. These are single-architecture
+$\leq30$ steps, warm, mean of 3--5) costs 49.9~ms at $N=50$, 62.3~ms at
+$N=100$, 64.4~ms at $N=200$, 57.7~ms at $N=400$, 65.7~ms at $N=800$,
+and 106.0~ms at $N=1600$: sublinear scaling consistent with fixed
+JIT/host-callback overhead dominating the
+$O(N\cdot\mathrm{kl}\cdot\mathrm{ku})$ factorisation at these sizes
+(non-monotonic entries reflect $\sim30\%$ machine variance across
+runs). Complete forward sweeps (10 biases) take 69.6~ms ($N=100$),
+105.1~ms ($N=200$), and 118.0~ms ($N=400$) warm. Adjoint gradients
+(forward plus backward, 10 biases) take 981.6~ms ($N=100$),
+1066.5~ms ($N=200$), and 1767.4~ms ($N=400$), approximately
+$14$--$15\times$ the corresponding forward sweep, consistent with the
+$O(KN^3)$ dense-adjoint accounting. An earlier harness run gave
+30.7--47.8~ms ($N=50$--$400$) and $\sim17\times$; both records are
+archived. These are single-architecture
 measurements; ratios would differ on GPU or with different JAX
 versions, and the host-callback round trip in each Newton iteration
 precludes GPU-resident execution of the forward linear solve.
+
+Wall-clock break-even against central finite differences was measured
+on a homojunction device ($N=100$, 10 biases) at $P=2$, $4$, and $8$
+builder-threaded parameters. The FD/adjoint wall-time ratio is $0.40$
+($P=2$), $0.71$ ($P=4$), and $1.48$ ($P=8$), placing break-even near
+$P\approx6$--$7$ on this configuration (an independent repeat gave
+$0.35$/$0.74$/$1.09$); adjoint--FD agreement is $\leq7.3\times10^{-4}$
+in all cases. Below break-even, derivative-free or FD search is faster
+in wall time despite higher evaluation counts; the adjoint advantage
+grows with parameter dimension since FD cost scales as $2P$ sweeps.
 
 No historical cross-implementation timing ratios are reported: earlier
 timing pairs were collected on unmatched hardware, tolerances, and code
@@ -887,25 +999,34 @@ scaling rather than a fundamental factorisation failure.
 
 \textbf{Performance.} Controlled single-architecture benchmarks of the
 shipped v0.1.17 code show a full single-bias Newton solve costing
-30.7--47.8~ms warm from $N=50$ to $N=400$ (near-flat scaling: fixed
+49.9--106.0~ms warm from $N=50$ to $N=1600$ (sublinear scaling: fixed
 JIT/host-callback overhead dominates at these sizes). The adjoint
-gradient costs approximately $17\times$ the forward sweep at $N=100$.
-Dense Jacobian storage is $167\times$ larger than block storage.
-Historical cross-implementation timing ratios are withdrawn; only the
-controlled single-architecture measurements above are retained.
+gradient costs approximately $14$--$15\times$ the forward sweep.
+Against finite differences, wall-clock break-even sits near $P\approx
+6$--$7$ parameters at $N=100$. Dense Jacobian storage is $167\times$
+larger than block storage. Historical cross-implementation timing
+ratios are withdrawn; only the controlled single-architecture
+measurements above are retained.
 
 \textbf{Usefulness.} Adjoint gradients reduce the number of objective
 evaluations by $20\times$ compared with finite differences in a
-two-parameter design. Sensitivity rankings are stable across sample
-sizes (Spearman $\rho=0.73$ between 32 and 128 samples). All three
-design applications connect derivatives to interpretable tasks: parameter
-ranking, bounded efficiency search, and synthetic curve fitting.
+two-parameter design, with wall-clock break-even near $P\approx6$--$7$
+parameters. The sensitivity leader (hole lifetime) holds top rank in
+$100\%$ of bootstrap resamples at 256 samples in standardized
+coordinates (Spearman $\rho=0.80$ against the 32-sample ordering).
+All three design applications connect derivatives to interpretable
+tasks: parameter ranking, bounded efficiency search, and synthetic
+curve fitting.
 
 The contribution is an implementation that combines structured forward
 algebra, an explicit backward stability strategy, and verified
 derivatives---not a new adjoint principle or a uniformly linear-cost
-solver. Reproducible source and benchmark archives, controlled
-ablation studies, and validation against measured devices remain
+solver. The evidence presented constitutes numerical verification and
+software validation, not experimental validation against measured
+devices: no J--V, EQE, temperature-dependent, transient, or impedance
+measurement is compared here, so no real-device predictive accuracy is
+claimed. Reproducible source and benchmark archives, controlled
+ablation studies, and calibration against measured devices remain
 necessary for stronger quantitative conclusions.
 
 \section*{Data and code availability}

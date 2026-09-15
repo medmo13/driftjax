@@ -1,7 +1,9 @@
 \begin{abstract}
 DriftJax is a one-dimensional drift--diffusion--Poisson solver for
 photovoltaic device simulation and design sensitivity analysis, implemented
-in JAX with exact gradients via the implicit function theorem. The forward
+in JAX with implicit-function-theorem gradients of the converged discrete
+system, numerically verified against finite differences on selected
+configurations. The forward
 solver combines Scharfetter--Gummel fluxes, an analytically assembled
 block-tridiagonal Jacobian, and a direct pivoted banded elimination
 (LAPACK \code{dgbsv}) that requires $O(N\cdot\mathrm{kl}\cdot

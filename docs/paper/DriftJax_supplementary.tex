@@ -727,20 +727,24 @@ not silently replaced by guessed corrected values.
 \subsection{Reported timing pairs}
 \begin{table}[tbp]
 \centering\small
-\caption{Timing pairs retained from the supplied reports. Ratios are
-computed from those pairs. The reference for the first four rows is
-labelled $\partial\mathrm{PV}$ v0.0.5; the last row compares against
-an eager DriftJax implementation. These are not new measurements.}
+\caption{Timing pairs retained from the supplied reports for provenance
+only. The reference for the first four rows is labelled
+$\partial\mathrm{PV}$ v0.0.5; the last row compares against
+an eager DriftJax implementation. These historical measurements are
+retained for provenance and are not evidence for any present
+performance claim; cross-implementation ratios computed from unmatched
+hardware, tolerances, and code revisions are withdrawn (see the
+performance section of the main article).}
 \label{supp:timings}
-\begin{tabularx}{\linewidth}{@{}Xrrr@{}}
+\begin{tabularx}{\linewidth}{@{}Xrr@{}}
 \toprule
-Workload & Reference (s) & DriftJax (s) & Ratio \\
+Workload & Reference (s) & DriftJax (s) \\
 \midrule
-Homojunction forward sweep & 77.1 & 0.26 & $297\times$ \\
-CdS/CdTe forward sweep & 52.8 & 0.26 & $203\times$ \\
-Two-parameter gradient & 58.5 & $\sim0.8$ & $\sim73\times$ \\
-Two-parameter SLSQP & 426.2 & $\sim37$ & $\sim11.5\times$ \\
-Transient, 50 steps & 74.3 & 0.55 & $135\times$ \\
+Homojunction forward sweep & 77.1 & 0.26 \\
+CdS/CdTe forward sweep & 52.8 & 0.26 \\
+Two-parameter gradient & 58.5 & $\sim0.8$ \\
+Two-parameter SLSQP & 426.2 & $\sim37$ \\
+Transient, 50 steps & 74.3 & 0.55 \\
 \bottomrule
 \end{tabularx}
 \end{table}
