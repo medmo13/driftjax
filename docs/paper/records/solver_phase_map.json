@@ -1,0 +1,94 @@
+{
+ "points": [
+  {
+   "device": "homojunction",
+   "N": 100,
+   "log10_cond": 11.790927258052925,
+   "dense": "OK",
+   "banded": "OK",
+   "regime": "dense-optimal",
+   "note": ""
+  },
+  {
+   "device": "heterojunction",
+   "N": 100,
+   "log10_cond": 17.243951044602575,
+   "dense": "OK",
+   "banded": "OK",
+   "regime": "dense-optimal",
+   "note": ""
+  },
+  {
+   "device": "perovskite3",
+   "N": 15,
+   "log10_cond": 45.617372863489685,
+   "dense": "FAILED",
+   "banded": "FAILED",
+   "regime": "uncertifiable",
+   "note": ""
+  },
+  {
+   "device": "homojunction",
+   "N": 200,
+   "log10_cond": 11.790030383266107,
+   "dense": "OK",
+   "banded": "OK",
+   "regime": "dense-optimal",
+   "note": ""
+  },
+  {
+   "device": "homojunction",
+   "N": 400,
+   "log10_cond": 11.7896446544372,
+   "dense": "OK",
+   "banded": "OK",
+   "regime": "dense-optimal",
+   "note": ""
+  },
+  {
+   "device": "heterojunction",
+   "N": 200,
+   "log10_cond": 12.358942773478864,
+   "dense": "OK",
+   "banded": "OK",
+   "regime": "dense-optimal",
+   "note": ""
+  },
+  {
+   "device": "homojunction",
+   "N": 100,
+   "log10_cond": 11.790927258052925,
+   "dense": "OK",
+   "banded": "OK",
+   "regime": "dense-optimal",
+   "note": "forward arms agree; see solver_causality.json"
+  },
+  {
+   "device": "heterojunction",
+   "N": 100,
+   "log10_cond": 17.243951044602575,
+   "dense": "OK",
+   "banded": "OK",
+   "regime": "dense-optimal",
+   "note": "forward arms agree; see solver_causality.json"
+  },
+  {
+   "device": "perovskite3",
+   "N": 15,
+   "log10_cond": 26.69897000433602,
+   "dense": "OK",
+   "banded": "OK",
+   "regime": "dense-optimal",
+   "note": "forward lstsq fallback used"
+  },
+  {
+   "device": "homojunction",
+   "N": 15,
+   "log10_cond": 12.0,
+   "dense": "OK",
+   "banded": "OK",
+   "regime": "dense-optimal",
+   "note": "clean banded"
+  }
+ ]
+}

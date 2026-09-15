@@ -70,6 +70,21 @@ solve runs through a host callback, so forward Newton steps are not
 differentiable through; gradients flow exclusively through the
 \code{custom_vjp} implicit-adjoint path.
 
+Solver-evolution arc (why each choice was made, not just what it is):
+unpivoted block-Thomas failed on row-scaled heterojunctions (residuals
+$\sim10^2$) while agreeing with dense LU below $10^{-16}$ on clean
+systems, which forced pivoted banded elimination for the forward path;
+the transpose then behaved differently (same $\kappa$, different
+stability), which forced dense LU for the production adjoint with the
+structured transpose retained opt-in; decomposing the transpose cost
+showed the raw \code{dgbsv} kernel already beats dense LU
+($0.10$--$0.22$~ms vs $1$--$2$~ms at $N=100$) and the measured gap is
+packing/callback overhead, not numerics; the resulting backend regimes
+are mapped empirically in $(N,\kappa)$ space
+(\code{docs/paper/records/solver\_phase\_map.json}). Rank-deficient
+systems ($\kappa\sim10^{45}$) are outside every backend's envelope and
+report explicit failure rather than a solution.
+
 The article is organised around three questions:
 \begin{enumerate}[leftmargin=*,itemsep=2pt]
 \item \textbf{Correctness:} Does the implementation solve the stated
@@ -1071,13 +1086,17 @@ $2.1\times10^{-14}$ (no fallback); heterojunction
 banded $295$~ms at $2.3\times10^{-27}$. Accuracy is equivalent---but the
 stage timings show the $\sim$150$\times$ gap is not the linear algebra:
 the raw LAPACK \code{dgbsv} kernel on prebuilt band storage costs
-$0.10$--$0.22$~ms ($\sim$10--$20\times$ \emph{faster} than dense LU),
-while JAX band packing costs $91$--$150$~ms, dense-to-block extraction
-$7$--$9$~ms, and the host callback plus residual check the remainder.
+$0.09$--$0.22$~ms ($\sim$10--$20\times$ \emph{faster} than dense LU),
+while JAX band packing costs $5$--$150$~ms depending on implementation
+($150$~ms with 27 scatter updates, $5$~ms vectorized to 3 scatters),
+dense-to-block extraction $4$--$9$~ms, and the host callback plus
+residual check the remainder.
 A blocks-direct API (\code{adjoint\_banded\_solve\_blocks}, taking the
 analytic blocks with no dense intermediate) cuts the wrapper to
-$184$--$314$~ms with identical accuracy, confirming extraction was
-$\sim$40\% of the overhead. The previously reported $N\approx620$
+$50$--$74$~ms with identical accuracy, and unpreconditioned matrix-free
+GMRES stagnates (residual $\sim$0.6 despite reporting convergence),
+confirming that iteration without a structured preconditioner is not a
+backend. The previously reported $N\approx620$
 crossover is therefore retracted as stated: it was a crossover of backend
 \emph{wrappers}, not of the algorithms. Extending the wrappers along $N$
 (homojunction $N=200/400$, heterojunction $N=200$), dense times grow

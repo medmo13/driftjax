@@ -747,11 +747,16 @@ def _sweep_bwd(solver, optics, protocol, progress, ls, statistics, init, fused, 
             from driftjax.numerics.mixed_precision import adjoint_dense_solve as _ads
 
             g_x = _agx(cell, pot)
-            J = _dfb(*_bj(cell, bound, pot))
+            Ab, Bb, Cb = _bj(cell, bound, pot)
+            J = _dfb(Ab, Bb, Cb)
             if _banded_adjoint_enabled():
-                from driftjax.numerics.banded_solve import adjoint_banded_solve as _abs
+                # Blocks-direct: no dense extraction (Phase B). Falls back
+                # to dense LU on the same gate as the dense-J API.
+                from driftjax.numerics.banded_solve import (
+                    adjoint_banded_solve_blocks as _absb,
+                )
 
-                lam_b, fb = _abs(J, g_x)
+                lam_b, fb = _absb(Ab, Bb, Cb, g_x)
                 lam = jax.lax.cond(fb, lambda _: _ads(J.T, g_x), lambda _: lam_b, None)
             else:
                 lam = _ads(J.T, g_x)

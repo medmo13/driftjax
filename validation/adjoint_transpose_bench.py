@@ -21,6 +21,7 @@ import sys
 import time
 from pathlib import Path
 
+import jax
 import jax.numpy as jnp
 import numpy as np
 
@@ -251,6 +252,32 @@ def bench_case(Jn, g, label, reps=9):
         }
     except Exception as e:
         rec["banded_blocks_direct"] = {"status": "FAILED", "error": f"{type(e).__name__}: {e}"}
+    # --- matrix-free GMRES reference (unpreconditioned; expected NOT to
+    # compete — recorded as the honest negative result motivating a
+    # banded-transpose preconditioner as future work) ---
+    try:
+        from jax.scipy.sparse.linalg import gmres as _gmres
+
+        from driftjax.numerics.analytic_jacobian import (
+            blockwise_matvec_transpose as _bmT,
+        )
+
+        A_g, B_g, C_g = (jnp.asarray(t) for t in extract_blocks(jnp.asarray(Jn)))
+        gg = jnp.asarray(gn)
+        mv = lambda v, _A=A_g, _B=B_g, _C=C_g: _bmT(_A, _B, _C, v)
+        lam_g, info_g = _gmres(mv, gg, tol=1e-8, atol=0.0, restart=50, maxiter=200)
+        lam_g = np.asarray(jax.block_until_ready(lam_g))
+        r_g = bwd_res(lam_g)
+        # info==0 with large residual = stagnation, not success.
+        rec["gmres_unpreconditioned"] = {
+            "status": "OK" if (int(info_g) == 0 and r_g < 1e-6) else "FAILED",
+            "info": int(info_g),
+            "backward": r_g,
+            "forward_err": fwd_err(lam_g),
+            "note": "no preconditioner; banded transpose as P^-1 is future work",
+        }
+    except Exception as e:
+        rec["gmres_unpreconditioned"] = {"status": "FAILED", "error": f"{type(e).__name__}: {e}"}
     return rec
 
 

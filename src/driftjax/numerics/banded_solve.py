@@ -41,29 +41,37 @@ def _blocks_to_lapack_banded(A, B, C):
     ab = _jnp.zeros((kl + ku + 1, N), dtype=A.dtype)
 
     idx = _jnp.arange(n)
+    # Vectorized stamp: one scatter per block family (3 dispatches total,
+    # not 27). (DI, DJ) enumerate the 3x3 intra-block offsets; rows/cols
+    # broadcast to (9, n) and values are the transposed blocks.
+    _DI, _DJ = _jnp.meshgrid(_jnp.arange(3), _jnp.arange(3), indexing="ij")
+    _P = (_DI.reshape(9, 1), _DJ.reshape(9, 1))
 
     # Diagonal blocks A[i]: block row = block col = i
-    for di in range(3):
-        for dj in range(3):
-            row = ku + (di - dj)
-            cols = 3 * idx + dj
-            ab = ab.at[row, cols].set(A[idx, di, dj])
+    rows = ku + _P[0] - _P[1]
+    cols = 3 * idx[None, :] + _P[1]
+    ab = ab.at[(rows, cols)].set(A.transpose(1, 2, 0).reshape(9, n))
 
-    # Super-diagonal blocks B[i]: block row = i, block col = i+1
-    for di in range(3):
-        for dj in range(3):
-            row = ku + (di - dj - 3)
-            cols = 3 * idx + 3 + dj
-            mask = (3 * idx + 3 + dj) < N
-            ab = ab.at[row, cols].set(jnp.where(mask, B[idx, di, dj], 0.0))
+    # Super-diagonal blocks B[i]: block row = i, block col = i+1.
+    # B has n-1 blocks; pad one zero block so the (9, n) stamp has matching
+    # shape — the mask zeroes column n-1 exactly as the scalar loop did.
+    _Z = _jnp.zeros((1, 3, 3), dtype=A.dtype)
+    Bp = _jnp.concatenate([B, _Z], axis=0)
+    rows_b = ku + _P[0] - _P[1] - 3
+    cols_b = 3 * idx[None, :] + 3 + _P[1]
+    mask_b = cols_b < N
+    ab = ab.at[(rows_b, cols_b)].set(
+        _jnp.where(mask_b, Bp.transpose(1, 2, 0).reshape(9, n), 0.0)
+    )
 
-    # Sub-diagonal blocks C[i]: block row = i+1, block col = i
-    for di in range(3):
-        for dj in range(3):
-            row = ku + (di + 3 - dj)
-            cols = 3 * idx + dj
-            mask = (3 * idx + 3 + di) < N
-            ab = ab.at[row, cols].set(jnp.where(mask, C[idx, di, dj], 0.0))
+    # Sub-diagonal blocks C[i]: block row = i+1, block col = i (same pad).
+    Cp = _jnp.concatenate([C, _Z], axis=0)
+    rows_c = ku + _P[0] + 3 - _P[1]
+    cols_c = 3 * idx[None, :] + _P[1]
+    mask_c = (3 * idx[None, :] + 3 + _P[0]) < N
+    ab = ab.at[(rows_c, cols_c)].set(
+        _jnp.where(mask_c, Cp.transpose(1, 2, 0).reshape(9, n), 0.0)
+    )
 
     return ab, kl, ku
 
