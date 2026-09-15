@@ -21,7 +21,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import driftjax as dj
 
-RECORD = Path(__file__).resolve().parent.parent / "docs" / "paper" / "records" / "solver_fallback.json"
+RECORD = (
+    Path(__file__).resolve().parent.parent / "docs" / "paper" / "records" / "solver_fallback.json"
+)
 
 
 def _three_layer(n_points=15):
@@ -55,7 +57,10 @@ def main():
     jax.config.update("jax_enable_x64", True)
     t0 = time.time()
     out = {"environment": {"dtype": "float64", "x64": True}, "cases": {}}
-    for name, dev in (("three_layer_perovskite_N15", _three_layer()), ("homojunction_N15", _homojunction())):
+    for name, dev in (
+        ("three_layer_perovskite_N15", _three_layer()),
+        ("homojunction_N15", _homojunction()),
+    ):
         sol = dj.simulate(dev, dj.Sweep(n_steps=5, vmax=1.0))
         out["cases"][name] = {
             "converged": bool(sol.converged),

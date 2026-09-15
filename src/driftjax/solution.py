@@ -61,6 +61,27 @@ class Solution(eqx.Module):
         """Current-density samples in A cm⁻²."""
         return self.current
 
+    @property
+    def gradient_status(self):
+        """Gradient certification status: CERTIFIED / UNRELIABLE / UNVERIFIED.
+
+        Step 36 (minimum viable failure semantics): CERTIFIED when the sweep
+        converged with no fallback (clean pivoted-banded solves throughout);
+        UNRELIABLE when unconverged (gradients must not be trusted) or when
+        any bias used the truncated-SVD fallback (minimum-norm
+        least-squares steps, not exact Newton steps — see fallback_used);
+        UNVERIFIED when the audit could not run (jit/grad/vmap, fused-scan
+        or batched paths with empty diagnostics).  Full certification with
+        adjoint residuals and condition estimates remains Tier-C work.
+        """
+        if not self.per_bias_residuals and not self.fallback_used:
+            return "UNVERIFIED"
+        if not self.converged:
+            return "UNRELIABLE"
+        if any(x is True for x in self.fallback_used):
+            return "UNRELIABLE"
+        return "CERTIFIED"
+
     def iv_curve(self):
         """Return ``(voltages[V], current[A/cm^2])``."""
         return self.voltages, self.current

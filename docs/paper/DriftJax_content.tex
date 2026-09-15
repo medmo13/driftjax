@@ -1060,7 +1060,20 @@ $N=100$--$400$): host-callback round trips plus $O(N^2)$ equilibration
 overhead exceed dense LU below the crossover, which lies beyond the
 tested range. Dense LU therefore remains the default; the banded
 adjoint is available for larger systems where the $O(N^3)$--$O(N)$
-gap may dominate.
+gap may dominate. A saved-Jacobian transpose benchmark
+(\code{validation/adjoint\_transpose\_bench.py},
+\code{docs/paper/records/adjoint\_transpose\_bench.json}) quantifies the
+trade on identical matrices with longdouble references: at $N=100$,
+homojunction ($\kappa=6.2\times10^{11}$), dense LU takes 1.94~ms with
+forward error $5.3\times10^{-14}$ vs banded $287$~ms at $2.1\times10^{-14}$
+(no fallback); heterojunction ($\kappa=1.8\times10^{17}$), dense 1.30~ms
+at $2.2\times10^{-28}$ vs banded $295$~ms at $2.3\times10^{-27}$. Accuracy
+is equivalent; the $\sim$150$\times$ wall-time gap is pure host-callback
+and equilibration overhead at this size, consistent with the end-to-end
+timing above. On the rank-deficient 3-layer perovskite transpose
+($\kappa\sim4\times10^{45}$) dense LU raises a singular-matrix error
+while the banded path returns with \code{used\_fallback} set---an honest
+negative result bounding the structured transpose to nonsingular systems.
 
 \section{Conclusions}\label{sec:conclusions}
 This article addresses three questions about a block-structured

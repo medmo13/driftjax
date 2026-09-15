@@ -10,6 +10,7 @@ records:
   bench_v017_dgbsv.json:        {script: benchmarks/run_benchmarks.py, covers: Newton/sweep/gradient timings N<=400}
   scaling_breakeven.json:       {script: validation/scaling_breakeven.py, covers: Newton N=50-1600, adjoint-vs-FD break-even P=2/4/8}
   solver_causality.json:        {script: validation/solver_causality.py, covers: 4-arm solver comparison + longdouble reference}
+  adjoint_transpose_bench.json: {script: validation/adjoint_transpose_bench.py, covers: dense vs equilibrated-banded transpose wall time + forward error vs longdouble}
   solver_fallback.json:         {script: validation/solver_fallback.py, covers: per-bias lstsq fallback flags (3-layer vs homo)}
   gradient_evidence_hetero.json:{script: validation/gradient_evidence_hetero.py, covers: 3-dir x 2-mesh Taylor study}
   pointwise_crosscode.json:     {script: validation/pointwise_crosscode.py, covers: Linf/L2 vs bundled dPV curves}
