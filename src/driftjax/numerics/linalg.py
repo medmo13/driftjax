@@ -1,9 +1,21 @@
 """Sparse / direct linear algebra for the DDP Jacobian.
 
+Solver taxonomy (single authoritative list; production default first):
+  PivotedBanded  LAPACK dgbsv via scipy (numerics/banded_solve.py) — the
+                 production Newton-step solver. Unpivoted block-Thomas was
+                 removed from production in v0.1.17 after controlled
+                 failures on row-scaled heterojunctions.
+  DenseLU        jnp.linalg.solve (small n / gradient A-B reference;
+                 production adjoint default).
+  CSRDirect      row-equilibrated banded→CSR spsolve (JAX CPU sparse-direct;
+                 experimental backend, not production).
+
 Backends (single entry point ``linsolve``):
   "csr"     row-equilibrated banded→CSR spsolve (JAX CPU sparse-direct)
-  "banded"  exact O(N) block-Thomas on the interleaved 3×3 blocks (pure jnp,
-            vmappable — the batched-sweep workhorse)
+  "banded"  legacy label: exact O(N) block-Thomas on the interleaved 3×3
+            blocks (pure jnp, vmappable). HISTORICAL ONLY — production
+            banded solves route through PivotedBanded (dgbsv); this label
+            is retained for the batched-sweep reference path.
   "dense"   jnp.linalg.solve (small n / gradient A-B reference)
   "auto"    CSR with dense fallback on bad linear residual
 

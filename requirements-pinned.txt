@@ -1,6 +1,7 @@
-# Pinned environment for DriftJax v0.1.16 CPC submission
+# Pinned environment for DriftJax v0.1.17 CPC submission
 # Generated: 2026-09-14, Python 3.13, CPU float64
 # Install: pip install -r requirements-pinned.txt
+# Every entry is exact-pinned (==); CI has a pin-check job enforcing this.
 jax==0.10.2
 jaxlib==0.10.2
 equinox==0.13.8
@@ -9,12 +10,11 @@ numpy==2.4.6
 scipy==1.18.0
 matplotlib==3.11.0
 pillow==12.2.0
-pyyaml>=6.0
-rich>=13.0
+pyyaml==6.0.3
 # Dev / test
-pytest>=9.0
-pytest-timeout>=2.3
-ruff>=0.16
+pytest==9.1.1
+pytest-timeout==2.4.0
+ruff==0.16.2
 # Docs
-mkdocs>=1.6
-mkdocs-material>=9.7
+mkdocs==1.6.1
+mkdocs-material==9.7.7

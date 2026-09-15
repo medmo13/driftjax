@@ -629,9 +629,44 @@ def _sweep_fwd(design, solver, optics, protocol, progress, ls, statistics, init=
     return sol, residuals
 
 
+def _warn_uncertified_primal_if(max_resid):
+    """Runtime warning for gradients on uncertified primal states (P0-5).
+
+    Called via jax.debug.callback from the backward pass with the concrete
+    max|F| recomputed from the forward residuals. Silent when the primal is
+    certified (max|F| <= 1e-6, same threshold as the concrete-path audit);
+    warns loudly otherwise, so a normal-looking gradient is never returned
+    silently on an unconverged state.
+    """
+    import warnings
+
+    try:
+        mr = float(max_resid)
+    except Exception:
+        return
+    if mr > 1e-6 or mr != mr:  # NaN-safe comparison
+        warnings.warn(
+            f"DriftJax backward pass on uncertified primal state (max|F|={mr:.3e} "
+            f"> 1e-6 audit threshold); returned gradient is UNRELIABLE.",
+            UserWarning,
+            stacklevel=2,
+        )
+
+
 def _sweep_bwd(solver, optics, protocol, progress, ls, statistics, init, fused, residuals, g_sol):
     design, cell, pot_arr, voltages_dim, currents_dim, P_in, fused_val = residuals
     alpha_mode = optics.alpha_mode
+    # P0-5: the custom VJP must not differentiate silently through an
+    # uncertified primal. Recompute max|F| per bias from the forward
+    # residuals (K cheap residual evals, no solves; trace-safe pure JAX)
+    # and warn at runtime when it exceeds the audit threshold. The IFT
+    # requires a converged root; without it the gradient is UNRELIABLE.
+    from driftjax.numerics.residual import comp_F as _comp_F_bwd
+
+    _F_all = jax.vmap(lambda pv, vb: _comp_F_bwd(cell, boundary_bias(cell, vb), vec2pot(pv)))(
+        pot_arr, voltages_dim
+    )
+    jax.debug.callback(_warn_uncertified_primal_if, jnp.max(jnp.abs(_F_all)))
 
     # Fold ALL Solution cotangents (eff/voc/ff/jsc/current) back onto the
     # primitive sweep outputs (voltages_dim, currents_dim) AND capture the

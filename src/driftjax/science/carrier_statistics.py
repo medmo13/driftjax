@@ -1,9 +1,9 @@
-"""Carrier statistics: Boltzmann (default) and exact Fermi–Dirac.
+"""Carrier statistics: Boltzmann (default, validated) and approximate Fermi–Dirac.
 
 Dimensionless formulation; energies are eV scaled by Vt (thermal voltage).
 
-Fermi–Dirac mode
-----------------
+Fermi–Dirac mode ("exact" alias: historical name, NOT exact)
+------------------------------------------------------------
 The Fermi integral of order 1/2,
 
     F_{1/2}(η) = (2/√π) ∫₀^∞ t^{1/2}/(1 + e^{t−η}) dt
@@ -67,9 +67,11 @@ def _f_half_exact(eta: jax.Array) -> jax.Array:
 
 
 def F_half(eta: jax.Array, mode: str = "exact") -> jax.Array:
-    """Fermi–Dirac integral of order 1/2.
+    """Fermi–Dirac integral of order 1/2 (approximate evaluator).
 
-    mode: "exact" (GL+Sommerfeld), "boltzmann" (exp(η)), "blakemore" (the
+    mode: "exact" (historical alias for the GL-quadrature + Sommerfeld
+    blend below — approximate to ~1e-6 in F and ~2e-4 at the eta=10 blend,
+    NOT exact), "boltzmann" (exp(η)), "blakemore" (the
     historical closed form — inaccurate, kept for provenance/cross-checking).
     """
     eta = jnp.asarray(eta, dtype=jnp.float64)
@@ -117,9 +119,24 @@ def _df_half_sommerfeld(eta: jax.Array) -> jax.Array:
 
 
 def _df_half_exact(eta: jax.Array) -> jax.Array:
-    w = 1.0 / (1.0 + jnp.exp(_SOMMERFELD_CUT - eta))
-    som = _df_half_sommerfeld(jnp.maximum(eta, 1.0))
-    return (1.0 - w) * _df_half_quad(eta) + w * som
+    """Exact derivative of the implemented _f_half_exact blend (P0-1 fix).
+
+    Primal: F = (1-w)*Q(eta) + w*S(c(eta)) with w = sigmoid(eta-10) and
+    c(eta) = maximum(eta, 1).  Differentiating term by term,
+        dF = (1-w)*Q' + w*S'*c' + w'*(S-Q),   w' = w*(1-w),
+    where c' = 1{eta > 1} is the derivative of the clamp.  The previous
+    implementation omitted the w'*(S-Q) blend-weight term, biasing dF
+    around the eta ~= 10 transition by ~w'(S-Q) (~5e-5 relative).  At
+    eta = 1 exactly the right-derivative is used (measure-zero kink).
+    """
+    e = jnp.asarray(eta, dtype=jnp.float64)
+    w = 1.0 / (1.0 + jnp.exp(_SOMMERFELD_CUT - e))
+    dw = w * (1.0 - w)
+    ec = jnp.maximum(e, 1.0)
+    cp = jnp.where(e > 1.0, 1.0, 0.0)
+    S = _f_half_sommerfeld(ec)
+    Q = _f_half_quad(e)
+    return (1.0 - w) * _df_half_quad(e) + w * _df_half_sommerfeld(ec) * cp + dw * (S - Q)
 
 
 def _blakemore_grad_single(eta: jax.Array) -> jax.Array:

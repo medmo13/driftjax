@@ -29,9 +29,13 @@ class Solution(eqx.Module):
     P_in: Float[Array, "nlam"]  # incident power per wavelength (W/m^2)  # noqa: F821
     protocol: str = eqx.field(static=True, default="sweep")
     # H1 failure semantics: True only when every bias residual was
-    # verified (concrete path); True-unverified under jit/grad tracing,
-    # where the audit cannot concretize. Never trust eff/voc/ff when
-    # converged is False.
+    # verified (concrete path). P0-4 contract: under jit/grad/vmap the
+    # audit cannot concretize, so converged stays at its default True and
+    # MUST NOT be read as "verified" there — gradient_status is the
+    # authoritative tri-state (CERTIFIED / UNRELIABLE / UNVERIFIED), and
+    # converged=True + gradient_status=UNVERIFIED means "not audited".
+    # Never trust eff/voc/ff when converged is False; never treat a
+    # gradient as certified unless gradient_status is CERTIFIED.
     converged: bool = True
     # max|F| over biases from the post-hoc audit (0.0 when unverified).
     max_residual: float = 0.0

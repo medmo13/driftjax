@@ -12,6 +12,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  pin-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: requirements-pinned.txt must be exact-pinned (== only)
+        run: |
+          if grep -n ">=" requirements-pinned.txt; then
+            echo "requirements-pinned.txt contains floor (>=) pins; pin exact versions"
+            exit 1
+          fi
+          grep -q '^jax==0.10.2$' requirements-pinned.txt
   lint:
     runs-on: ubuntu-latest
     steps:

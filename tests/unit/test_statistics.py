@@ -35,6 +35,36 @@ def test_d_f_half_boltzmann():
     assert abs(float(g) - float(jnp.exp(1.3))) < 1e-12
 
 
+def test_d_f_half_blend_weight_transition():
+    """P0-1: dF must include the w'(S-Q) blend-weight term at eta ~= 10.
+
+    The pre-fix formula (1-w)Q' + wS' missed it, erring by ~2.5e-4
+    relative at the quadrature/Sommerfeld transition. The fixed formula
+    is the exact derivative of the implemented primal: it must match both
+    central differences and jax.grad through F_half over eta = -20..50
+    with dense sampling around 8..12.
+    """
+    etas = np.concatenate(
+        [np.linspace(-20, 7, 15), np.linspace(8, 12, 41), np.linspace(13, 50, 10)]
+    )
+    h = 1e-5
+    worst_fd, argmax = 0.0, None
+    for e in etas:
+        ef = jnp.float64(e)
+        fd = (float(F_half(jnp.float64(e + h))) - float(F_half(jnp.float64(e - h)))) / (2 * h)
+        got = float(dF_half(ef))
+        sc = abs(fd) + 1e-30
+        r = abs(got - fd) / sc
+        if r > worst_fd:
+            worst_fd, argmax = r, e
+    assert worst_fd < 5e-5, (worst_fd, argmax)
+    eta = jnp.asarray(etas)
+    g = jax.grad(lambda ee: jnp.sum(F_half(ee)))(eta)
+    assert jnp.allclose(g, dF_half(eta), rtol=1e-4, atol=1e-6), (
+        float(jnp.max(jnp.abs(g - dF_half(eta)))),
+    )
+
+
 def test_resolve_statistics():
     assert resolve_statistics("fermi-dirac") == "exact"
     assert resolve_statistics("boltzmann") == "boltzmann"

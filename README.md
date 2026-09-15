@@ -137,7 +137,7 @@ MIT — see [LICENSE](LICENSE).
 ```bibtex
 @software{driftjax,
   title   = {DriftJax: A Differentiable 1-D Drift-Diffusion Solar-Cell Simulator in JAX},
-  version = {0.1.16},
+  version = {0.1.17},
   year    = {2026},
   url     = {https://github.com/medmo13/driftjax}
 }

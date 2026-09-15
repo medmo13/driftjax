@@ -27,8 +27,11 @@ classifiers = [
   "Topic :: Scientific/Engineering :: Chemistry",
 ]
 dependencies = [
-  "jax>=0.4.20",
-  "jaxlib>=0.4.20",
+  # Floors are the lowest versions exercised (paper env + CI smoke); older
+  # releases are not claimed compatible (pure_callback vmap_method and
+  # current Equinox tracing semantics postdate them).
+  "jax>=0.10.2",
+  "jaxlib>=0.10.2",
   "equinox>=0.13",
   "jaxtyping>=0.3",
   "numpy>=1.26",

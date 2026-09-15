@@ -37,3 +37,25 @@ def test_gr_balance(_cached_bias_pot):
     r = gr_balance_residual(small_cell, pot)
     assert r < 1.0, r
     # keep single identity; manual Jn/R/G re-derive was redundant with gr_balance_residual
+
+
+def test_equilibrium_zero_flux(_cached_bias_pot):
+    """Item 20: equilibrium means Jn=Jp=0, not just np=ni^2.
+
+    Mass action is a constitutive identity; vanishing carrier fluxes is
+    the thermodynamic equilibrium statement. Checks max|Jn|, max|Jp| at
+    the dark-equilibrium state against the physical current scale.
+    """
+    import jax.numpy as jnp
+
+    from driftjax.numerics.scharfetter_gummel import Jn, Jp
+
+    small_cell, _, pot_eq = _cached_bias_pot
+    jn = jnp.asarray(Jn(small_cell, pot_eq))
+    jp = jnp.asarray(Jp(small_cell, pot_eq))
+    from driftjax.units import thermal_scales
+
+    sc = thermal_scales(float(jnp.asarray(small_cell.T)))
+    scale = float(sc["current"])
+    assert float(jnp.max(jnp.abs(jn))) * scale < 1e-6, float(jnp.max(jnp.abs(jn)))
+    assert float(jnp.max(jnp.abs(jp))) * scale < 1e-6, float(jnp.max(jnp.abs(jp)))

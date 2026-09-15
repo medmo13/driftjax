@@ -313,6 +313,7 @@ def _init_cell_impl(
     """Bake a design: generation profile + statistics mode (impl)."""
     if ls is None:
         ls = spectrum(normalize=False)
+    mode = _resolve_statistics_gated(statistics)
     if fused:
         from driftjax.numerics.fused_kernels import fused_generation as _fg
 
@@ -354,7 +355,38 @@ def _init_cell_impl(
             ]
         },
     }
-    return PVCell(**d, statistics=resolve_statistics(statistics), T=design.T)
+    return PVCell(**d, statistics=mode, T=design.T)
+
+
+_FD_EXPERIMENTAL_WARNED = False
+
+
+def _resolve_statistics_gated(statistics: str) -> str:
+    """resolve_statistics + one-time experimental gate for non-Boltzmann modes.
+
+    P0-2: Fermi-Dirac transport/recombination thermodynamic consistency is
+    unvalidated (classical SRH/radiative/Auger closures are used regardless
+    of statistics mode), and Blakemore is documented-inaccurate (~60% at
+    eta=1). Both remain available but emit a single UserWarning per session
+    so they cannot be mistaken for validated production physics. The
+    validated scientific model is Boltzmann-only (paper §4, preliminary
+    section); resolve_statistics itself stays a pure mapper.
+    """
+    global _FD_EXPERIMENTAL_WARNED
+    mode = resolve_statistics(statistics)
+    if mode != "boltzmann" and not _FD_EXPERIMENTAL_WARNED:
+        import warnings
+
+        warnings.warn(
+            f"statistics={mode!r} is EXPERIMENTAL: Fermi-Dirac/Blakemore "
+            "transport-recombination thermodynamic consistency is not "
+            "validated (classical closures used regardless of mode). "
+            "Validated scope is Boltzmann-only.",
+            UserWarning,
+            stacklevel=3,
+        )
+        _FD_EXPERIMENTAL_WARNED = True
+    return mode
 
 
 import equinox as _eqx_vjp

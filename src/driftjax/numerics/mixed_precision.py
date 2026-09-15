@@ -23,6 +23,14 @@ an unconditioned speed/accuracy trade-off into a gated one.
 
 The FP32 dense core is used because it is vmappable and benefits from
 accelerator tensor cores; the same refinement wraps the batched sweep.
+
+Architecture note (item 10): enabling refinement disables the analytic
+block-Jacobian path in the Newton step (``use_analytic`` requires
+``not refinement``), so refinement currently runs on a dense Jacobian +
+dense FP32 core — it does NOT accelerate the structure-aware solver, it
+bypasses it. Structured (block/banded) FP32 factorization with FP64
+residual correction is future work; until then, treat refinement as a
+dense-backend accelerator with the COND_ROUGH/ROW_RATIO_SKIP gates above.
 """
 
 from __future__ import annotations
