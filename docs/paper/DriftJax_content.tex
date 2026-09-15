@@ -1096,7 +1096,17 @@ analytic blocks with no dense intermediate) cuts the wrapper to
 $50$--$74$~ms with identical accuracy, and unpreconditioned matrix-free
 GMRES stagnates (residual $\sim$0.6 despite reporting convergence),
 confirming that iteration without a structured preconditioner is not a
-backend. The previously reported $N\approx620$
+backend. End-to-end gradients confirm the wrapper accounting: hetero
+$N=100/200/400$ cost $1.11/1.30/2.23$~s dense vs $2.38/2.12/4.99$~s
+banded opt-in with bit-identical efficiencies, and $1.35$~s fused plus
+banded at $N=100$ (blocks-direct closes $\sim$60\% of the gap; packing,
+callback, equilibration, and checkpointing remain). Which scaling, if
+any, does the transpose need? On identical saved Jacobians, raw,
+row-equilibrated, column-scaled, and two-sided banded transposes agree
+to $10^{-13}$--$10^{-28}$ forward error on homo- and heterojunctions
+while column scaling degrades the backward residual $10^4\times$
+($10^{-9}$ vs $10^{-13}$): equilibration is overhead, not remedy, for
+$J^T$ here. The previously reported $N\approx620$
 crossover is therefore retracted as stated: it was a crossover of backend
 \emph{wrappers}, not of the algorithms. Extending the wrappers along $N$
 (homojunction $N=200/400$, heterojunction $N=200$), dense times grow
