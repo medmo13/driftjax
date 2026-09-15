@@ -708,6 +708,28 @@ path can drive below the absolute $10^{-6}$ audit remain
 orders on class ii) cannot rescue class iii in float64---a publishable
 limit of structured solvers, not a tuning gap.
 
+A dedicated $S_rJS_u$ diagnostic (\code{validation/scaling\_2x2.py},
+\code{docs/paper/records/scaling\_2x2.json}) tests whether diagonal
+rescaling is the fix the transpose needs, on $J$, $S_rJ$, $JS_u$,
+$S_rJS_u$ with $S_r=\mathrm{diag}(1/\mathrm{rowmax})$,
+$S_u=\mathrm{diag}(1/\mathrm{colmax})$, for primal and transpose with
+consistently transformed right-hand sides. Result: on nonsingular
+systems every arm is already accurate (forward errors $10^{-13}$ homo,
+$10^{-25}$--$10^{-28}$ hetero, all scalings, dense and banded), so
+scaling changes nothing about accuracy there---while $\kappa$ varies
+enormously (hetero: $1.8\times10^{17}\to1.9\times10^{4}$ under $S_r$,
+$4.2\times10^{7}$ under $S_u$). Naive one-shot two-sided scaling is
+\emph{worse} than row-only ($5.4\times10^{26}$ vs $1.9\times10^{4}$):
+independently composed $S_r$, $S_u$ fight, and proper two-sided
+equilibration requires iteration. On the rank-deficient perovskite
+($4.1\times10^{45}$) no scaling restores nonsingularity (best arm $S_rJ$
+at $8.2\times10^{32}$ still singular; dense throws on all four; banded
+garbage everywhere). Gate verdict: diagonal $S_rJS_u$ reformulation is
+rejected as the rescue---it collapses $\kappa$ without changing accuracy
+where systems are solvable, and cannot make singular systems solvable.
+The JAX-native solver spec therefore keeps its robust-pivot requirement;
+scaling is demoted from candidate fix to diagnostic.
+
 A causality study on identical saved Jacobians (homojunction
 and heterojunction, $N=100$, $V=0.5$~V) separates the roles of scaling
 and algorithm across row, column, and two-sided equilibration:

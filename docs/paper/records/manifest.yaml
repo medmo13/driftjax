@@ -10,6 +10,7 @@ records:
   bench_v017_dgbsv.json:        {script: benchmarks/run_benchmarks.py, covers: Newton/sweep/gradient timings N<=400}
   scaling_breakeven.json:       {script: validation/scaling_breakeven.py, covers: Newton N=50-1600, adjoint-vs-FD break-even P=2/4/8}
   solver_causality.json:        {script: validation/solver_causality.py, covers: 4-arm solver comparison + longdouble reference}
+  scaling_2x2.json:             {script: validation/scaling_2x2.py, covers: SrJSu gate verdict (J/SrJ/JSu/SrJSu x primal/transpose)}
   adjoint_transpose_bench.json: {script: validation/adjoint_transpose_bench.py, covers: dense vs equilibrated-banded transpose wall time + forward error vs longdouble}
   solver_phase_map.json:        {script: validation/solver_phase_map.py, covers: (N, kappa) backend-regime map from all records}
   solver_phase_map.png:         {script: validation/solver_phase_map.py, covers: regime map figure}
