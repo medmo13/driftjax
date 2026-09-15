@@ -12,19 +12,19 @@
    "ref_ok": true,
    "dense": {
     "ok": true,
-    "wall_s": 0.0019448370003374293,
+    "wall_s": 0.0017299429964623414,
     "backward": 1.783393408655699e-13,
     "forward_err": 5.335019034059054e-14
    },
    "banded_equil": {
     "ok": true,
-    "wall_s": 0.28685699500056216,
+    "wall_s": 0.18504638800368411,
     "backward": 2.295424555022756e-13,
     "forward_err": 2.1432076323987716e-14,
     "used_fallback": false
    },
-   "speedup_dense_over_banded": 0.006779813754702471,
-   "total_wall_s": 3.1
+   "speedup_dense_over_banded": 0.009348699075541532,
+   "total_wall_s": 2.0
   },
   "heterojunction_N100": {
    "label": "heterojunction_N100",
@@ -34,19 +34,19 @@
    "ref_ok": true,
    "dense": {
     "ok": true,
-    "wall_s": 0.0012987490044906735,
+    "wall_s": 0.0010490880013094284,
     "backward": 2.943503444793747e-13,
     "forward_err": 2.2175968361499546e-28
    },
    "banded_equil": {
     "ok": true,
-    "wall_s": 0.2948200770042604,
+    "wall_s": 0.19272148700110847,
     "backward": 3.542804483298038e-13,
     "forward_err": 2.3154713255107588e-27,
     "used_fallback": false
    },
-   "speedup_dense_over_banded": 0.004405225782747169,
-   "total_wall_s": 2.2
+   "speedup_dense_over_banded": 0.005443544555586551,
+   "total_wall_s": 1.4
   },
   "perovskite3_N15": {
    "label": "perovskite3_N15",
@@ -61,13 +61,60 @@
    },
    "banded_equil": {
     "ok": true,
-    "wall_s": 0.28710693700122647,
+    "wall_s": 0.17990683599782642,
     "backward": 1.0,
     "forward_err": null,
     "used_fallback": true
    },
    "speedup_dense_over_banded": null,
-   "total_wall_s": 2.8
+   "total_wall_s": 2.0
+  }
+ },
+ "scaling": {
+  "homojunction_N200": {
+   "n": 600,
+   "cond": 616638140391.0736,
+   "total_wall_s": 15.5,
+   "dense": {
+    "ok": true,
+    "wall_s": 0.008459368997137062
+   },
+   "banded_equil": {
+    "ok": true,
+    "wall_s": 0.2054510579982889,
+    "used_fallback": false
+   },
+   "speedup_dense_over_banded": 0.0411746188097387
+  },
+  "homojunction_N400": {
+   "n": 1200,
+   "cond": 616090701911.8203,
+   "total_wall_s": 23.2,
+   "dense": {
+    "ok": true,
+    "wall_s": 0.06533364899951266
+   },
+   "banded_equil": {
+    "ok": true,
+    "wall_s": 0.2544000820053043,
+    "used_fallback": false
+   },
+   "speedup_dense_over_banded": 0.25681457523331475
+  },
+  "heterojunction_N200": {
+   "n": 600,
+   "cond": 2285297652298.0454,
+   "total_wall_s": 1.9,
+   "dense": {
+    "ok": true,
+    "wall_s": 0.008076652004092466
+   },
+   "banded_equil": {
+    "ok": true,
+    "wall_s": 0.2053537459942163,
+    "used_fallback": false
+   },
+   "speedup_dense_over_banded": 0.03933043424647312
   }
  }
 }

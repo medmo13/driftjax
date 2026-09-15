@@ -39,9 +39,9 @@ RECORD = (
 )
 
 
-def _homo():
+def _homo(n_points=100):
     return dj.Device(
-        n_points=100,
+        n_points=n_points,
         layers=[
             (
                 1e-4,
@@ -184,6 +184,25 @@ def bench_case(Jn, g, label, reps=5):
     }
 
 
+def _device_at_bias_light(dev_fn, v, n_steps=6):
+    """Cheaper Jacobian extraction than solver_causality.device_at_bias
+    (n_steps=6 sweep instead of 11) for the N-scaling arm."""
+    import jax
+
+    from driftjax.numerics.residual import F_jacobian
+    from driftjax.science.contacts import boundary_bias
+
+    jax.config.update("jax_enable_x64", True)
+    dev = dev_fn()
+    sol = dj.simulate(dev, dj.Sweep(vmax=1.0, n_steps=n_steps))
+    vv = np.asarray(sol.voltages)
+    idx = int(np.argmin(np.abs(vv - v)))
+    J = np.asarray(
+        F_jacobian(sol.cell, boundary_bias(sol.cell, sol.voltages[idx]), sol.potentials[idx])
+    )
+    return J
+
+
 def main():
     import jax
 
@@ -217,6 +236,51 @@ def main():
             ),
             flush=True,
         )
+    # N-scaling arm: where does O(N^3) dense lose to the banded transpose?
+    # (lighter n_steps=6 extraction; accuracy already established above,
+    # here only wall times + fallback flags are recorded).
+    out["scaling"] = {}
+    for label, fn, v, _nn in (
+        ("homojunction_N200", lambda: _homo(n_points=200), 0.5, 200),
+        ("homojunction_N400", lambda: _homo(n_points=400), 0.5, 400),
+        ("heterojunction_N200", lambda: ex2_device(n_points=200), 0.5, 200),
+    ):
+        t0 = time.perf_counter()
+        Jn = _device_at_bias_light(fn, v)
+        gn = np.ones(Jn.shape[0])
+        td, dok = None, True
+        try:
+            for _ in range(4):
+                t1 = time.perf_counter()
+                np.linalg.solve(Jn.T, gn)
+                dt = time.perf_counter() - t1
+                td = dt if td is None else min(td, dt)
+        except Exception as e:
+            dok, derr = False, f"{type(e).__name__}"
+        tb, fb, bok = None, None, True
+        try:
+            for _ in range(4):
+                t1 = time.perf_counter()
+                lam_j, fbj = adjoint_banded_solve(jnp.asarray(Jn), jnp.asarray(gn), tol=1e-8)
+                dt = time.perf_counter() - t1
+                if tb is None or dt < tb:
+                    tb, fb = dt, bool(fbj)
+        except Exception as e:
+            bok, berr = False, f"{type(e).__name__}"
+        rec = {
+            "n": int(Jn.shape[0]),
+            "cond": float(np.linalg.cond(Jn)),
+            "total_wall_s": round(time.perf_counter() - t0, 1),
+            "dense": {"ok": dok, **({"wall_s": td} if dok else {"error": derr})},
+            "banded_equil": {
+                "ok": bok,
+                **({"wall_s": tb, "used_fallback": fb} if bok else {"error": berr}),
+            },
+        }
+        if dok and bok and tb and tb > 0:
+            rec["speedup_dense_over_banded"] = td / tb
+        out["scaling"][label] = rec
+        print(f"{label} cond={rec['cond']:.2e} dense={rec['dense']} banded={rec['banded_equil']}", flush=True)
     RECORD.write_text(json.dumps(out, indent=1, default=float))
     print(f"wrote {RECORD}")
 
