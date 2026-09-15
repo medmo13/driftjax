@@ -60,18 +60,14 @@ def _blocks_to_lapack_banded(A, B, C):
     rows_b = ku + _P[0] - _P[1] - 3
     cols_b = 3 * idx[None, :] + 3 + _P[1]
     mask_b = cols_b < N
-    ab = ab.at[(rows_b, cols_b)].set(
-        _jnp.where(mask_b, Bp.transpose(1, 2, 0).reshape(9, n), 0.0)
-    )
+    ab = ab.at[(rows_b, cols_b)].set(_jnp.where(mask_b, Bp.transpose(1, 2, 0).reshape(9, n), 0.0))
 
     # Sub-diagonal blocks C[i]: block row = i+1, block col = i (same pad).
     Cp = _jnp.concatenate([C, _Z], axis=0)
     rows_c = ku + _P[0] + 3 - _P[1]
     cols_c = 3 * idx[None, :] + _P[1]
     mask_c = (3 * idx[None, :] + 3 + _P[0]) < N
-    ab = ab.at[(rows_c, cols_c)].set(
-        _jnp.where(mask_c, Cp.transpose(1, 2, 0).reshape(9, n), 0.0)
-    )
+    ab = ab.at[(rows_c, cols_c)].set(_jnp.where(mask_c, Cp.transpose(1, 2, 0).reshape(9, n), 0.0))
 
     return ab, kl, ku
 
@@ -98,7 +94,15 @@ def banded_solve_with_info(A, B, C, b):
     True when the banded storage was non-finite and zeros were returned. Both
     are trace-safe boolean arrays so they can ride a ``lax.while_loop`` carry
     into Newton statistics (R2 provenance: which solver actually ran).
+
+    Opt-in native path (``DRIFTJAX_NATIVE_BANDED=1``): tries the JAX-native
+    Givens QR solver first (no host callback); on ``ok=False`` falls through
+    to the callback path below, preserving all flags and fallbacks. The env
+    var is read at trace time (static); the default path is bit-identical
+    to before.
     """
+    import os
+
     import jax
 
     n = A.shape[0]
@@ -145,6 +149,17 @@ def banded_solve_with_info(A, B, C, b):
     x = out[:-1].reshape(n, 3)
     flag = out[-1]
     info = {"used_lstsq": flag == 1, "used_zeros": (flag == 2) | has_nan}
+    if os.environ.get("DRIFTJAX_NATIVE_BANDED", "0") == "1":
+        from driftjax.numerics.banded_native import native_banded_solve as _nbs
+
+        x_nat, info_nat = _nbs(A, B, C, b)
+        use_native = jnp.asarray(info_nat["ok"]) & (~has_nan)
+        x = jax.tree.map(lambda xn, xc: jnp.where(use_native, xn, xc), x_nat, x)
+        info = {
+            "used_lstsq": jnp.where(use_native, False, info["used_lstsq"]),
+            "used_zeros": jnp.where(use_native, False, info["used_zeros"]),
+            "used_native": use_native,
+        }
     return x, info
 
 
@@ -386,6 +401,12 @@ def adjoint_banded_solve(J, g, tol=1e-8):
     has_nan = ~jnp.all(jnp.isfinite(banded_t))
     y = jax.lax.cond(has_nan, _zeros, _do_solve, None)
     lam = (Dr * y).reshape(g.shape)
+    # NOTE (measured): the JAX-native transpose was tried here
+    # (native_banded_transpose on the Je blocks) but reverted: under the
+    # vmapped + checkpointed backward the scan loop costs ~440 ms flat
+    # (vs ~10 ms jitted standalone) — an XLA CPU batching cliff independent
+    # of scatter style. The native solver stays available for serial/jit
+    # use (forward path) and as a benchmark reference; see the paper note.
     resid = jnp.linalg.norm(J.T @ lam.reshape(-1) + (-g.reshape(-1))) / (
         jnp.linalg.norm(g_flat) + 1e-30
     )

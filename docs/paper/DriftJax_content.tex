@@ -1161,6 +1161,25 @@ while both banded paths report status FAILED with \code{used\_fallback}
 set---fallback zeros are recorded as a failure marker, never as a
 solution, bounding the structured transpose to nonsingular systems.
 
+A JAX-native structured solver was built and measured against this
+decomposition (\code{src/driftjax/numerics/banded\_native.py},
+\code{tests/unit/test\_banded\_native.py}): Givens QR in \code{lax}
+scan primitives, no host callbacks, matching dense LU to $10^{-13}$ on
+heterojunction Jacobians with explicit singular flagging. Standalone
+jitted kernel time is $9$--$15$~ms at $N=100$ (vs $50$--$70$~ms wrapper,
+$0.1$~ms raw LAPACK), and the forward Newton path runs correctly
+end-to-end under the \code{DRIFTJAX\_NATIVE\_BANDED} opt-in with
+fallback provenance preserved. But under the vmapped plus checkpointed
+backward the same scan costs $\sim$440~ms flat regardless of size
+($222\times$ for $2\times$ work at $N=30$), independent of scatter
+style---an XLA CPU batching cliff for loop-carried dynamic updates, not
+a numerics failure. End-to-end native gradients therefore cost $\sim$25~s
+vs $1.1$~s dense. The native solver is kept as a proven serial/jit
+backend and benchmark reference; eliminating dense from the backward
+additionally requires either a vmap-safe scan formulation or the
+compiled-kernel (FFI) route, both recorded as future work with these
+numbers as the acceptance baseline.
+
 \section{Conclusions}\label{sec:conclusions}
 This article addresses three questions about a block-structured
 drift--diffusion--Poisson solver: correctness, performance, and
