@@ -1,0 +1,47 @@
+Dear Editor,
+
+We submit the manuscript "DriftJax: Structure-aware differentiable device
+simulation" with the accompanying software (v0.1.17-post2, MIT licence,
+archived on Zenodo under concept DOI 10.5281/zenodo.22762674) for
+consideration as a Computer Physics Communications Program Library article.
+
+What the paper contributes. DriftJax is a one-dimensional
+drift-diffusion-Poisson simulator in JAX that supplies reverse-mode
+sensitivities of scalar design objectives through an implicit-function
+adjoint (custom VJP). The implementation combines an analytically
+assembled 3x3 block-tridiagonal Jacobian with a pivoted banded forward
+solve (LAPACK dgbsv) and a pivoted dense-LU adjoint, plus a layered
+verification harness (analytic-vs-AD Jacobians, conservation identities,
+manufactured solutions, finite-difference Taylor studies, cross-code
+comparison). Example applications cover sensitivity ranking, bounded
+band-gap/thickness optimisation, and synthetic IV-curve recovery.
+
+Relationship to prior work. The model-to-gradient workflow builds
+directly on Mann et al.'s partial-PV; the manuscript distinguishes
+shared methodology (implicit differentiation, analytical derivatives)
+from its own implementation choices (pivoted banded forward algebra,
+documented backward stability strategy, verification record) and
+withdraws unmatched historical timing claims in favour of controlled
+single-architecture benchmarks.
+
+Reproducibility. The repository pins exact dependencies
+(requirements-pinned.txt), archives per-example JSON sidecars,
+execution logs and figures (docs/paper/records/), the raw full-suite
+test log (237 passed, 1 xfailed; tests/v017_test_log.txt), and the
+machine-readable benchmark record. No measured-device validation is
+claimed; physical validation against experiment is stated as future work.
+
+Authorship and conflicts. Authors: Mohammed Benaissa (first and
+corresponding author), Mohamed Maoudj, Abd Elouahab Noua (CRTSE,
+Algiers). The authors declare no competing interests. The work is
+original and not under consideration elsewhere.
+
+We suggest handling as a program-library submission with referees
+spanning semiconductor device modelling and scientific computing /
+automatic differentiation. The CPC catalogue identifier, assigned on
+acceptance, will be added to the published record.
+
+Yours sincerely,
+Mohammed Benaissa (corresponding author)
+Research Center in Semiconductor Technology for Energetics (CRTSE),
+Algiers, Algeria

@@ -786,9 +786,14 @@ carry the smoke marker for the sub-60\,s dev loop) and 32 slow
 regression gates deselected by default. Earlier documents reported
 subsets of these scopes (31 fast-core, 204 non-slow); the numbers above
 were machine-counted on the v0.1.16 release commit. The v0.1.17 revision
-adds \code{tests/unit/test\_banded\_solve.py} (4 tests: dense agreement,
-residual, LAPACK layout, JVP loud-failure pin), bringing the
-machine-counted total to 240. The
+adds \code{tests/unit/test\_banded\_solve.py} (dense agreement,
+residual, LAPACK layout, transpose agreement, JVP loud-failure pin),
+while the Block-Thomas removal deletes \code{tests/unit/test\_block\_thomas.py}
+(2 tests) and the obsolete \code{\_inv3} guard test (1 test); the
+heterojunction builder-gradient pin adds
+\code{tests/gradient/test\_hetero\_builder\_grad.py} (cached-design
+inertness, nonzero builder-threaded gradient with FD sign/magnitude
+agreement), bringing the machine-counted total to 240. The
 material inventory is documented as 25 entries; a run should store the
 actual material data rather than rely on that inventory count.
 The gallery contains 15 research scripts, 4 tutorials, and 2 developer
