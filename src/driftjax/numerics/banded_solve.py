@@ -132,6 +132,75 @@ def banded_transpose(A, B, C, g):
     return banded_solve(At, Ct, Bt, g.reshape(A.shape[0], 3)).reshape(-1)
 
 
+def _row_equilibrate(J):
+    """Row equilibration: (Je, Dr) with Je = Dr @ J, Dr = diag(1/rowmax)."""
+    s = jnp.max(jnp.abs(J), axis=1)
+    s = jnp.where(jnp.isfinite(s) & (s > 0), s, jnp.asarray(1.0, dtype=s.dtype))
+    Dr = 1.0 / s
+    return Dr[:, None] * J, Dr
+
+
+def adjoint_banded_solve(J, g, tol=1e-8):
+    """Solve J^T·lam = g via equilibrated pivoted banded transpose.
+
+    Row equilibration tames the SRV-contact row-scaling imbalance before
+    the banded transpose solve; the solution is unscaled (lam = Dr @ y)
+    and checked against the ORIGINAL system. Returns (lam, used_fallback):
+    used_fallback is True when the residual exceeds tol or is non-finite,
+    in which case lam is zeros and the caller must route to dense LU.
+
+    Caution (v0.1.12 lesson): a residual gate cannot certify adjoint
+    accuracy under severe ill-conditioning (kappa amplifies small
+    residuals into large solution errors). This path is opt-in
+    (DRIFTJAX_BANDED_ADJOINT=1); dense LU remains the default.
+    """
+    import jax
+
+    from scipy.linalg import solve_banded as _sb
+
+    Je, Dr = _row_equilibrate(J)
+    A, B, C = extract_blocks(Je)
+    banded, kl, ku = _blocks_to_lapack_banded(A, B, C)
+    # Transposed-band storage of the equilibrated blocks = band storage
+    # of (Je^T); solve Je^T y = g then unscale lam = Dr y.
+    At = jnp.transpose(A, (0, 2, 1))
+    Ct = jnp.transpose(C, (0, 2, 1))
+    Bt = jnp.transpose(B, (0, 2, 1))
+    banded_t, _, _ = _blocks_to_lapack_banded(At, Ct, Bt)
+    g_flat = g.reshape(-1)
+
+    def _solve(ab_flat, b_in):
+        import numpy as _np
+
+        ab_np = ab_flat.reshape(kl + ku + 1, -1)
+        try:
+            x_np = _sb((kl, ku), ab_np, b_in)
+        except Exception:
+            x_np = _np.zeros_like(b_in)
+        return x_np.astype(ab_flat.dtype)
+
+    def _do_solve(_):
+        return jax.pure_callback(
+            _solve,
+            jax.ShapeDtypeStruct(g_flat.shape, g_flat.dtype),
+            banded_t.reshape(-1),
+            g_flat,
+            vmap_method="sequential",
+        )
+
+    def _zeros(_):
+        return jnp.zeros_like(g_flat)
+
+    has_nan = ~jnp.all(jnp.isfinite(banded_t))
+    y = jax.lax.cond(has_nan, _zeros, _do_solve, None)
+    lam = (Dr * y).reshape(g.shape)
+    resid = jnp.linalg.norm(J.T @ lam.reshape(-1) + (-g.reshape(-1))) / (
+        jnp.linalg.norm(g_flat) + 1e-30
+    )
+    fallback = has_nan | (~jnp.isfinite(resid)) | (resid > tol)
+    return jnp.where(fallback, jnp.zeros_like(lam), lam), fallback
+
+
 def banded_solve_batched(A, B, C, b):
     """Batched pivoted banded solve: (N, B, 3, 3) blocks, (N, B, 3) rhs.
 

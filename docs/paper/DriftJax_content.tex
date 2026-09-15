@@ -488,7 +488,9 @@ reruns. FD denotes central finite differences.}
 \toprule
 Quantity & Reported outcome & Scope \\
 \midrule
-Analytical versus AD Jacobian & Order $10^{-12}$ discrepancy & Same
+Analytical versus AD Jacobian & Order $10^{-12}$ discrepancy (historical
+record; superseded by the controlled saved-matrix comparison of
+Section~\ref{sec:conditioning}, $<5\times10^{-17}$) & Same
 residual and state ordering; norm and scaling must be recorded \\
 Banded linear solve & Relative residual $<10^{-14}$ & Backward-error
 check, not a uniform forward-error bound \\
@@ -674,7 +676,7 @@ state mismatch, contraction cancellation) are listed as open.
 Five systematic mesh refinements ($N=62$, 125, 250, 500, 1000) on a
 homojunction device demonstrate monotonic convergence. The efficiency
 error relative to $N=500$ decreases from $1.6\times10^{-3}$ at $N=62$
-to $1.0\times10^{-4}$ at $N=1000$, a $15\times$ improvement. The
+to $1.0\times10^{-4}$ at $N=1000$, a $16\times$ improvement. The
 observed convergence order is approximately 1.8 between $N=250$ and
 $N=500$ and approximately 1.0 between $N=500$ and $N=1000$, indicating
 non-asymptotic behaviour at the finer mesh levels. The fill factor is
@@ -701,8 +703,10 @@ physical device. Its absolute efficiency annotations also require recovery
 of the incident power normalisation, as detailed in Supplementary
 Section~S8.
 
-\paperfigure{research_01_device_iv.png}{Homojunction refinement example:
-current--voltage curves, comparison with a reference slope, dark-equilibrium
+\paperfigure{research_01_device_iv.png}{Homojunction refinement example
+at five meshes ($N=62$--$1000$):
+current--voltage curves, observed convergence with a reference slope
+(not a claimed rate), dark-equilibrium
 bands, and carrier densities. Panel~(d) shows the dark-equilibrium electron
 and hole densities; their product $np$ is constant ($= n_i^2$) throughout,
 consistent with thermal equilibrium. A separate zero-illumination solve is
@@ -981,6 +985,19 @@ solvers, controlled performance measurements, and inverse problems with
 noise and multiple observables. These extensions address the present
 backward scaling and identifiability limitations more directly than
 unqualified claims of end-to-end linear complexity.
+
+The equilibrated structured adjoint was implemented and tested, not
+merely deferred: row-equilibrated pivoted banded transpose
+(\code{adjoint\_banded\_solve}) with a residual gate to dense LU,
+opt-in via \code{DRIFTJAX\_BANDED\_ADJOINT=1}. On a heterojunction
+device it reproduces dense-LU gradients to all reported digits, and
+19/19 gradient and analytic-adjoint tests pass with the flag engaged.
+It is not faster at tested sizes (warm 2.1--6.8~s vs dense 1.8~s at
+$N=100$--$400$): host-callback round trips plus $O(N^2)$ equilibration
+overhead exceed dense LU below the crossover, which lies beyond the
+tested range. Dense LU therefore remains the default; the banded
+adjoint is available for larger systems where the $O(N^3)$--$O(N)$
+gap may dominate.
 
 \section{Conclusions}\label{sec:conclusions}
 This article addresses three questions about a block-structured

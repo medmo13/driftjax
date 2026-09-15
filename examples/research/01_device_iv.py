@@ -2,8 +2,8 @@
 
 Question: how much spatial resolution is needed before the reported IV metrics
 stop changing materially? The result is a convergence study, not just a plot:
-the panel shows IV curves at three meshes plus the relative efficiency error
-against the finest grid, demonstrating second-order spatial accuracy.
+the panel shows IV curves at five meshes plus the relative efficiency error
+against the finest grid; the observed order is non-asymptotic (see manuscript).
 """
 
 import driftjax as dj
@@ -31,7 +31,7 @@ from examples.support import (
 
 def main():
     example_args("01_device_iv")
-    resolutions = (125, 250, 500)
+    resolutions = (62, 125, 250, 500, 1000)
     results = []
     solutions = []
     for points in resolutions:
@@ -70,7 +70,7 @@ def main():
     )
     axes[0].legend(frameon=False, loc="upper right", fontsize=8, handlelength=1.2)
     axes[0].grid(alpha=0.18, linestyle="--")
-    axes[0].set_title("deltapv ex1 benchmark: $J$--$V$ (mesh convergence)", fontsize=9, pad=8)
+    axes[0].set_title("Homojunction $J$--$V$ (mesh convergence)", fontsize=9, pad=8)
     iv_knee_inset(axes[0], solutions[-1])
     # Finest mesh is the reference (error exactly 0): exclude it from the
     # log panel rather than flooring it to a misleading 1e-16 dot.
@@ -89,8 +89,9 @@ def main():
     )
     axes[1].set(xlabel="number of grid points", ylabel="relative efficiency error")
     axes[1].grid(which="both", alpha=0.18, linestyle="--")
-    axes[1].set_title("Second-order spatial convergence", fontsize=9, pad=8)
-    # Reference slope segment: demonstrates (not just asserts) the N^-2 rate.
+    axes[1].set_title("Observed mesh convergence (reference slope shown)", fontsize=9, pad=8)
+    # Reference slope segment: illustrative N^-2 guide only; the observed
+    # coupled-solver order is non-asymptotic (see manuscript Section 4.4).
     if len(resolutions) >= 2:
         err = max(results[0]["relative_efficiency_error"], 1e-16)
         slope_guide(axes[1], resolutions[0], err, decades=2.0, slope=-2.0, color=style.GRAY)

@@ -88,6 +88,11 @@ def _adjoint_solve(cell, bound, pot, g_x):
     vmap-compatible (the old path raised ``TracerBoolConversionError``
     under jit and was non-batchable).
 
+    Opt-in structured path: with ``DRIFTJAX_BANDED_ADJOINT=1``, the solve
+    is first attempted via row-equilibrated pivoted banded transpose
+    (:func:`adjoint_banded_solve`); a residual gate routes failures to
+    dense LU. Default (unset) is dense LU.
+
     Numerical note: for some multi-layer stacks the state Jacobian becomes
     *numerically singular* near open circuit (condition number ~1e14,
     smallest singular value at round-off); there the forward Newton solve
@@ -100,7 +105,23 @@ def _adjoint_solve(cell, bound, pot, g_x):
     from driftjax.numerics.mixed_precision import adjoint_dense_solve as _ads3
 
     J = F_jacobian(cell, bound, pot)
+    if _banded_adjoint_enabled():
+        from driftjax.numerics.banded_solve import adjoint_banded_solve as _abs3
+
+        lam_b, fb = _abs3(J, g_x)
+        return jax.lax.cond(fb, lambda _: _ads3(J.T, g_x), lambda _: lam_b, None)
     return _ads3(J.T, g_x)
+
+
+def _banded_adjoint_enabled() -> bool:
+    """Whether the adjoint may attempt the equilibrated banded transpose.
+
+    Opt-in via ``DRIFTJAX_BANDED_ADJOINT=1`` (default off); evaluated at
+    trace time from static context, so only the taken path compiles.
+    """
+    import os
+
+    return os.environ.get("DRIFTJAX_BANDED_ADJOINT", "0") == "1"
 
 
 def _iter_cb_for(progress, phase):
@@ -637,14 +658,26 @@ def _sweep_bwd(solver, optics, protocol, progress, ls, statistics, init, fused, 
 
             g_x = _agx(cell, pot)
             J = _dfb(*_bj(cell, bound, pot))
-            lam = _ads(J.T, g_x)
+            if _banded_adjoint_enabled():
+                from driftjax.numerics.banded_solve import adjoint_banded_solve as _abs
+
+                lam_b, fb = _abs(J, g_x)
+                lam = jax.lax.cond(fb, lambda _: _ads(J.T, g_x), lambda _: lam_b, None)
+            else:
+                lam = _ads(J.T, g_x)
             return _apb(cell_of_d, pot, vb, lam, gcb)
         # g_x = d current_b / d x  at the fixed forward cell
         g_x = jax.grad(lambda x: total_current(cell, vec2pot(x)))(potv)
         from driftjax.numerics.mixed_precision import adjoint_dense_solve as _ads2
 
         J = F_jacobian(cell, bound, pot)
-        lam = _ads2(J.T, g_x)
+        if _banded_adjoint_enabled():
+            from driftjax.numerics.banded_solve import adjoint_banded_solve as _abs2
+
+            lam_b, fb = _abs2(J, g_x)
+            lam = jax.lax.cond(fb, lambda _: _ads2(J.T, g_x), lambda _: lam_b, None)
+        else:
+            lam = _ads2(J.T, g_x)
         # direct channel:  d current_b / d(cell leaves), pot fixed
         u_cell = jax.grad(lambda c: total_current(c, pot))(cell_of_d)
         # implicit channel:  (dF_b/d(cell leaves))^T lam

@@ -6,13 +6,14 @@ so linear-mobility and log-lifetime coordinates are comparable), (b) 256
 Sobol samples, (c) 200 bootstrap resamples for rank confidence, (d) Spearman
 rank correlation vs the published 32-sample ordering.
 
-Writes JSON to docs/paper/records/dgsm_extended.json.
+Writes JSON to docs/paper/records/dgsm_extended_N{N}.json.
 """
 # ruff: noqa: E402 -- sys.path bootstrap precedes package imports
 
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -43,7 +44,7 @@ BASE = dict(
     tn=1e-8,
     tp=1e-8,
 )
-NPOINTS, NSTEPS, N, NBOOT = 500, 15, 256, 200
+NPOINTS, NSTEPS, NBOOT = 500, 15, 200
 
 mat0 = dj.material(**BASE)
 
@@ -68,6 +69,7 @@ def main():
     jax.config.update("jax_enable_x64", True)
     from scipy.stats.qmc import Sobol
 
+    N = int(os.environ.get("DGSM_N", "256"))
     grad_z = jax.jacobian(eff_of_z)
     sob = Sobol(d=4, seed=12345)
     Z = 2.0 * sob.random_base2(m=int(np.log2(N))) - 1.0
@@ -106,7 +108,8 @@ def main():
     }
     print(json.dumps({k: v for k, v in out.items() if k != "dgsm"}, indent=1), flush=True)
     dest = (
-        Path(__file__).resolve().parent.parent / "docs" / "paper" / "records" / "dgsm_extended.json"
+        Path(__file__).resolve().parent.parent
+        / "docs" / "paper" / "records" / f"dgsm_extended_N{N}.json"
     )
     dest.write_text(json.dumps(out, indent=1))
     print(f"wrote {dest}", flush=True)

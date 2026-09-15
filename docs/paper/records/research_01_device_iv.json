@@ -2,7 +2,7 @@
   "figure": "research_01_device_iv.png",
   "metadata": {
     "backend": "cpu",
-    "driftjax": "0.1.16",
+    "driftjax": "0.1.17",
     "jax": "0.10.2",
     "platform": "Linux-6.8.0-138-generic-x86_64-with-glibc2.35",
     "python": "3.13.13",
@@ -10,14 +10,24 @@
   },
   "results": [
     {
+      "efficiency_fraction": 0.204001756178184,
+      "ff": 0.8713788397813861,
+      "jsc_A_per_cm2": 0.01985711030235543,
+      "n_points": 62,
+      "pmax_dimensionless": 6.480429943589624e-07,
+      "relative_efficiency_error": 0.018786095538291955,
+      "voc_V": 1.0609946728013908,
+      "wall_s": 6.918752917001257
+    },
+    {
       "efficiency_fraction": 0.2023179268441331,
       "ff": 0.8585712633891935,
       "jsc_A_per_cm2": 0.020112142926546915,
       "n_points": 125,
       "pmax_dimensionless": 6.426940511730286e-07,
-      "relative_efficiency_error": 0.011581605427719119,
+      "relative_efficiency_error": 0.01037704090597695,
       "voc_V": 1.0543918151087026,
-      "wall_s": 13.1228461970004
+      "wall_s": 5.838963194997632
     },
     {
       "efficiency_fraction": 0.20000860316964686,
@@ -25,9 +35,9 @@
       "jsc_A_per_cm2": 0.020196934820685932,
       "n_points": 250,
       "pmax_dimensionless": 6.353581288898354e-07,
-      "relative_efficiency_error": 3.507869858375088e-05,
+      "relative_efficiency_error": 0.001155736525649807,
       "voc_V": 1.0509517339292884,
-      "wall_s": 11.719418949999636
+      "wall_s": 5.9577477740022005
     },
     {
       "efficiency_fraction": 0.2000015873742471,
@@ -35,9 +45,19 @@
       "jsc_A_per_cm2": 0.020254954672680583,
       "n_points": 500,
       "pmax_dimensionless": 6.353358421353296e-07,
-      "relative_efficiency_error": 0.0,
+      "relative_efficiency_error": 0.0011907734534505026,
       "voc_V": 1.0504194517815735,
-      "wall_s": 7.845129729000291
+      "wall_s": 6.15993352499936
+    },
+    {
+      "efficiency_fraction": 0.20024002788376927,
+      "ff": 0.8457725950907206,
+      "jsc_A_per_cm2": 0.020284215667612317,
+      "n_points": 1000,
+      "pmax_dimensionless": 6.360932851331843e-07,
+      "relative_efficiency_error": 0.0,
+      "voc_V": 1.0503678581676545,
+      "wall_s": 6.329112931001873
     }
   ]
 }
