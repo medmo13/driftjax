@@ -227,6 +227,12 @@ the Boltzmann limit applies for reduced Fermi energies well below
 zero~\cite{blakemore1982}.
 Consistency of a non-Boltzmann density closure with transport and
 recombination remains a model-specific requirement~\cite{farrell2021}.
+The blended quadrature/Sommerfeld evaluator's derivative initially
+omitted the blend-weight term $w'(S-Q)$, biasing $dF/d\eta$ by
+$\sim$2.5$\times10^{-4}$ relative at the $\eta\approx10$ transition;
+the corrected exact derivative of the implemented blend agrees with
+central differences to $7\times10^{-6}$ over $\eta\in[-20,50]$
+(\code{tests/unit/test\_statistics.py}).
 
 Recombination combines Shockley--Read--Hall~\cite{shockleyread1952,hall1952},
 radiative, and Auger terms~\cite{gaury2019}.
@@ -726,6 +732,25 @@ path can drive below the absolute $10^{-6}$ audit remain
 \code{converged=False} with a loud warning. Row-equilibration ($\sim$6
 orders on class ii) cannot rescue class iii in float64---a publishable
 limit of structured solvers, not a tuning gap.
+
+Failure-semantics contract (all machine-checked): every sweep carries
+\code{converged}, \code{max\_residual}, per-bias residuals, and per-bias
+\code{fallback\_used} flags (True = truncated-SVD step taken on that
+bias; None = unverified under tracing). A zeros/nonfinite linear result
+can never satisfy the step-norm gate directly: a zero step yields
+relative linear residual exactly $1.0$, which always trips the dense
+retry ($1.0>10^{-4}$), so the dense fallback engages, and joint dense
+failure surfaces as NaN handled by best-iterate logic (pinned by
+\code{test\_failed\_linear\_solve\_never\_certifies}). Non-Boltzmann
+statistics emit a once-per-session experimental warning at cell build
+(classical closures regardless of mode; validated scope is Boltzmann).
+Gradients carry the authoritative tri-state \code{gradient\_status}:
+CERTIFIED (converged, no fallback), UNRELIABLE (unconverged or fallback
+used), UNVERIFIED (audit impossible under tracing)---\code{converged=True}
+plus UNVERIFIED means ``not audited,'' never ``verified.'' The backward
+pass additionally recomputes max$|F|$ from its own residuals and warns
+at runtime above the audit threshold, so no normal-looking gradient is
+returned silently on an uncertified primal.
 
 A dedicated $S_rJS_u$ diagnostic (\code{validation/scaling\_2x2.py},
 \code{docs/paper/records/scaling\_2x2.json}) tests whether diagonal

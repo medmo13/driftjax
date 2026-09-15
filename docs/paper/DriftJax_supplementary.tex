@@ -122,7 +122,12 @@ F_{1/2}(\eta)\sim e^\eta\quad(\eta\to-\infty).
 There is no second normalisation factor in the density formula.
 The documented numerical implementation uses quadrature and an
 asymptotic branch; its value and derivative should be checked over the
-actual degeneracy range, including the branch transition.
+actual degeneracy range, including the branch transition. A smooth blend
+$F=(1-w)Q+wS$ was found to differentiate incorrectly in an earlier
+revision (missing $w'(S-Q)$ term, $\sim$2.5$\times10^{-4}$ relative error
+at $\eta\approx10$); the corrected exact derivative of the implemented
+blend agrees with central differences to $7\times10^{-6}$ over
+$\eta\in[-20,50]$, densely sampled around the transition.
 
 For Boltzmann statistics, the derivatives at fixed material parameters
 are especially simple:
@@ -362,6 +367,29 @@ following the general iterative-refinement construction~\cite{carson2018}:
 The documented dense path is GPU-gated, with a configurable override and
 float64 fallback. Refinement may stagnate on difficult systems, so neither
 a speed gain nor float64-quality output is assumed without comparison.
+
+\subsection{Backend regimes and failure semantics}
+The $(N,\kappa)$ regime map (\code{docs/paper/records/solver\_phase\_map.json},
+Fig.~\ref{suppfig:phasemap}) compiles dense vs structured transpose
+outcomes across all benchmark records. Regimes: dense-optimal (both OK,
+dense faster as measured, not assumed), structured-competitive,
+structured-kernel-wins (raw \code{dgbsv} kernel only), dense-only
+(banded FAILED, dense OK), and uncertifiable (neither backend produces a
+certified solution, e.g.\ the rank-deficient 3-layer perovskite transpose
+at $\kappa\sim4\times10^{45}$ where dense raises singular-matrix and the
+banded path flags fallback). Fallback zeros are recorded with explicit
+FAILED status, never as a solution vector.
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.9\linewidth]{solver_phase_map.png}
+\caption{Adjoint solver regimes in $(N,\kappa)$ space from measured
+outcomes across all records. No point yet lands in structured-optimal on
+wall time: the raw kernel wins everywhere measured ($0.1$~ms vs
+$2$~ms dense at $N=100$, widening with $N$), but wrapper overhead
+(packing, host callback, equilibration, residual check) dominates the
+structured path end to end.}
+\label{suppfig:phasemap}
+\end{figure}
 
 \section{Implicit derivatives and objective functions}\label{supp:adjoint}
 \subsection{Single-state and multi-bias derivatives}
