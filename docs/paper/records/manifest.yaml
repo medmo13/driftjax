@@ -3,7 +3,7 @@
 # environment. Reproduce with: JAX_ENABLE_X64=1 PYTHONPATH=src:. MPLBACKEND=Agg
 #   python <script> --output-dir docs/paper/records  (examples)
 #   python validation/<script>                      (validation studies)
-commit: 56209c9  # + fallback provenance (aa6c1f8) + Tier B core: transpose bench, gradient_status, envelope docs
+commit: 0d81bf3  # + overhead surgery (79d3c09) + audit fixes (12126c2) + first-principles verdict (0d81bf3)
 environment: {python: 3.13.13, jax: 0.10.2, scipy: 1.18.0, numpy: 2.4.6,
   platform: Linux-6.8.0-138-generic-x86_64, dtype: float64, x64: true}
 records:
