@@ -38,8 +38,19 @@ def main():
     import jax
 
     jax.config.update("jax_enable_x64", True)
+    import os
+
     out = {}
-    for n in (500, 1000, 2000):
+    ns = (500, 1000, 2000) if not os.environ.get("N4000_ONLY") else (4000,)
+    if os.environ.get("N4000_ONLY"):
+        prev = json.load(
+            open(
+                Path(__file__).resolve().parent.parent
+                / "docs" / "paper" / "records" / "mesh_extended.json"
+            )
+        )
+        out.update(prev)
+    for n in ns:
         out[str(n)] = run(n)
         print(n, {k: round(v, 6) for k, v in out[str(n)].items()}, flush=True)
     # Richardson extrapolation for PCE assuming order p from the two

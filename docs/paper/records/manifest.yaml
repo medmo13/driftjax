@@ -1,0 +1,33 @@
+# Benchmark/evidence manifest — DriftJax v0.1.17+ (unreleased round-3/4 fixes).
+# Every record below was produced by the script shown, on the stated
+# environment. Reproduce with: JAX_ENABLE_X64=1 PYTHONPATH=src:. MPLBACKEND=Agg
+#   python <script> --output-dir docs/paper/records  (examples)
+#   python validation/<script>                      (validation studies)
+commit: b4c33dc  # base release tag v0.1.17-post2; plus unreleased fixes, see git log
+environment: {python: 3.13.13, jax: 0.10.2, scipy: 1.18.0, numpy: 2.4.6,
+  platform: Linux-6.8.0-138-generic-x86_64, dtype: float64, x64: true}
+records:
+  bench_v017_dgbsv.json:        {script: benchmarks/run_benchmarks.py, covers: Newton/sweep/gradient timings N<=400}
+  scaling_breakeven.json:       {script: validation/scaling_breakeven.py, covers: Newton N=50-1600, adjoint-vs-FD break-even P=2/4/8}
+  solver_causality.json:        {script: validation/solver_causality.py, covers: 4-arm solver comparison + longdouble reference}
+  gradient_evidence_hetero.json:{script: validation/gradient_evidence_hetero.py, covers: 3-dir x 2-mesh Taylor study}
+  pointwise_crosscode.json:     {script: validation/pointwise_crosscode.py, covers: Linf/L2 vs bundled dPV curves}
+  mesh_extended.json:           {script: validation/mesh_extended.py, covers: homo PCE N=500/1000/2000 + Richardson}
+  dgsm_extended.json:          {script: validation/dgsm_extended.py (DGSM_N=256), covers: standardized DGSM + bootstrap}
+  dgsm_extended_N512.json:     {script: validation/dgsm_extended.py (DGSM_N=512), covers: standardized DGSM + bootstrap}
+  inverse_noise.json:          {script: validation/inverse_noise.py, covers: 8x 5%-noise refits}
+  research_01_device_iv.json:  {script: examples/research/01_device_iv.py, covers: 5-level mesh convergence}
+  research_02_heterojunction_physics.json: {script: examples/research/02_heterojunction_physics.py}
+  research_03_optical_model_comparison.json:{script: examples/research/03_optical_model_comparison.py}
+  research_04_temperature_recombination.json:{script: examples/research/04_temperature_recombination.py}
+  research_06_constrained_inverse_design.json:{script: examples/research/06_constrained_inverse_design.py}
+  research_07_tandem_current_matching.json:  {script: examples/research/07_tandem_current_matching.py}
+  research_08_statistics_regime_map.json:    {script: examples/research/08_statistics_regime_map.py}
+  research_09_srv_contacts.json:             {script: examples/research/09_srv_contacts.py}
+  research_10_generation_profile.json:       {script: examples/research/10_generation_profile.py}
+  research_11_transient_small_signal.json:   {script: examples/research/11_transient_small_signal.py}
+  research_12_material_thickness_design_map.json:{script: examples/research/12_material_thickness_design_map.py}
+  research_13_target_iv_structure.json:      {script: examples/research/13_target_iv_structure.py}
+  research_14_dgsm_global.json:              {script: examples/research/14_dgsm_global.py}
+  research_15_deltapv_crosscode.json:        {script: examples/research/15_deltapv_crosscode.py}
+  research_16_graded_doping.json:            {script: examples/research/16_graded_doping.py}

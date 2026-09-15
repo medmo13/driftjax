@@ -99,7 +99,12 @@ Table~\ref{tab:deltapv-comparison} distinguishes shared methodology from
 implementation choices. The reference-code observations concern the
 public \code{master} branch of \code{romanodev/deltapv}, inspected on
 14 September 2026~\cite{deltapvsource}; they do not identify the revision
-used for the archived timing measurements. DriftJax entries describe the
+used for the archived timing measurements. The numerical reference
+curves themselves are frozen blobs
+(\code{examples/resources/deltapv\_\{ex1,ex2\}\_iv.npz}, versioned in
+this repository), so the curve comparison is reproducible independently
+of the moving source branch; only the source-code observations are
+date-bound. DriftJax entries describe the
 supplied release documentation, not an independently inspected source tree.
 
 \begin{papertable}
@@ -539,7 +544,12 @@ $2\times10^{-10}$--$4\times10^{-8}$ at $h=10^{-4}$--$10^{-3}$, and
 directional Taylor remainders $|f(x{+}h)-f(x)-hg_{\mathrm{adj}}|/
 |hg_{\mathrm{adj}}|$ decreasing linearly with $h$ (e.g.\ $10^{-2}$ at
 $h=10^{-1}$ to $10^{-5}$--$10^{-6}$ at $h=10^{-5}$) before the Newton
-rounding floor at $h\leq10^{-6}$. Adjoint gradients are mesh-stable
+rounding floor at $h\leq10^{-6}$. The normalisation divides by $|hg|$,
+so this linear decay is exactly the expected quadratic decay
+$R(h)=O(h^2)$ of the unscaled remainder: log--log fits of $R(h)$
+give slopes $p=1.98$--$2.09$ in five of six cases (the sixth,
+thickness direction at $N=500$, gives $p=1.58$, an open deviation
+possibly from mesh-mapping nonlinearity, reported as observed). Adjoint gradients are mesh-stable
 across $N=200$ and $N=500$ to $1$--$4\%$ in all three directions. An
 earlier single-point study on the same device reported
 $g_{\mathrm{adj}}=-2.2059\times10^{-2}$ with best agreement
@@ -577,7 +587,9 @@ Full-sweep PCE & Homojunction & FD & 8 params, $N$=100 &
 $\leq7.3\times10^{-4}$ (break-even study) \\
 16-param efficiency & Multilayer & FD (single point) & 1 eval &
 $4.2\times10^{-3}$ max (interface params) \\
-$V_{\mathrm{oc}}$ (interpolated) & --- & --- & --- & Not performed \\
+$V_{\mathrm{oc}}$ (interpolated) & Homojunction & FD & thickness dir,
+$N$=100/200 & $1.4\times10^{-7}$ / $4.2\times10^{-8}$; $18\%$ mesh
+variation \\
 Full-sweep PCE & Heterojunction & --- & --- & Not performed \\
 Interface affinity & Heterojunction & --- & --- & Not performed \\
 \bottomrule
@@ -653,24 +665,25 @@ This confirms that pivoting is essential for the heterojunction Jacobian
 and motivated the v0.1.17 production default (Section~\ref{sec:newton});
 the dense fallback is retained for singular or non-finite blocks.
 
-A four-arm causality study on identical saved Jacobians (homojunction
+A causality study on identical saved Jacobians (homojunction
 and heterojunction, $N=100$, $V=0.5$~V) separates the roles of scaling
-and algorithm: unpivoted block-Thomas vs pivoted banded, each raw and
-row-equilibrated, plus dense LU, with forward errors measured against a
-longdouble-residual refined reference
+and algorithm across row, column, and two-sided equilibration:
+unpivoted block-Thomas vs pivoted banded under each scaling, plus dense
+LU, with forward errors measured against a longdouble-refined reference
 (\code{docs/paper/records/solver\_causality.json}). At this
 non-degenerate bias all arms agree (forward errors $10^{-13}$--$10^{-27}$,
-backward residuals $10^{-13}$--$10^{-8}$): row scaling alone does not
-separate the solvers here, bounding the failure regime to the
-equilibrium-adjacent degenerate states above rather than all biases.
-Equilibration changes the banded backward residual by orders of
-magnitude on the homojunction ($5.1\times10^{-12}$ raw vs
-$8.7\times10^{-8}$ equilibrated) while leaving forward errors at
-$10^{-14}$--$10^{-15}$---further evidence that backward residuals do
-not certify solution accuracy. Row imbalance is therefore established
-as a major numerical amplifier, not an isolated sole cause; the
-remaining candidates (transpose assembly, right-hand-side construction,
-state mismatch, contraction cancellation) are listed as open.
+backward residuals $10^{-13}$--$10^{-8}$, including the column and
+two-sided variants): no scaling choice separates the solvers here,
+bounding the failure regime to the equilibrium-adjacent degenerate
+states above rather than all biases. Equilibration changes the banded
+backward residual by orders of magnitude on the homojunction
+($5.1\times10^{-12}$ raw vs $8.7\times10^{-8}$ equilibrated) while
+leaving forward errors at $10^{-14}$--$10^{-15}$---further evidence
+that backward residuals do not certify solution accuracy. Row imbalance
+is therefore established as a major numerical amplifier, not an
+isolated sole cause; the remaining candidates (transpose assembly,
+right-hand-side construction, state mismatch, contraction cancellation)
+are listed as open.
 
 \subsection{Mesh refinement and cross-code comparison}
 Five systematic mesh refinements ($N=62$, 125, 250, 500, 1000) on a
@@ -687,13 +700,16 @@ device problem; the $O(N^{-2})$ guide shown in the figure is an
 illustrative reference slope~\cite{salari2000,oberkampf2002}.
 Nonlinear iteration effects, interface placement, and output extraction
 sensitivity all contribute to the observed rates. An extended refinement
-on the matched Si-like homojunction to $N=2000$
+on the matched Si-like homojunction to $N=4000$
 (\code{docs/paper/records/mesh\_extended.json}) gives PCE $20.0002\%$,
-$20.0240\%$, $20.0378\%$ at $N=500$, $1000$, $2000$ (each $\sim7$~s wall
-time), with observed order $\approx0.79$; Richardson extrapolation from
-these levels lands at $20.019\%$, below the finest-grid value,
+$20.0240\%$, $20.0378\%$, $20.0450\%$ at $N=500$, $1000$, $2000$, $4000$
+($\sim7$~s wall time each through $N=2000$, $\sim15$~s at $N=4000$),
+with observed order $\approx0.79$ over $500$--$2000$ rising to
+$\approx0.94$ over $1000$--$4000$; Richardson extrapolation from
+these levels lands below the finest-grid value,
 confirming the non-asymptotic regime rather than correcting it. No
-clean coupled-solver order is claimed.
+clean coupled-solver order is claimed; refinement beyond $N=4000$
+exceeds the available compute budget.
 This configuration is designated as a synthetic homojunction because the
 original material identification and band-gap specification are
 inconsistent across the archived records (the label states silicon but the
@@ -886,7 +902,14 @@ $5\%$-noise realizations of the same two-parameter problem, refit from
 the published start on a reduced mesh ($N=200$, 21 biases) with a capped
 budget, recover thickness within $5\%$ of truth only once (mean
 $1.82\pm0.32$~$\mu$m against $1.80$~$\mu$m truth; most runs exhaust the
-budget unconverged). Reduced resolution and budget confound the noise
+budget unconverged). The sensitivity matrix
+$S_{ka}=\partial J(V_k)/\partial\theta_a$ at the heterojunction
+operating point (11 biases, 3 parameters) has singular values
+$4.1\times10^{-1}$, $1.6\times10^{-2}$, $1.0\times10^{-3}$
+(\code{docs/paper/records/identifiability.json}):
+$\sigma_{\min}/\sigma_{\max}=2.5\times10^{-3}$, so the parameters are
+structurally distinguishable in principle but noise-sensitive in
+practice---consistent with the probe outcome above. Reduced resolution and budget confound the noise
 effect here, so this is a stress probe rather than a production-fit
 statistic---but it demonstrates empirically that matched-model recovery
 at zero noise does not imply robustness at realistic noise, exactly the
@@ -985,7 +1008,12 @@ can invalidate a local derivative even when the forward output is finite.
 
 Future work should prioritise verified sparse or structured transpose
 solvers, controlled performance measurements, and inverse problems with
-noise and multiple observables. These extensions address the present
+noise and multiple observables. Explicitly out of scope for the present
+revision on resource grounds: reimplementation against independent codes
+(SESAME), refinement beyond $N=4000$, optimisation scaling past $P=8$,
+ensembles past $N=512$ samples, hundred-realization inverse statistics,
+measured-device calibration, and a JAX-native structured-solver rewrite;
+each is recorded above as future work with its reason. These extensions address the present
 backward scaling and identifiability limitations more directly than
 unqualified claims of end-to-end linear complexity.
 
@@ -1041,7 +1069,14 @@ curve fitting.
 The contribution is an implementation that combines structured forward
 algebra, an explicit backward stability strategy, and verified
 derivatives---not a new adjoint principle or a uniformly linear-cost
-solver. The evidence presented constitutes numerical verification and
+solver. Three limitations established here are results in their own
+right: a structured solver can be asymptotically optimal yet numerically
+inferior to a pivoted band solver on severely scaled semiconductor
+systems; gradient accuracy depends on more than linear-system residual,
+with parameter contraction and conditioning able to dominate; and for
+low-dimensional photovoltaic optimisation, adjoint evaluation-count
+advantages need not translate into wall-clock superiority
+(break-even near $P\approx6$--$7$ at the tested configuration). The evidence presented constitutes numerical verification and
 software validation, not experimental validation against measured
 devices: no J--V, EQE, temperature-dependent, transient, or impedance
 measurement is compared here, so no real-device predictive accuracy is

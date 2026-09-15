@@ -125,6 +125,16 @@ def equilibrate(J):
     return Dr @ Jn, Dr
 
 
+def _banded_t_of(M, rhs, unscale):
+    """Banded transpose solve on dense M with diagonal unscaling of y."""
+    from driftjax.numerics.banded_solve import banded_transpose as _bt2
+
+    AB, BB, CB = (np.asarray(t) for t in extract_blocks(jnp.asarray(M)))
+    y = np.asarray(_bt2(jnp.asarray(AB), jnp.asarray(BB), jnp.asarray(CB),
+                        jnp.asarray(rhs)))
+    return unscale * y
+
+
 def run_case(Jn, g, label):
     n = Jn.shape[0] // 3
     A, B, C = (np.asarray(t) for t in extract_blocks(jnp.asarray(Jn)))
@@ -171,6 +181,26 @@ def run_case(Jn, g, label):
         ).reshape(-1)
     )
     rec["fwd_dense"] = metrics(np.linalg.solve(Jn, bn))
+    # Column and two-sided scaling (diagonal scalings preserve the block
+    # pattern, so the banded solve applies; unscaling derived in comments).
+    # Forward: J Dc y = b -> x = Dc y; Dr J Dc y = Dr b -> x = Dc y.
+    # Adjoint: (J Dc)^T z = Dc g -> z = lam directly;
+    #   (Dr J Dc)^T z = Dc g -> lam = Dr z.
+    sc = np.max(np.abs(Jn), axis=0)
+    sc[~np.isfinite(sc) | (sc == 0)] = 1.0
+    Dc = np.diag(1.0 / sc)
+
+    def _banded_of(M, rhs):
+        AB, BB, CB = (np.asarray(t) for t in extract_blocks(jnp.asarray(M)))
+        return np.asarray(
+            banded_solve(jnp.asarray(AB), jnp.asarray(BB), jnp.asarray(CB),
+                         jnp.asarray(rhs).reshape(n, 3))
+        ).reshape(-1)
+
+    rec["fwd_banded_col"] = metrics(Dc @ _banded_of(Jn @ Dc, bn))
+    rec["fwd_banded_both"] = metrics(Dc @ _banded_of(Dr @ Jn @ Dc, Dr @ bn))
+    rec["adj_banded_col"] = metrics_t(_banded_t_of(Jn @ Dc, Dc @ bn, np.ones(n * 3)))
+    rec["adj_banded_both"] = metrics_t(_banded_t_of(Dr @ Jn @ Dc, Dc @ bn, Dr.diagonal()))
     # adjoint arms via transposed blocks
     At, Ct, Bt = A.transpose(0, 2, 1), C.transpose(0, 2, 1), B.transpose(0, 2, 1)
     rec["adj_bt_raw"] = metrics_t(bt_solve_numpy(At, Ct, Bt, bn.reshape(n, 3)).reshape(-1))
