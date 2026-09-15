@@ -12,14 +12,14 @@ abstract: >-
   design parameters are obtained transparently through jax.grad(simulate) via an
   implicit-function-theorem adjoint implemented as a custom_vjp.
 authors:
-  - family-names: Noua
-    given-names: Abd Elouahab
-    affiliation: "Research Center in Semiconductor Technology for Energetics (CRTSE), 02 Bd. Frantz Fanon, B.P. 140, Alger - 7 Merveilles 16038, Algiers, Algeria"
   - family-names: Benaissa
     given-names: Mohammed
     affiliation: "Research Center in Semiconductor Technology for Energetics (CRTSE), 02 Bd. Frantz Fanon, B.P. 140, Alger - 7 Merveilles 16038, Algiers, Algeria"
   - family-names: Maoudj
     given-names: Mohamed
+    affiliation: "Research Center in Semiconductor Technology for Energetics (CRTSE), 02 Bd. Frantz Fanon, B.P. 140, Alger - 7 Merveilles 16038, Algiers, Algeria"
+  - family-names: Noua
+    given-names: Abd Elouahab
     affiliation: "Research Center in Semiconductor Technology for Energetics (CRTSE), 02 Bd. Frantz Fanon, B.P. 140, Alger - 7 Merveilles 16038, Algiers, Algeria"
 version: 0.1.17
 doi: 10.5281/zenodo.22762675
