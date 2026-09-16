@@ -1,4 +1,12 @@
 """Why the adjoint uses the dense solve (history) and the forward uses dgbsv.
+"""3-Layer Perovskite Stress Test — SINGULAR MATRIX (NOT A SOLAR CELL)
+====================================================================
+WARNING: n-p-n (n+ p n+) with electron-selective contacts has no hole path.
+Jsc~0, Voc=nan. This is a singular-Jacobian (kappa~1e45) stress test for
+the lstsq fallback, NOT a device-performance simulation.
+See test_perovskite_pin.py for a real p-i-n positive control.
+"""
+"""3-Layer Perovskite Stress Test — SINGULAR MATRIX (NOT A SOLAR CELL)
 
 Historical record (pre-v0.1.17): the drift-diffusion Jacobian J (3n x 3n,
 block-tridiagonal: diag A, super B, sub C) had a forward solve via

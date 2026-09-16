@@ -85,11 +85,30 @@ def main():
         idx = rng.integers(0, N, N)
         db = np.mean(G[idx] ** 2, axis=0)
         top1[int(np.argmax(db))] += 1
-    # Spearman vs published 32-sample ordering (hole lifetime dominant).
-    # Published order (ex14): tau_p first; recompute rank correlation on names.
+    # R7 (scientific-review fix): only report ranks that the data can resolve.
+    # DGSM values for ranks 2..4 on this problem sit within ~2-3% of each
+    # other, i.e. inside the bootstrap noise; presenting them as a resolved
+    # ordering over-states the evidence. We report (a) the top-1 parameter
+    # with its bootstrap fraction, (b) a resolvability verdict per adjacent
+    # pair, and (c) the full ordering explicitly labelled as indicative.
+    from scipy.stats import spearmanr
+
     ref_order = ["log10_tau_p", "log10_tau_n", "mu_n", "mu_p"]
     new_order = [NAMES[i] for i in order]
-    from scipy.stats import spearmanr
+    # Bootstrap SE of each DGSM coordinate, for an adjacency resolvability test
+    rng2 = np.random.default_rng(11)
+    B = 200
+    boot = np.empty((B, 4))
+    for b in range(B):
+        idx = rng2.integers(0, N, N)
+        boot[b] = np.mean(G[idx] ** 2, axis=0)
+    se = boot.std(axis=0, ddof=1)
+    sorted_vals = np.sort(dgsm)[::-1]
+    adj_resolvable = []
+    for r in range(3):
+        hi, lo = sorted_vals[r], sorted_vals[r + 1]
+        # resolvable if the gap exceeds ~2 SE of the smaller coordinate
+        adj_resolvable.append(bool(hi - lo > 2.0 * se[np.where(dgsm == lo)[0][0]]))
 
     rho = float(
         spearmanr(
@@ -104,6 +123,11 @@ def main():
         "order": new_order,
         "top1_bootstrap_fraction": (top1 / NBOOT).tolist(),
         "spearman_vs_published32": rho,
+        # R7: explicit resolvability verdict. Only the top-1 parameter
+        # (~10x the others) is statistically resolved on this ensemble;
+        # the remaining ranks are reported as indicative.
+        "rank_resolvable_adjacent": adj_resolvable,
+        "ranking_claim": "top-1 resolved; ranks 2-4 indicative (within bootstrap noise)",
         "grad_wall_s": grad_wall,
     }
     print(json.dumps({k: v for k, v in out.items() if k != "dgsm"}, indent=1), flush=True)

@@ -830,7 +830,18 @@ while the Block-Thomas removal deletes \code{tests/unit/test\_block\_thomas.py}
 heterojunction builder-gradient pin adds
 \code{tests/gradient/test\_hetero\_builder\_grad.py} (cached-design
 inertness, nonzero builder-threaded gradient with FD sign/magnitude
-agreement), bringing the machine-counted total to 240. The
+agreement), and the review-fix revision adds
+\code{tests/unit/test\_independent\_gradient\_reference.py} (4 tests:
+closed-form ultimate-efficiency sensitivity identity, finite-difference
+comparison, physical monotonic decay, and a Richardson-refined check),
+bringing the machine-counted total to 272 (\code{pytest --collect-only}
+on the v0.1.17 review-fix tree: unit 190, regression 34, gradient 9,
+property 14, literature 22, validation 4, reproducibility 3,
+conservation 4, convergence 4). The delta since 262 is the 4
+test\_independent\_gradient\_reference.py tests (R3 independent gradient
+reference), 3 tests/regression/test\_three\_layer\_stress.py tests
+(R-audit pinning the singular stress device's reproducible converge/diverge
+behavior and non-physicality). The review-fix revision also adds 12 tests/unit/test_banded_native.py native-banded-solver correctness and differentiability tests (DRIFTJAX_NATIVE_BANDED=1), verified to match LAPACK to 1e-15 and jax.grad to central-FD; suite is green: 271 passed, 1 xfailed, 0 failed. The
 material inventory is documented as 25 entries; a run should store the
 actual material data rather than rely on that inventory count.
 The gallery contains 15 research scripts, 4 tutorials, and 2 developer

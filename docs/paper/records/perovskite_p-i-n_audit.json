@@ -1,0 +1,32 @@
+{
+  "purpose": "Pin the perovskite p-i-n positive control from the SCIENTIFIC_REVIEW.md.",
+  "device_config": {
+    "material": "pvk Eg=1.55, Chi=3.9, eps=24.0, Nc=2.2e18, Nv=1.8e19, mn=20.0, mp=20.0, A=2e5, tn=1e-6, tp=1e-6",
+    "structure": "p(0.1e-4 cm, Na=1e16) / i(5e-4 cm, Nd=1e13) / n(0.1e-4 cm, Nd=1e16)",
+    "n_points": 120,
+    "contacts": "non-selective ohmic (Snl=Snr=Spl=Spr=1e7)",
+    "optics": "BeerLambert(beer-lambert)",
+    "spectrum": "raw AM1.5G (899.9168 W/m2)",
+    "solver": "Newton(max_steps=400)"
+  },
+  "result": {
+    "converged": true,
+    "max_residual": 2.83e-16,
+    "voc_V": 0.969914,
+    "jsc_mA_per_cm2": 14.7791,
+    "ff": 0.656861,
+    "pce_raw": 0.104629,
+    "pce_standard": 0.094157,
+    "p_in_total_wm2": 899.9168,
+    "fallback_used": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ],
+    "iv_shape": "monotonic; forward current +14.78 mA/cm^2 at V=0 crosses zero at Voc=0.970V, sweeps to negative quadrant at V=1.0V",
+    "note": "Jsc=14.8 mA/cm2 is in the review cited range. Device converges to machine precision with correct diode J-V."
+  },
+  "verdict": "POSITIVE CONTROL - structurally-correct p-i-n perovskite converges to machine precision with correct diode J-V physics."
+}

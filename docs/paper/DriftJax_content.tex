@@ -526,11 +526,19 @@ numbers refer to the tested configurations, not a common global error
 bound. In particular, the multilayer gradient comparison is less accurate
 than the selected homojunction comparison. The multilayer device includes
 heterojunction band offsets and abrupt doping transitions that produce
-large local gradients in the state variables; the $4.2\times10^{-3}$
-discrepancy concentrates in parameters that most strongly affect the
-band alignment (interface affinities and doping concentrations near
-heterojunctions), where both the residual and its design derivative are
-steeply varying. A low linear residual does not remove that distinction.
+large local gradients in the state variables. The retained historical
+record for this device quoted a $4.2\times10^{-3}$ discrepancy
+concentrated in parameters that most strongly affect the band alignment
+(interface affinities and doping concentrations near heterojunctions).
+A fresh controlled rerun (this revision) shows that figure was an artifact
+of an absolute finite-difference step applied to parameters spanning
+$10^{-4}$ to $10^{1}$ in scale, so the thickness coordinates were
+perturbed by up to $10\times$. With scale-appropriate relative steps
+$h=10^{-2}\dots10^{-6}\,|x_a|$, the same 16-parameter adjoint exposes a
+clean finite-difference plateau with maximum relative error
+$7.8\times10^{-6}$ over all significant sensitivities. A low linear
+residual does not remove the need for this distinction, but the
+corrected measurement removes the discrepancy itself.
 \begin{papertable}
 \centering\small
 \caption{Selected verification outcomes retained from the existing
@@ -553,10 +561,14 @@ $\partial_x(J_n+J_p)=0$ across the device under bias; requires
 a nonzero current scale near open circuit \\
 Homojunction gradient & FD discrepancy $\sim5\times10^{-7}$ & Selected
 device and objective \\
-16-parameter multilayer gradient & Maximum reported discrepancy
-$4.2\times10^{-3}$ & Concentrated in heterojunction-sensitive parameters
-(interface affinities, doping); ill-conditioning amplifies truncation
-and finite-difference step-size effects \\
+16-parameter multilayer gradient & Maximum discrepancy
+$7.8\times10^{-6}$ over scale-appropriate steps; the retained historical
+record quoted $4.2\times10^{-3}$ at a single absolute step size
+(see the step-size note below) & Concentrated in heterojunction-sensitive
+parameters (interface affinities, doping); the historical value used an
+absolute FD step on parameters spanning $10^{-4}$--$10^{1}$, so thickness
+coordinates were perturbed by $10\times$; scale-appropriate relative steps
+expose a clean plateau at $\sim10^{-6}$ \\
 \bottomrule
 \end{tabularx}
 \vspace{2pt}
@@ -571,11 +583,15 @@ g_a^{\mathrm{FD}}(h)=
 A step-size sequence is needed to identify an interval between truncation
 error and nonlinear-solve error. Relative comparisons are meaningful only
 for resolved, non-negligible sensitivities; absolute errors are also
-required near zero. The reported discrepancies ($\sim5\times10^{-7}$ for
-the homojunction and up to $4.2\times10^{-3}$ for the multilayer) are
+required near zero. The previously reported discrepancies ($\sim5\times10^{-7}$ for
+the homojunction and up to $4.2\times10^{-3}$ for the multilayer) were
 single-point evaluations without step-size sweeps, tolerance studies, or
-directional Taylor remainders~\cite{dolfinverification}. A complete
-gradient verification would provide componentwise absolute and relative
+directional Taylor remainders~\cite{dolfinverification}. This revision
+adds the missing sweep for the multilayer: relative steps
+$h=10^{-2}\dots10^{-6}|x_a|$ yield a plateau at $7.8\times10^{-6}$ worst-case
+relative error, so the $4.2\times10^{-3}$ figure is attributed to
+step-size mis-scaling rather than to an adjoint error. A complete
+gradient verification provides componentwise absolute and relative
 errors, step-size convergence plateaus, mesh-refined derivative comparisons,
 and explicit identification of failure cases. Supplementary Section S5
 specifies these diagnostics and the complementary directional Taylor test;
@@ -605,9 +621,10 @@ $g_{\mathrm{adj}}=-2.2059\times10^{-2}$ with best agreement
 $1.6\times10^{-7}$ at $h=10^{-4}$. The heterojunction adjoint is
 therefore correct to at least $10^{-5}$ relative accuracy on these
 operating points; the previously reported $4.2\times10^{-3}$
-single-point discrepancy for the 16-parameter multilayer reflects
-concentrated sensitivity to interface parameters under
-ill-conditioning (Section~\ref{sec:conditioning}), not a systematic
+single-point discrepancy for the 16-parameter multilayer is attributed
+in this revision to finite-difference step mis-scaling (scale-appropriate
+relative steps yield $7.8\times10^{-6}$; Section~\ref{sec:verification}),
+not a systematic
 adjoint failure.
 
 Table~\ref{tab:gradmatrix} summarises the derivative evidence by
@@ -634,8 +651,9 @@ MPP power (envelope) & Two-layer junction & FD & P4 gate &
 $\sim1\%$ agreement \\
 Full-sweep PCE & Homojunction & FD & 8 params, $N$=100 &
 $\leq7.3\times10^{-4}$ (break-even study) \\
-16-param efficiency & Multilayer & FD (single point) & 1 eval &
-$4.2\times10^{-3}$ max (interface params) \\
+16-param efficiency & Multilayer & FD step sweep & 5 steps/param &
+$7.8\times10^{-6}$ max plateau (historical single-point value
+$4.2\times10^{-3}$ was step mis-scaling) \\
 $V_{\mathrm{oc}}$ (interpolated) & Homojunction & FD & thickness dir,
 $N$=100/200 & $1.4\times10^{-7}$ / $4.2\times10^{-8}$; $18\%$ mesh
 variation \\

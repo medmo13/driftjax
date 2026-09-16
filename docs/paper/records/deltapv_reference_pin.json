@@ -1,0 +1,52 @@
+{
+ "purpose": "R8: pin the cross-code reference. The \u2202PV source branch moves, so the reproducible anchor is the FROZEN reference curve, now content-addressed by SHA-256.",
+ "note": "The GitHub master branch of romanodev/deltapv was inspected 14 September 2026 (modules solver.py, linalg.py, residual.py, adjoint.py, physics.py, optical.py, recomb.py); no immutable commit identifier was recorded at that time. To make the cross-code comparison reproducible independently of the moving branch, the exact reference IV curves used in Figure crosscode are archived in-repo and pinned below.",
+ "source_url": "https://github.com/romanodev/deltapv",
+ "inspection_date": "2026-09-14",
+ "reference_curves": {
+  "ex1": {
+   "file": "examples/resources/deltapv_ex1_iv.npz",
+   "sha256": "1b383a7cb7e2d57d316614885932769833cb265fa15adc2e3aa33514b784938b",
+   "arrays": {
+    "v": {
+     "shape": [
+      23
+     ],
+     "dtype": "float64",
+     "first": 0.0,
+     "last": 1.1
+    },
+    "j": {
+     "shape": [
+      23
+     ],
+     "dtype": "float64",
+     "first": 0.020254954672729628,
+     "last": -0.08127687496877442
+    }
+   }
+  },
+  "ex2": {
+   "file": "examples/resources/deltapv_ex2_iv.npz",
+   "sha256": "4abb91149de2e76e76f6d2324dba327e1c3eb7bf3f4df5f8e05ec7978f827518",
+   "arrays": {
+    "v": {
+     "shape": [
+      19
+     ],
+     "dtype": "float64",
+     "first": 0.0,
+     "last": 0.9
+    },
+    "j": {
+     "shape": [
+      19
+     ],
+     "dtype": "float64",
+     "first": 0.01816377774518947,
+     "last": -0.002480359400904262
+    }
+   }
+  }
+ }
+}

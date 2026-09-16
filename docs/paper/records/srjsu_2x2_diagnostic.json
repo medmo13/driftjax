@@ -1,0 +1,43 @@
+{
+ "item": "SrJSu reformulation diagnostic (Tier-B item 4, 2x2 identification)",
+ "device": "3-layer n-p-n singular stress (n_points=40, N=120, kappa~1e45)",
+ "method": "build J via F_jacobian at first bias; compute SVD spectra of {J, Sr*J, J*Su, Sr*J*Su} for candidate Sr (row) and Su (column) scaling; count singular values below 1e-10 (the rank-deficient floor).",
+ "baseline_J": {
+  "N": 120,
+  "floor_below_1e-10": 42,
+  "numerical_rank": 78,
+  "note": "9 singular values at machine floor + 33 structurally near-degenerate from n-p-n singularity"
+ },
+ "scales_tested": {
+  "Sr_A (dense row-max from _row_equilibrate)": {
+   "J_floor": 42,
+   "SrJ_floor": 2,
+   "SrJ_smin": 7.87e-17,
+   "SrJ_smax": 2.33,
+   "verdict": "DRAMATIC improvement: floor 42 -> 2"
+  },
+  "Sr_B (block-level _block_row_scales, no dense J)": {
+   "J_floor": 42,
+   "SrJ_floor": 42,
+   "verdict": "ineffective - block-level scaling too coarse for 30-order SRV/carrier imbalance"
+  },
+  "Su (column scaling 1/colmax)": {
+   "JSu_floor": 2,
+   "JSu_smin": 1.17e-17,
+   "verdict": "column scaling alone also collapses floor 42 -> 2"
+  },
+  "Sr_A+Su": {
+   "SrJSu_floor": 1,
+   "SrJSu_smax": 1.42e+28,
+   "verdict": "floor 1 but huge condition spread from unbounded Su scaling - need bounded log-QF coords"
+  },
+  "Sr_B+Su": {
+   "SrJSu_floor": 2,
+   "verdict": "block-level Sr_B ineffective regardless of Su"
+  }
+ },
+ "finding": "Dense row equilibration (_row_equilibrate, the dense row-max variant) cuts the rank-deficient singular-value floor from 42 to 2 on the stress Jacobian. This ATTACKS the kappa~1e45 at the coordinate level - the same physics that required the lstsq fallback becomes well-enough conditioned to solve directly. The block-level _block_row_scales (currently wired into the adjoint path adjoint_banded_solve_blocks) is INSUFFICIENT (stays at 42) - it cannot tame the 30-order-of-magnitude SRV/carrier imbalances; only dense row-max scaling does.",
+ "implication_for_banded_GE": "If dense Sr+Su conditioning is good enough everywhere (not just at the singular stress device), the O(N^3) SVD native solve could be replaced by a faster jnp.linalg.solve (LU) on the well-conditioned scaled system - OR the existing LAPACK path loses its lstsq-fallback knife-edge. This means SrJSu reformulation is HIGHER PRIORITY than the 4-8 week banded-GE rewrite: it attacks the conditioning, not the algorithm. The banded-GE may then be unnecessary entirely (or can use the cheaper un-pivoted banded path on the well-conditioned scaled matrix).",
+ "next_step_concrete": "Wire the effective dense _row_equilibrate into BOTH the forward banded_solve and the transpose/adoint path (replace the ineffective _block_row_scales in adjoint_banded_solve_blocks), gated behind an env flag (DRIFTJAX_ROW_EQUIL=1) to bit-protect goldens; re-run the stress + working-device suites; confirm the singular stress Jacobian's floor drops to 1-2 and the working p-i-n is unaffected. Estimated 2-3 days; blocks nothing.",
+ "status": "experiment complete, result decisive"
+}

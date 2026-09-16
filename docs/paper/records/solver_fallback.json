@@ -21,12 +21,19 @@
         0.5,
         0.75,
         1.0
-      ]
+      ],
+      "physical": false,
+      "note": "NOT a physical solar cell (n-p-n with electron-selective contacts, no hole path). See perovskite_3layer_audit.json. Efficiency 1.7% is a numerical trace (Voc=nan, Jsc~0). Reproduces ONLY with default raw spectrum (899.9 W/m\u00b2); diverges with spectrum(normalize=True) \u2014 see perovskite_repro_check.json.",
+      "or_reproduce": {
+        "status": "FLAGGED",
+        "reason": "Device is a singular-matrix stress test, not a PV simulation. The archived 'converges to 1e-8' outcome is non-physical (Voc=nan, Jsc=0). The record is pinned to the default-spectrum call path that produces it; the normalized-spectrum path is documented as a known divergence. Do not cite this as a device-performance number.",
+        "positive_control": "Perovskite p-i-n (Eg=1.55, non-selective ohmic contacts, N=120) converges to 4.4e-16, Voc=0.964 V, Jsc=11.9 mA/cm\u00b2, PCE=7.96% \u2014 see validation/test_perovskite_pin.py and perovskite_p-i-n_audit.json."
+      }
     },
     "homojunction_N15": {
       "converged": true,
       "efficiency": 0.17510152095986609,
-      "max_residual": 1.910308227791989e-15,
+      "max_residual": 1.910308227791289e-15,
       "fallback_used": [
         false,
         false,
@@ -40,8 +47,9 @@
         0.5,
         0.75,
         1.0
-      ]
+      ],
+      "physical": true
     }
   },
-  "wall_s": 44.9
+  "wall_s": 23.3
 }

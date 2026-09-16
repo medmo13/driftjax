@@ -110,6 +110,7 @@ def solve_transient_step(cell, bound, pot_prev, dt, max_iter: int = 20, tol: flo
 
 
 def solve_transient(cell, v_applied, pot_eq, t_final, n_steps: int = 100):
+    _warn_transient_experimental()
     """Ramp-hold protocol; returns (times, currents, pot_final).
 
     Uses lax.scan over time steps for full XLA compilation.
@@ -130,6 +131,7 @@ def solve_transient(cell, v_applied, pot_eq, t_final, n_steps: int = 100):
 
 
 def ac_small_signal(cell, v_dc, pot_dc, omega, amplitude: float = 1e-4):
+    _warn_transient_experimental()
     """AC terminal-current admittance Y(ω) at a DC operating point.
 
     Uses vmap over frequencies for batched solve.
@@ -154,3 +156,25 @@ def ac_small_signal(cell, v_dc, pot_dc, omega, amplitude: float = 1e-4):
     V_all = jax.vmap(jnp.linalg.solve)(M_all, F_all)
     Y = jax.vmap(lambda v: I_c @ v / amplitude)(V_all)
     return Y
+
+
+_TRANSIENT_WARNED = False
+
+
+def _warn_transient_experimental():
+    """R6 (scientific-review fix): one-time experimental gate for transient/AC."""
+    global _TRANSIENT_WARNED
+    if not _TRANSIENT_WARNED:
+        import warnings
+
+        warnings.warn(
+            "Backward-Euler transient / small-signal (AC) response are "
+            "PRELIMINARY capabilities: carrier storage and terminal+"
+            "displacement-current accounting are not part of the validated "
+            "steady-state model (paper §3.3, Supplementary S6). Use for "
+            "structural exploration only; validate quantitative predictions "
+            "independently.",
+            UserWarning,
+            stacklevel=3,
+        )
+        _TRANSIENT_WARNED = True

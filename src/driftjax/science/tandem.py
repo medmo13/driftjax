@@ -44,8 +44,36 @@ from __future__ import annotations
 import jax.numpy as jnp
 
 
+_TANDEM_WARNED = False
+
+
+def _warn_tandem_experimental():
+    """R6 (scientific-review fix): one-time experimental gate for tandem."""
+    global _TANDEM_WARNED
+    if not _TANDEM_WARNED:
+        import warnings
+
+        warnings.warn(
+            "series_two_terminal is a PRELIMINARY capability: series tandem "
+            "composition is not a validated DriftJax model (current matching "
+            "and the limiting-cell knee need their own validation matrix; "
+            "paper §3.3). Use for structural exploration only, and validate "
+            "any quantitative prediction independently.",
+            UserWarning,
+            stacklevel=3,
+        )
+        _TANDEM_WARNED = True
+
 def series_two_terminal(iv_top, iv_bottom, v_out=None):
     """Series-connect two simulated sub-cells into one 2-terminal IV curve.
+
+    .. warning::
+       PRELIMINARY capability (R6). Series tandem composition is provided as
+       an engineering tool; its DriftJax-specific realisation is **not a
+       validated model** — current matching, sub-cell interaction and the
+       limiting-cell knee need their own validation matrix (paper §3.3).
+       Do not use it for quantitative device prediction without independent
+       checks. This warning fires once per process.
 
     Parameters
     ----------
@@ -79,6 +107,8 @@ def series_two_terminal(iv_top, iv_bottom, v_out=None):
     power point is taken on the parametric ``J * W(J)`` table, so it does
     not depend on the requested output grid.
     """
+    _warn_tandem_experimental()
+
     vt, it = iv_top
     vb, ib = iv_bottom
     vt, it = jnp.asarray(vt), jnp.asarray(it)

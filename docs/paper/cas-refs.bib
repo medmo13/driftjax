@@ -101,7 +101,13 @@
   url = {https://github.com/romanodev/deltapv},
   note = {Master branch inspected 14 September 2026; modules: solver.py,
     linalg.py, residual.py, adjoint.py, physics.py, optical.py, recomb.py.
-    No immutable commit identifier recorded}
+    No immutable commit identifier was recorded for the moving master
+    branch, so the cross-code comparison is pinned instead by the SHA-256
+    content hash of the archived reference IV curves
+    (docs/paper/records/deltapv\_reference\_pin.json):
+    ex1 sha256 1b383a7c..., ex2 sha256 4abb9114.... The source
+    observations remain date-bound; the numerical comparison is
+    reproducible from the frozen curves alone}
 }
 @article{farrell2021,
   author = {Farrell, Patrick E. and Purohit, Sumathi M.},

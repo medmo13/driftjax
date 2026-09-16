@@ -104,10 +104,18 @@ def banded_solve_with_info(A, B, C, b):
     import os
 
     import jax
-
+    import os
     n = A.shape[0]
     banded, kl, ku = _blocks_to_lapack_banded(A, B, C)
     b_flat = b.reshape(-1)
+    if os.environ.get("DRIFTJAX_ROW_EQUIL","0") == "1":
+        dr = _scalar_row_scales(A, B, C)  # (3n,) per-scalar-row
+        dr_blk = dr.reshape(n, 3)
+        Ae = A * dr_blk[:, :, None]
+        Be = B * dr_blk[:-1, :, None] if n > 1 else B
+        Ce = C * dr_blk[1:, :, None] if n > 1 else C
+        banded, kl, ku = _blocks_to_lapack_banded(Ae, Be, Ce)
+        b_flat = b_flat * dr  # equilibrated RHS
 
     def _solve(ab_flat, b_in):
         import numpy as _np
@@ -188,10 +196,18 @@ def banded_solve(A, B, C, b):
     banded_solve_with_info when the caller needs the used_zeros flag.
     """
     import jax
-
+    import os
     n = A.shape[0]
     banded, kl, ku = _blocks_to_lapack_banded(A, B, C)
     b_flat = b.reshape(-1)
+    if os.environ.get("DRIFTJAX_ROW_EQUIL","0") == "1":
+        dr = _scalar_row_scales(A, B, C)  # (3n,) per-scalar-row
+        dr_blk = dr.reshape(n, 3)
+        Ae = A * dr_blk[:, :, None]
+        Be = B * dr_blk[:-1, :, None] if n > 1 else B
+        Ce = C * dr_blk[1:, :, None] if n > 1 else C
+        banded, kl, ku = _blocks_to_lapack_banded(Ae, Be, Ce)
+        b_flat = b_flat * dr  # equilibrated RHS
 
     def _solve(ab_flat, b_in):
         import numpy as _np
@@ -223,6 +239,8 @@ def banded_solve(A, B, C, b):
 
     has_nan = ~jnp.all(jnp.isfinite(banded))
     x = jax.lax.cond(has_nan, _zeros, _do_solve, None)
+    if os.environ.get("DRIFTJAX_ROW_EQUIL","0") == "1":
+        x = x / dr  # un-scale
     return x.reshape(n, 3)
 
 

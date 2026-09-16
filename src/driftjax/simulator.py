@@ -749,9 +749,44 @@ def _sweep(*args, **kwargs):
 
 
 def _mpp(voltages, currents, tau=None):
+    """Maximum-power point of the P = V·J curve.
+
+    When ``tau`` is ``None`` (the default) the MPP is found by a
+    per-segment cubic-PCHIP maximisation followed by a hard
+    ``argmax`` over the candidate set.  That selection is *discrete*:
+    if the global maximiser switches between segments as a design
+    parameter changes the returned ``pmax`` is only Lipschitz, and
+    its gradient is a subgradient that is discontinuous at the
+    switch.  This is usually fine for a *solved* IV curve, but it
+    makes the efficiency objective non-smooth whenever it is used
+    inside an adjoint/JVP/VJP pass.  The warning below is emitted
+    once per concrete call so the user cannot miss it.
+
+    To obtain a globally smooth objective, pass a positive ``tau``
+    (see :func:`driftjax.numerics.spline.calcPmax_smooth`): the
+    soft-maximum is smooth everywhere and recovers the hard MPP as
+    ``tau -> 0``.
+    """
     from driftjax.numerics.spline import calcPmax_cubic, calcPmax_smooth
+    import warnings
 
     if tau is None:
+        # Warn only on the concrete path: inside jit/grad/vmap the voltages
+        # are tracers and the warning would fire once per mapped element.
+        from jax.core import Tracer
+
+        if not isinstance(voltages, Tracer):
+            warnings.warn(
+                "Default MPP objective is the HARD argmax over PCHIP "
+                "candidates (no smoothing tau).  The resulting pmax is "
+                "only Lipschitz in the design: its gradient is a "
+                "subgradient and is discontinuous at segment switches. "
+                "Use Sweep(mpp_tau=...) for a smooth objective inside "
+                "adjoint/JVP/VJP differentiation.  See the R5 note in "
+                "SCIENTIFIC_REVIEW.md.",
+                UserWarning,
+                stacklevel=2,
+            )
         return calcPmax_cubic(jnp.asarray(voltages), jnp.asarray(currents))
     return calcPmax_smooth(jnp.asarray(voltages), jnp.asarray(currents), tau)
 

@@ -36,3 +36,13 @@ records:
   research_14_dgsm_global.json:              {script: examples/research/14_dgsm_global.py}
   research_15_deltapv_crosscode.json:        {script: examples/research/15_deltapv_crosscode.py}
   research_16_graded_doping.json:            {script: examples/research/16_graded_doping.py}
+  banded_native_benchmark.json:  {script: benchmarks/native_breakeven.py, covers: JAX-native vs LAPACK callback solve correctness + wall time}
+  forward_scaling_verdict.json:   {script: validation/forward_scaling_verdict.py, covers: warm Newton O(N) scaling exponent measured 0.16-0.44}
+  grad_vs_fd_stepsweep.json:      {script: validation/grad_vs_fd_stepsweep.py, covers: scale-appropriate relative FD step sweep (resolves 4.2e-3 case)}
+  perovskite_3layer_audit.json:   {script: validation/transpose_banded_stability.py, covers: 3-layer n-p-n stress device audit (non-physical)}
+  perovskite_repro_check.json:    {script: validation/solver_fallback.py, covers: spectrum normalization fragility of 3-layer stress device}
+  perovskite_p-i-n_audit.json:    {script: tests/regression/test_perovskite_pin.py, covers: structurally-correct p-i-n positive control}
+  deltapv_reference_pin.json:     {script: validation/pointwise_crosscode.py, covers: SHA-256 pinned dPV reference IV curves (ex1, ex2)}
+  identifiability.json:          {script: validation/identifiability.py, covers: parameter identifiability probe (5% and 12.5% noise)}
+  srjsu_2x2_diagnostic.json:      {script: validation/scaling_2x2.py, covers: 2x2 preconditioning identification matrix on stress Jacobian}
+

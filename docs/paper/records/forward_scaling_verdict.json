@@ -1,0 +1,28 @@
+{
+ "purpose": "R9: quantify whether the O(N) forward-complexity advantage is observable, or whether fixed overhead dominates the tested range.",
+ "source": "docs/paper/records/scaling_breakeven.json (validation/scaling_breakeven.py)",
+ "measurement": {
+  "newton_ms_by_N": {
+   "50": 49.926809599855915,
+   "100": 62.28283240052406,
+   "200": 64.42116039979737,
+   "400": 57.66826420003781,
+   "800": 65.70458466740092,
+   "1600": 105.98412266457065
+  }
+ },
+ "analysis": {
+  "fitted_exponent_full_range": 0.1571865443562761,
+  "fitted_exponent_N_ge_400": 0.43899932470423464,
+  "theoretical_O_N_exponent": 1.0,
+  "time_ratio_N1600_over_N50": 2.122789810003732,
+  "mesh_increase_factor": 32.0,
+  "verdict": "Forward wall time is OVERHEAD-DOMINATED across N=50..1600: a 32x mesh increase raises warm Newton time only ~2.1x (fitted exponent 0.16 full range, 0.44 for N>=400), versus the O(N) prediction of 32x. The host-callback round trip plus Python/reshape dispatch, not the O(N*kl*ku) banded flop count, sets the cost. The O(N) claim is therefore ASYMPTOTIC ONLY on this hardware; no crossover into the linear regime is observed within N<=1600."
+ },
+ "recommendation": "Either extend the study to N where the banded flop count dominates (estimated N>>1600 at this overhead), or complete the FFI LAPACK kernel to remove the host callback, before quoting the O(N) advantage as measured.",
+ "result": {
+  "worst_plateau_rel_err_is_scaling": true,
+  "fitted_exponent_full_range": 0.15718654435627624,
+  "fitted_exponent_N_ge_400": 0.4389993247042346
+ }
+}

@@ -85,6 +85,8 @@ def test_fused_vs_unfused_generation():
     assert float(jnp.max(jnp.abs(G_f - G_u))) < 1e-12
 
 
+@pytest.mark.slow
+@pytest.mark.timeout(120)
 def test_batched_equals_serial_and_jit():
     """Batched forward equals serial and is jit-cacheable."""
     from driftjax.science.spectrum import spectrum

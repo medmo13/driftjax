@@ -187,9 +187,15 @@ def _forward(
     allow_trace = _is_tracer(design)
     if allow_trace:
         progress = None  # reporting is a concrete-path feature; never during grad/vmap
-    ls = (
-        ls if ls is not None else spectrum(normalize=False)
-    )  # raw AM1.5G (matches canonical examples)
+    # R1 (scientific-review fix): the AM1.5G normalisation is now EXPLICIT
+    # and recorded on the Solution. The default remains the raw embedded
+    # table (sum = 899.9168 W/m^2) so that every previously published /
+    # golden IV curve reproduces bit-for-bit; but the denominator is no
+    # longer implicit; Solution.p_in_total_wm2 exposes it and the CLI /
+    # console print both conventions. Pass spectrum(normalize=True) for the
+    # standard 1-sun 1000 W/m^2 convention.
+    if ls is None:
+        ls = spectrum(normalize=False)
     statistics = statistics or "boltzmann"
     # Effective strategy flags. The ``Newton`` fields are authoritative;
     # the legacy ``Sweep.refinement`` / ``Sweep.fused`` flags act as OR-fallbacks
@@ -273,6 +279,7 @@ def _forward(
                 eq_pot=pot_eq,
                 protocol="equilibrium",
                 P_in=ls.P_in,
+                p_in_total_wm2=jnp.sum(ls.P_in),
             ),
             (pot_eq,),
         )
@@ -388,6 +395,7 @@ def _forward(
         eq_pot=pot_eq,
         protocol="sweep",
         P_in=ls.P_in,
+        p_in_total_wm2=jnp.sum(ls.P_in),
         # R2 provenance: per-bias lstsq flags (True/False concrete serial;
         # None entries when unverified: traced, fused-scan, batched paths).
         fallback_used=list(_sweep_fallbacks),
@@ -470,6 +478,7 @@ def _simulate_sweep(
                 eq_pot=pot_eq,
                 protocol="sweep",
                 P_in=ls2.P_in,
+                p_in_total_wm2=jnp.sum(ls2.P_in),
                 # R2: fused-scan per-bias lstsq flags (concrete bools).
                 fallback_used=[bool(x) for x in list(fb_arr)],
                 voc_bracketed=bool(_voc_bracketed_f),
@@ -675,6 +684,7 @@ def _sweep_fwd(design, solver, optics, protocol, progress, ls, statistics, init=
                 eq_pot=pot_eq,
                 protocol="sweep",
                 P_in=ls2.P_in,
+                p_in_total_wm2=jnp.sum(ls2.P_in),
                 # R2: fused-scan per-bias lstsq flags (concrete bools from the
                 # eager jit call; True = dgbsv failed and lstsq stepped).
                 fallback_used=[bool(x) for x in list(fb_arr)],
@@ -1150,7 +1160,11 @@ def simulate(
             UserWarning,
             stacklevel=2,
         )
-    ls = ls if ls is not None else spectrum(normalize=False)
+    # R1: raw-AM1.5G default (sum 899.9168 W/m^2) preserves every published
+    # golden IV curve bit-for-bit. Use spectrum(normalize=True) for the
+    # standard 1-sun 1000 W/m^2 convention. The denominator is reported.
+    if ls is None:
+        ls = spectrum(normalize=False)
     if T is not None:
         design = design.with_temperature(float(T))
     # close() runs in a finally so a mid-sweep exception cannot leak the

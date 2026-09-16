@@ -1,0 +1,28 @@
+{
+ "purpose": "Verify whether the 3-layer perovskite stress device (validation/transpose_banded_stability.py) is a functional PV simulation or a solver-conditioning stress test, and whether the Jacobians tested are at converged states.",
+ "device_config": {
+  "structure": "n-p-n (mt 2e-5 @ 1e18) / (mat 6e-5 @ -1e18) / (mat 2e-5 @ 1e18)",
+  "contacts": "Snl=1e7, Snr=0, Spl=0, Spr=1e7 (left electron-selective, right electron-selective, no hole path)",
+  "n_points": 15,
+  "optics": "BeerLambert(tauc)",
+  "purpose_in_script": "ill-conditioned target for transpose-stability comparison"
+ },
+ "forward_solve": {
+  "converged": false,
+  "max_residual": 44.0,
+  "Jsc_A_per_m2": 0.0,
+  "Voc": null,
+  "verdict": "The device does NOT produce a physically valid IV. Jsc=0 (no hole-collection path in the n-p-n with both contacts electron-selective), Voc=nan (diverged sweep), garbage PCE."
+ },
+ "jacobian_state": {
+  "script_checks_converged": false,
+  "note": "real_dev() iterates s.potentials and builds F_jacobian WITHOUT checking s.converged. The transpose 'instability' is therefore evaluated at NON-converged (diverged) states where the linearization is not a trustworthy tangent.",
+  "caveat": "The paper's dense-adjoint justification cites this device's transpose instability. Since the Jacobians are built at diverged points, the instability may partly reflect divergence from a bad guess rather than genuine ill-conditioning of a physical solution branch."
+ },
+ "control": "A working Si homojunction (n-p, non-selective contacts) on the same path converges: Jsc=101 A/m^2, PCE=7.8% \u2014 so the solver is healthy; the 3-layer perovskite is a pathological, non-PV configuration.",
+ "extended_mesh_contact_sweep": {
+  "purpose": "Answer: is non-convergence from the coarse mesh (n=15) or the structure? Sweep n=15..160 and contact selectivity to isolate.",
+  "result": "Jsc stays at 0 (or the device gives garbage PCE/Voc) across ALL n_points in {15,40,80,160} and ALL contact variants {(1e7,0,0,1e7),(1e7,1e7,1e7,1e7),(1e2,1e7,1e7,1e2),(1e7,1e7,0,1e7),(1e7,0,1e7,0)}. The n-p-n structure (n+ / p / n+) with an n+ layer against the hole contact blocks hole extraction, so no configuration yields a finite Jsc. The non-convergence of the stress config is therefore STRUCTURAL (wrong device for a solar cell), not a mesh or solver failure.",
+  "contrast": "A conventional p-i-n homojunction on the same path converges cleanly (Jsc=101 A/m^2, PCE=7.8%), confirming the solver handles perovskite-like parameters when the contact/structure is physically sound."
+ }
+}

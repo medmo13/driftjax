@@ -35,3 +35,9 @@ The complete release gate is
 `tests/regression/test_release_validated.py`; it includes forward parity
 checks, finite-difference gradient checks, optimizer convergence checks, and
 warm-start differentiation checks.
+
+- `perovskite_pin_control.py` regenerates
+  `docs/paper/records/perovskite_p-i-n_audit.json` -- the structurally-correct
+  p-i-n positive control that demonstrates the solver handles perovskite
+  parameters when the device geometry is sound (counterpart to the 3-layer
+  n-p-n stress test).

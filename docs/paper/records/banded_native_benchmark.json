@@ -1,0 +1,44 @@
+{
+ "deliverable": "src/driftjax/numerics/banded_native.py \u2014 JAX-native pivoted banded solver (opt-in via DRIFTJAX_NATIVE_BANDED=1, wired into banded_solve_with_info with use_native flag)",
+ "status": "implemented + tested, CORRECT & DIFFERENTIABLE; NOT faster on CPU",
+ "method": "dense reconstruction of (3n,3n) block matrix from (A,B,C) 3x3 blocks + jnp.linalg.lstsq (SVD). Singular -> min-norm lstsq. No scipy callback, pure XLA.",
+ "correctness": {
+  "dense_reconstruction": "bit-exact vs package LAPACK-banded reconstruction (max diff 0.0)",
+  "vslapack": "matches scipy.solve_banded to 1e-15 on 8/8 random well-conditioned banded systems (30-node interleaved)",
+  "singular_stress": "3-layer n-p-n (kappa~1e45): SVD rank 78 < 90 -> singular=True, routed to lstsq, reproduces archived residual 2.1857e-8 bit-exactly",
+  "end_to_end": "p-i-n perovskite PCE + Voc + Jsc match shipped callback path to <1e-9"
+ },
+ "differentiability": "jax.grad of native solve matches central finite differences to <1e-5 (tested on n=8 block banded system)",
+ "performance_measured_honest": {
+  "method": "isolated subprocess per (mode,n); warm = 2nd of 2 runs (compile excluded); cold = first run (compile+runtime)",
+  "n=40": {
+   "callback_cold_s": 7.996,
+   "native_cold_s": 8.887,
+   "callback_warm_s": 0.48,
+   "native_warm_s": 1.31
+  },
+  "n=80": {
+   "callback_cold_s": 8.014,
+   "native_cold_s": 8.912,
+   "callback_warm_s": 0.552,
+   "native_warm_s": 1.591
+  },
+  "n=160": {
+   "callback_cold_s": 7.393,
+   "native_cold_s": 13.928,
+   "callback_warm_s": 0.62,
+   "native_warm_s": 3.84
+  }
+ },
+ "honest_verdict": "The native SVD solve is CORRECT (1e-15 vs LAPACK), SINGULAR-AWARE, END-TO-END bit-identical, and DIFFERENTIABLE (free autodiff, no hand-written VJP) \u2014 but on CPU it is SLOWER than the LAPACK callback because SVD is O(N^3) vs banded-LU O(N*bw^2). An earlier '15x speedup' claim was a JIT-cache-leakage artifact between sequential same-process runs and is RETRACTED. The native path is engaged only when DRIFTJAX_NATIVE_BANDED=1 (a misspelled env var must NOT engage it). The genuine CPU-throughput win requires a band-storage pivoted GE in lax.scan (the documented Tier-B item, 4-8 weeks: 'the hard part is stable pivot logic in scan form, not the band arithmetic'). The native path's real value is structural: removing the host callback enables GPU-residency and free end-to-end autodiff of the linear solve, which the pure_callback LAPACK path cannot provide without a custom VJP.",
+ "tests": "tests/unit/test_banded_native.py \u2014 12 tests, all pass (RC 0, ~50s).",
+ "row_equilibration_gate": {
+  "env": "DRIFTJAX_ROW_EQUIL=1",
+  "where": "adjoint_banded_solve_blocks in numerics/banded_solve.py (replaces insufficient block-level _block_row_scales with per-scalar-row _scalar_row_scales)",
+  "status": "wired + golden-safe + gated (default off)",
+  "verified": "test_row_equilibration_golden_safe: well-conditioned solve bit-identical (rel_diff 1.4e-16); gate off by default so all goldens unchanged",
+  "honest_limitation": "row-equilibration is an exact similarity transform on a NON-singular matrix, so it does not change the solution there - it only rescues FALSE fallbacks on moderately ill-conditioned-but-nonsingular systems. It CANNOT rescue the structurally-singular (rank-78) 3-layer stress device, which is genuinely rank-deficient and routes to lstsq in both gate settings.",
+  "relation_to_diagnostic": "the 42->1 SVD floor reduction is about rank DETERMINATION (SVD sees the structure), not about making banded-LU succeed on a structurally-singular matrix. The gate captures the right mechanism (dense per-scalar row equilibration vs the ineffective block-level) for the cases where it can help.",
+  "recommendation": "Keep gated off by default; enable per-run when the adjoint fallback rate is suspicious (high used_fallback on a nominally converging device). The real rank-deficiency fix still needs either SrJSu coordinate change or the banded-GE - this gate is a safe diagnostic lever."
+ }
+}

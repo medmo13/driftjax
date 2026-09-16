@@ -67,8 +67,10 @@ markers = [
   "slow: long-running regression / golden tests",
   "experimental: L9 comparison vs published experimental data (real gate)",
   "smoke: sub-60s dev-loop tier (no solves, no subprocesses, no hypothesis)",
+  "timeout: per-test timeout in seconds (applied by pytest-timeout); slow tests default to 600s",
 ]
 filterwarnings = ["ignore::DeprecationWarning"]
+timeout = {options = {default = 60, slow = 600}, method = "signal"}
 
 [tool.ruff]
 line-length = 100

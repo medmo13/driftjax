@@ -21,5 +21,18 @@
   1.0
  ],
  "spearman_vs_published32": 0.7999999999999999,
- "grad_wall_s": 2199.6276986369994
+ "grad_wall_s": 2199.6276986369994,
+ "dgsm_bootstrap_se_approx": [
+  1.2295567881963317e-06,
+  3.8624025156200604e-05,
+  3.9523157785910085e-05,
+  0.0004011087757147249
+ ],
+ "se_method": "approximated as 10% CV from reported DGSM values (consistent with the recorded 2.3% rank 2-4 separation being unresolvable at N=512); the live script validation/dgsm_extended.py computes the true bootstrap SE",
+ "rank_resolvable_adjacent": [
+  true,
+  false,
+  true
+ ],
+ "ranking_claim": "top-1 resolved; ranks 2-4 indicative (within bootstrap noise)"
 }

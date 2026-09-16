@@ -1,0 +1,93 @@
+{
+ "purpose": "R-audit: does the 3-layer perovskite stress device reproduce its archived converged outcome on the review-fix tree?",
+ "archived_record": "docs/paper/records/solver_fallback.json claims: converged=true, max_residual=2.19e-8, efficiency=1.7%, fallback_used=[true,true,true,true,true], V=[0,.25,.5,.75,1.0]",
+ "current_run_exact_config": {
+  "n_points": 15,
+  "layers": [
+   [
+    "2e-5",
+    1e+18
+   ],
+   [
+    "6e-5",
+    -1e+18
+   ],
+   [
+    "2e-5",
+    1e+18
+   ]
+  ],
+  "contacts": "Snl=1e7,Snr=0,Spl=0,Spr=1e7",
+  "vmax": 1.0,
+  "n_steps": 5
+ },
+ "current_result": {
+  "converged": false,
+  "max_residual": 19.34,
+  "efficiency": 0.0,
+  "fallback_used": [
+   true,
+   true,
+   true,
+   false,
+   false
+  ],
+  "voc": "nan",
+  "jsc": 0.0,
+  "note": "sweep DIVERGES above V~0.25V (fallback stops firing at biases 3-4)"
+ },
+ "verdict": "REGRESSION / non-reproducibility: the shipped code does NOT reproduce the archived 'converges to 1e-8' claim for the 3-layer perovskite on the exact same inputs. The current run diverges at high bias and falls back to best-iterate with garbage PCE. Either the archived record was from a different code revision, or a continuity/globalization change between 0.1.16+ and the review tree broke convergence on this stiff device.",
+ "impact": "solver_fallback.json's headline 'sweep converges to ~1e-8' is not reproducible on the review-fix tree; the record must be flagged OR-REPRODUCE or the convergence regression fixed.",
+ "root_cause": {
+  "finding": "Reproduced the archived record ONLY when called exactly as the script does (default ls=None -> raw 899.9 W/m2).",
+  "default_spectrum": {
+   "converged": true,
+   "max_residual": 2.1857e-08,
+   "fallback": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "efficiency": 0.017,
+   "voc": "nan"
+  },
+  "normalized_spectrum_ls": {
+   "converged": false,
+   "max_residual": 19.34,
+   "fallback": [
+    true,
+    true,
+    true,
+    false,
+    false
+   ],
+   "efficiency": 0.0,
+   "voc": "nan",
+   "cause": "Passing spectrum(normalize=True) (1000 W/m2) changes the generation scale ~11%; on the rank-deficient Jacobian (dense kappa ~4e45) the extra drive pushes biases 3-4 past the lstsq-fallback recovery radius, so dgbsv raises and the sweep diverges instead of converging at ~1e-8."
+  },
+  "meta": "Even in the converging case, Voc=nan and Jsc~0 (efficiency 1.7% is a numerical trace, not a physical operating point). The device remains NOT a working solar cell; it is a singular-matrix stress test whose numerical outcome is fragile to incident-power scaling."
+ },
+ "positive_control_working_pin": {
+  "question": "Does a properly-structured perovskite p-i-n converge and give a sensible J-V (ruling out 'the solver cant handle perovskite')?",
+  "device": {
+   "material": "pvk Eg=1.55 Chi=3.9 eps=24 Nc=2.2e18 Nv=1.8e19 mn=20 mp=20 A=2e5 tn=1e-6 tp=1e-6",
+   "structure": "p(0.1e-4, Na=1e16) / i(5e-4, Nd=1e13) / n(0.1e-4, Nd=1e16)",
+   "n_points": 120,
+   "contacts": "non-selective ohmic (Snl=Snr=Spl=Spr=1e7)"
+  },
+  "result": {
+   "converged": true,
+   "max_residual": 4.4e-16,
+   "Voc_V": 0.964,
+   "Jsc_A_per_m2": 118.9,
+   "Jsc_mA_per_cm2": 11.9,
+   "FF": 0.697,
+   "PCE_pct": 7.96,
+   "iv_shape": "monotonic decreasing; forward current +11.9 mA/cm^2 at V=0 crosses zero at Voc=0.964V, sweeps to -17 mA/cm^2 at V=1.0V  (correct diode quadrant)"
+  },
+  "interpretation": "The p-i-n converges to machine precision and shows the textbook diode J-V. Jsc (12 mA/cm^2) is lower than the ~35 mA/cm^2 textbook perovskite because the model uses a thin (dimensionless) absorber and Beer-Lambert optics; the package's own Si reference targets ~17 mA/cm^2 by the same calibration, so this is the model's normal regime \u2014 not a defect. The solver handles perovskite parameters correctly.",
+  "verdict": "The 3-layer n-p-n failure is STRUCTURAL (no hole path), not a material/handling limitation. A correct p-i-n works."
+ }
+}

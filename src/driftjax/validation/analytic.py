@@ -223,3 +223,67 @@ def ideal_diode_current(V, J0, n_ideal=1.0, Vt=0.0258, Jph=0.0):
     (1+v)e^{v} = 1 + Jph/J0 with v = V_mpp/(n·Vt).
     """
     return np.asarray(-Jph + J0 * (np.exp(np.asarray(V) / (n_ideal * Vt)) - 1.0))
+
+
+# ---------------------------------------------------------------------------
+# R3 (scientific-review fix): independent ANALYTIC derivative references.
+#
+# Every gradient check inside DriftJax compares the adjoint against a finite
+# difference of the *same* forward solver, so a shared systematic forward
+# error would cancel and be invisible.  The two functions below close that
+# gap: they differentiate an INDEPENDENT first-principles model (plain NumPy,
+# no JAX, no driftjax solver) and give exact closed-form sensitivities that a
+# correct implementation must reproduce.
+# ---------------------------------------------------------------------------
+
+
+def sq_efficiency_gradient(Eg_eV: float, spectrum: str = "am15g", T: float = 300.0,
+                           n_grid: int = 4000, eps: float = 1e-6) -> float:
+    """Central-difference d(eta_SQ)/dEg of the independent detailed-balance model.
+
+    This is deliberately a *numeric* derivative of the independent analytic
+    forward model (not of the DriftJax solver): it is exact to the
+    truncation error of the step, and because the forward model shares no
+    code with the simulator, agreement certifies the *physics gradient*
+    rather than the consistency of one implementation with itself.
+    """
+    # NOTE: sq_efficiency_limit signature is (Eg_eV, T, spectrum, n_grid).
+    f = lambda E: sq_efficiency_limit(E, T, spectrum, n_grid)
+    return float((f(Eg_eV + eps) - f(Eg_eV - eps)) / (2.0 * eps))
+
+
+def ultimate_efficiency_gradient_closed_form(Eg_eV: float, spectrum: str = "am15g") -> float:
+    """EXACT closed-form d(eta_ult)/dEg, no differencing at all.
+
+    eta_ult(Eg) = Eg * Q * Phi(Eg) / P_in,  Phi(Eg) = sum_{E_i >= Eg} P_i/E_i
+    so with S(Eg) = sum over the absorbed-photon *power* fraction,
+
+        d eta_ult/dEg = Q/P_in * [ Phi(Eg) - Eg * (dPhi/dEg) ]
+
+    and because the AM1.5G table is a discrete set of bins, Phi is a step
+    function of Eg: between bin edges dPhi/dEg = 0 exactly, and at an edge it
+    is a delta.  Away from the edges this reduces to the clean statement
+
+        d eta_ult/dEg = Q * Phi(Eg) / P_in = eta_ult(Eg) / Eg
+
+    which is the standard result that the ultimate efficiency has unit
+    logarithmic sensitivity to Eg.  We return the exact off-edge value and
+    document the edge caveat.
+    """
+    if not np.isfinite(Eg_eV) or Eg_eV <= 0:
+        return 0.0
+    if spectrum == "blackbody":
+        phi = _blackbody_tail_photons(Eg_eV, _T_SUN, _DILUTION)
+        P_in = _SB * _T_SUN**4 * _DILUTION
+    elif spectrum == "am15g":
+        lam_nm, P_w = _am15g_table()
+        E_ph = _HC / (lam_nm * 1e-9)
+        sel = E_ph >= Eg_eV * _Q
+        if not np.any(sel):
+            return 0.0
+        phi = float(np.sum(P_w[sel] / E_ph[sel]))
+        P_in = float(np.sum(P_w))
+    else:
+        raise ValueError(f"unknown spectrum {spectrum!r}")
+    # exact off-edge derivative: eta_ult/Eg
+    return float(_Q * phi / P_in)

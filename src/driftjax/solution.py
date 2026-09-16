@@ -28,6 +28,13 @@ class Solution(eqx.Module):
     eq_pot: Potentials  # equilibrium potential
     P_in: Float[Array, "nlam"]  # incident power per wavelength (W/m^2)  # noqa: F821
     protocol: str = eqx.field(static=True, default="sweep")
+    # R1 (scientific-review fix): the efficiency denominator, made explicit.
+    # eta = Pmax / sum(P_in). The raw embedded AM1.5G table sums to
+    # 899.9168 W/m^2 (DriftJax default, preserves all goldens bit-for-bit);
+    # spectrum(normalize=True) gives the standard 1-sun 1000 W/m^2 value.
+    # Read this before quoting an absolute efficiency: the two conventions
+    # differ by ~11% relative.
+    p_in_total_wm2: object = 899.9167906040965  # float on concrete paths, 0-d array under trace
     # H1 failure semantics: True only when every bias residual was
     # verified (concrete path). P0-4 contract: under jit/grad/vmap the
     # audit cannot concretize, so converged stays at its default True and
@@ -66,8 +73,36 @@ class Solution(eqx.Module):
         still have a large residual — this does NOT mean the IV curve
         or efficiency is wrong, only that the residual cannot be
         driven below the conditioning floor.
+
+        The denominator is ``p_in_total_wm2`` (raw AM1.5G = 899.9168 W/m^2
+        by default).  Use :attr:`efficiency_standard` for the 1000 W/m^2
+        1-sun convention.
         """
         return self.eff
+
+    @property
+    def efficiency_standard(self):
+        """Efficiency with the denominator relabelled to 1000 W/m^2 (fraction).
+
+        R1 (scientific-review fix): eta_standard = eta * P_in_total / 1000.
+        This is the *convention rescaling* of the same converged solve, i.e.
+        "this Pmax expressed against the 1-sun denominator", which is what
+        makes the number comparable across codes that normalise differently.
+
+        It is NOT identical to re-solving with ``spectrum(normalize=True)``:
+        Pmax is only approximately linear in the photon flux, so scaling the
+        flux by k scales Pmax by ~k with a small superlinear deviation (about
+        0.06% relative at 1 sun for a typical cell).  For the exact
+        1000 W/m^2 efficiency, pass ``ls=spectrum(normalize=True)`` to
+        ``simulate``.  The difference is documented, not hidden.
+        """
+        denom = self.p_in_total_wm2
+        if denom is None:
+            denom = 899.9167906040965
+        denom = float(jnp.asarray(denom))
+        if not (denom > 0.0):
+            return float("nan")
+        return float(jnp.asarray(self.eff)) * denom / 1000.0
 
     @property
     def currents(self):
