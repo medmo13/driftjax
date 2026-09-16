@@ -44,5 +44,5 @@ records:
   perovskite_p-i-n_audit.json:    {script: tests/regression/test_perovskite_pin.py, covers: structurally-correct p-i-n positive control}
   deltapv_reference_pin.json:     {script: validation/pointwise_crosscode.py, covers: SHA-256 pinned dPV reference IV curves (ex1, ex2)}
   identifiability.json:          {script: validation/identifiability.py, covers: parameter identifiability probe (5% and 12.5% noise)}
-  srjsu_2x2_diagnostic.json:      {script: validation/scaling_2x2.py, covers: 2x2 preconditioning identification matrix on stress Jacobian}
+  srjsu_2x2_diagnostic.json:      {script: validation/scaling_2x2.py, covers: 2x2 preconditioning identification matrix on stress Jacobian; shows dense row-eq cuts singular floor 42->2; _scalar_row_scales + DRIFTJAX_ROW_EQUIL=1 gate implemented in adjoint_banded_solve_blocks, golden-safe}
 
