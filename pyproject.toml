@@ -70,7 +70,8 @@ markers = [
   "timeout: per-test timeout in seconds (applied by pytest-timeout); slow tests default to 600s",
 ]
 filterwarnings = ["ignore::DeprecationWarning"]
-timeout = {options = {default = 60, slow = 600}, method = "signal"}
+timeout = 60
+timeout_method = "signal"
 
 [tool.ruff]
 line-length = 100

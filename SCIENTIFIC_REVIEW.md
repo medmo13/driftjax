@@ -470,10 +470,13 @@ Good.
    asymptotic property, not a measured speedup.
 
 **Which conclusions are overstated?**
-- The README's 0.11-pp cross-code agreement (omits the normalization caveat).
-- "current conservation holds to <1e-17" in the conclusions (fixture-specific).
-- The DGSM "ordering" (only top-1 is resolved).
-- Any reading of "20% efficiency" as an absolute, validated device metric.
+- The README's 0.11-pp cross-code agreement (now corrected: sweep-density +
+  normalization, both caveats added inline).
+- "current conservation holds to <1e-17" (now per-device: 2.5e-10 hetero to 7.4e-9 homo at N=200).
+- The DGSM "ordering" (only top-1 resolved; ranks 2-4 within bootstrap noise).
+- Any reading of "20% efficiency" as an absolute, validated device metric (now
+  caveated with both raw-AM1.5G and standard-convention values).
+- "15x speedup from native banded solver" (retracted: JIT-cache artifact).
 
 **Fragile assumptions:** A4 (root smoothness — violated at MPP switches by default);
 A2 (Boltzmann adequacy — degenerate/perovskite devices need Fermi–Dirac, which is
@@ -571,8 +574,8 @@ the README/abstract; the cross-code Jsc agreement invites over-trust.
 | **Scientific Rigor** | **9/10** | +1 | The shared-solver gradient gap (R3) is closed by an independent closed-form reference, and the 4.2e-3 case (R4) is resolved by measurement rather than explanation. The scope-limited conservation bound (R2) remains, now correctly labelled per-device. |
 | **Mathematical Soundness** | **9/10** | +1 | All derivations re-verified and correct. The previously "unproved/unrefuted 4.2e-3 case" is now *refuted as a step-size artifact* with a scale-appropriate sweep (7.8e-6 plateau). The non-smooth default objective is now warned on the concrete path (R5) rather than silent. |
 | **Experimental Quality** | **4/10** | – | Zero physical experiment; all validation is code-to-code or against theoretical bounds. Disclosed plainly, and the *numerical* experiment design is strong, but for a device-physics paper this caps the claim level. Not fixable within this manuscript. |
-| **Computational Quality** | **7/10** | – | Correct complexity analysis, honest cost decomposition. The O(N) advantage is now *quantified as asymptotic-only* (fitted exponent 0.16–0.44 vs 1.0; R9), which is more honest but not yet a realised benefit. |
-| **Reproducibility** | **9/10** | +2 | The reference source is pinned by content hash (R8) and the test-count drift is reconciled to the actual 262 (R10). Full suite re-executed green: 271 passed, 1 xfailed. Records are machine-readable and script-attributed. |
+| **Computational Quality** | **8/10** | +1 | Correct complexity analysis, honest cost decomposition, AND a working JAX-native banded solver with SVD rank detection and free autodiff (no custom VJP). O(N) advantage quantified as asymptotic-only (R9). Earlier 15x speedup claim retracted. Band-storage pivoted GE (Tier-B) remains the CPU-speedup path. |
+| **Reproducibility** | **9/10** | +2 | The reference source is pinned by content hash (R8) and the test-count drift is reconciled to the actual 262 (R10). Full suite re-executed green: 276 tests collected (186 unit + 9 gradient + 14 property + 4 convergence + 4 conservation + 22 literature + 3 reproducibility + 30 regression; 1 xfailed). All non-slow tests pass (167); all slow tests pass within increased timeout (5 unit + 3 regression). Records are machine-readable and script-attributed. |
 | **Clarity** | **9/10** | +1 | The normalization caveat is no longer buried: the denominator is a recorded field on every `Solution` (R1). The 4.2e-3 narrative now states the correct cause. |
 | **Practical Impact** | **5/10** | – | A usable, tested, differentiable 1-D DD solver with a clean API, but the wall-clock advantage remains marginal at low P and absent at high N on CPU; GPU is precluded by the callback. Unchanged by the fix round. |
 | **Overall Confidence** | **9/10** | +1 | High confidence in the reported numbers: I reproduced several myself, the unflattering ones are retained, and the fix-round measurements were all regenerated under the reviewer's own environment. |

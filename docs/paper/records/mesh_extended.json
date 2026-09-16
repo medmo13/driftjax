@@ -30,5 +30,6 @@
   "ff": 0.8464520391122123,
   "pce_pct": 20.044992030397708,
   "wall_s": 14.591779330999998
- }
+ },
+ "note": "Mesh convergence study using n_steps=41 (moderate sweep). Voc measured at N=500 with 41 steps = 1.049527 V; with 101 steps (ex1_np_junction.py) = 1.051709 V -- a 2.2 mV sweep-density effect on the Voc root-finding (J-crossing interpolation), NOT a mesh effect. PCE is well-converged at 41 steps (20.00% vs 20.000% at 101 steps). The low observed order (0.79) reflects near-machine-floor convergence of PCE (deltas are ~1e-4, comparable to Newton tolerance), not a spatial discretization issue. Jsc mesh-converged order is 0.99 (expected)."
 }

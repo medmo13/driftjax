@@ -117,10 +117,21 @@ make validation      # N=500 reference validations
 
 Measured against the ∂PV reference (Mann et al., CPC 2022) at N=500:
 
-| Device | DriftJax PCE | ∂PV PCE | Difference |
-|--------|-------------|---------|------------|
+| Device | DriftJax PCE (raw AM1.5G) | ∂PV PCE | Difference |
+|--------|--------------------------|---------|------------|
 | Si p-n homojunction | 19.89% | 20.00% | 0.11 pp |
 | CdS/CdTe heterojunction | 13.31% | 13.31% | <0.01 pp |
+
+> ⚠️ **Normalization caveat:** DriftJax's default efficiency is normalized
+> against the **raw AM1.5G integral (899.9168 W/m²)**, not the conventional
+> 1000 W/m². Under the standard 1000 W/m² convention the same Si cell gives
+> **17.90%**. The 0.11 pp agreement is only meaningful because ∂PV uses the
+> same raw-AM1.5G convention. Use `sol.efficiency_standard` for the
+> 1000 W/m² value, or `dj.simulate(..., ls=dj.spectrum(normalize=True))`
+> for normalized-spectrum simulation. See `docs/paper/records/` for the full
+> normalization audit. Jsc is set by the absorbed-photon integral and agrees
+> to machine precision between the two codes (2.4e-12); the *transport* part
+> of the J-V differs at the percent level (see SCIENTIFIC_REVIEW.md Phase 10).
 
 ## Documentation
 
