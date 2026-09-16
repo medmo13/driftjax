@@ -2,7 +2,7 @@
   "figure": "research_01_device_iv.png",
   "metadata": {
     "backend": "cpu",
-    "driftjax": "0.1.17",
+    "driftjax": "0.1.18",
     "jax": "0.10.2",
     "platform": "Linux-6.8.0-138-generic-x86_64-with-glibc2.35",
     "python": "3.13.13",

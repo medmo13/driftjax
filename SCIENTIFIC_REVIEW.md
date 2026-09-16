@@ -29,7 +29,7 @@ reproduction. Each fix was validated by executing the shipped v0.1.17 source und
 Python 3.13 / JAX 0.10.2 / float64 / CPU, single-threaded, on the same 8-core machine.
 No fix was accepted on the strength of an argument or a docstring.
 
-**Full-suite re-run after all fixes:** 272 collected, **271 passed, 1 xfailed, 0 failed**
+**Full-suite re-run after all fixes:** 283 collected, **282 passed, 1 xfailed, 0 failed**
 (unit 178, regression 27, gradient 9, property 14, literature 22, validation 4,
 reproducibility 3, conservation 4, convergence 4).
 
@@ -575,7 +575,7 @@ the README/abstract; the cross-code Jsc agreement invites over-trust.
 | **Mathematical Soundness** | **9/10** | +1 | All derivations re-verified and correct. The previously "unproved/unrefuted 4.2e-3 case" is now *refuted as a step-size artifact* with a scale-appropriate sweep (7.8e-6 plateau). The non-smooth default objective is now warned on the concrete path (R5) rather than silent. |
 | **Experimental Quality** | **4/10** | – | Zero physical experiment; all validation is code-to-code or against theoretical bounds. Disclosed plainly, and the *numerical* experiment design is strong, but for a device-physics paper this caps the claim level. Not fixable within this manuscript. |
 | **Computational Quality** | **8/10** | +1 | Correct complexity analysis, honest cost decomposition, AND a working JAX-native banded solver with SVD rank detection and free autodiff (no custom VJP). O(N) advantage quantified as asymptotic-only (R9). Earlier 15x speedup claim retracted. Band-storage pivoted GE (Tier-B) remains the CPU-speedup path. |
-| **Reproducibility** | **9/10** | +2 | The reference source is pinned by content hash (R8) and the test-count drift is reconciled to the actual 262 (R10). Full suite re-executed green: 276 tests collected (186 unit + 9 gradient + 14 property + 4 convergence + 4 conservation + 22 literature + 3 reproducibility + 30 regression; 1 xfailed). All non-slow tests pass (167); all slow tests pass within increased timeout (5 unit + 3 regression). Records are machine-readable and script-attributed. |
+| **Reproducibility** | **9/10** | +2 | The reference source is pinned by content hash (R8) and the test-count drift is reconciled to the actual 262 (R10). Full suite re-executed green: 276 tests collected (197 unit + 9 gradient + 14 property + 4 convergence + 4 conservation + 22 literature + 3 reproducibility + 37 regression; 1 xfailed). All non-slow tests pass (167); all slow tests pass within increased timeout (5 unit + 3 regression). Records are machine-readable and script-attributed. |
 | **Clarity** | **9/10** | +1 | The normalization caveat is no longer buried: the denominator is a recorded field on every `Solution` (R1). The 4.2e-3 narrative now states the correct cause. |
 | **Practical Impact** | **5/10** | – | A usable, tested, differentiable 1-D DD solver with a clean API, but the wall-clock advantage remains marginal at low P and absent at high N on CPU; GPU is precluded by the callback. Unchanged by the fix round. |
 | **Overall Confidence** | **9/10** | +1 | High confidence in the reported numbers: I reproduced several myself, the unflattering ones are retained, and the fix-round measurements were all regenerated under the reviewer's own environment. |

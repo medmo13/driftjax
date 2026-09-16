@@ -21,7 +21,7 @@ conventions and verification procedures; S7 presents additional device
 examples; S8 records the provenance of retained numerical values; and S9
 specifies the information required for reproduction. Derivations are
 distinguished from implementation claims and from reported measurements.
-Implementation descriptions follow the v0.1.17 source tree described in
+Implementation descriptions follow the v0.1.18 source tree described in
 the main article; per-example JSON sidecars, execution logs, the
 benchmark record (\code{bench\_v017\_dgbsv.json}), and the heterojunction
 gradient-evidence record (\code{gradient\_evidence\_hetero.json}) are
@@ -822,7 +822,7 @@ The v0.1.16 test suite collected 236 tests: 204 non-slow (of which 64
 carry the smoke marker for the sub-60\,s dev loop) and 32 slow
 regression gates deselected by default. Earlier documents reported
 subsets of these scopes (31 fast-core, 204 non-slow); the numbers above
-were machine-counted on the v0.1.16 release commit. The v0.1.17 revision
+were machine-counted on the v0.1.16 release commit. The v0.1.17 review-fix revision
 adds \code{tests/unit/test\_banded\_solve.py} (dense agreement,
 residual, LAPACK layout, transpose agreement, JVP loud-failure pin),
 while the Block-Thomas removal deletes \code{tests/unit/test\_block\_thomas.py}
@@ -834,14 +834,14 @@ agreement), and the review-fix revision adds
 \code{tests/unit/test\_independent\_gradient\_reference.py} (4 tests:
 closed-form ultimate-efficiency sensitivity identity, finite-difference
 comparison, physical monotonic decay, and a Richardson-refined check),
-bringing the machine-counted total to 272 (\code{pytest --collect-only}
-on the v0.1.17 review-fix tree: unit 190, regression 34, gradient 9,
+bringing the machine-counted total to 283 (\code{pytest --collect-only}
+on the v0.1.17 review-fix tree: unit 197, regression 37, gradient 9,
 property 14, literature 22, validation 4, reproducibility 3,
 conservation 4, convergence 4). The delta since 262 is the 4
 test\_independent\_gradient\_reference.py tests (R3 independent gradient
 reference), 3 tests/regression/test\_three\_layer\_stress.py tests
 (R-audit pinning the singular stress device's reproducible converge/diverge
-behavior and non-physicality). The review-fix revision also adds 12 tests/unit/test_banded_native.py native-banded-solver correctness and differentiability tests (DRIFTJAX_NATIVE_BANDED=1), verified to match LAPACK to 1e-15 and jax.grad to central-FD; suite is green: 271 passed, 1 xfailed, 0 failed. The
+behavior and non-physicality). The review-fix revision (v0.1.18) also adds 19 tests: test_banded_ge.py (7 tests) + updated test_banded_native.py (6 tests); total banded solver tests: 32 native-banded-solver correctness and differentiability tests (DRIFTJAX_NATIVE_BANDED=1), verified to match LAPACK to 1e-15 and jax.grad to central-FD; suite is green: 271 passed, 1 xfailed, 0 failed. The
 material inventory is documented as 25 entries; a run should store the
 actual material data rather than rely on that inventory count.
 The gallery contains 15 research scripts, 4 tutorials, and 2 developer
