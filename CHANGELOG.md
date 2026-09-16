@@ -1,3 +1,54 @@
+## v0.1.18 (unreleased, review-fix round)
+
+### Scientific review fixes (R1-R10)
+- R1 (efficiency normalization): Added Solution.p_in_total_wm2 field
+  and Solution.efficiency_standard property (rescales to 1000 W/m2).
+  README headline table carries inline caveat (raw-AM1.5G + sweep-density).
+- R2 (current conservation): Per-device values in Table 3 (2.5e-10
+  hetero to 7.4e-9 homo at N=200). Bound restated as fixture-specific.
+- R3 (independent gradient reference): Added closed-form SQ gradient
+  tests in tests/unit/test_independent_gradient_reference.py (4 tests).
+  Closes the shared-solver gradient gap.
+- R4 (step-size artifact): Scale-appropriate FD step sweep
+  (grad_vs_fd_stepsweep.json) resolves the 4.2e-3 multilayer gradient
+  case to 7.8e-6 plateau. Step mis-scaling was the root cause.
+- R5 (non-smooth MPP): _mpp emits UserWarning on concrete path;
+  Sweep(mpp_tau=...) smooth soft-max opt-in.
+- R6 (model gating): PRELIMINARY UserWarning gates on
+  series_two_terminal (tandem), solve_transient, ac_small_signal.
+- R7 (DGSM reporting): Top-1 only as resolved; ranks 2-4 marked
+  indicative.
+- R8 (reference pinning): SHA-256 pinned dPV IV curves
+  (deltapv_reference_pin.json).
+- R9 (scaling verdict): Warm-Newton exponent 0.16-0.44 vs O(N) 1.0;
+  overhead-dominated at N<=1600.
+- R10 (test count): Reconciled to 276 (186 unit, 9 gradient, 14
+  property, 4 convergence, 4 conservation, 22 literature, 3
+  reproducibility, 30 regression).
+
+### Post-review hardening
+- Test timeout config: 60s default, 120s on slow tests.
+- Perovskite 3-layer n-p-n stress device: OR-REPRODUCE flagged;
+  README_3layer_stress.md relabels as NOT A SOLAR CELL.
+- Perovskite p-i-n positive control: test_perovskite_pin.py (3 tests)
+  pins convergence to 2.8e-16, Voc=0.970V, Jsc=14.8 mA/cm^2, PCE=10.5%.
+- banded_native_benchmark.json: JAX-native banded solver correct
+  (1e-15 vs LAPACK) but slower on CPU; 15x speedup claim retracted.
+- pointwise_crosscode.json: 0.11pp gap annotated as sweep-density
+  artifact, not normalization.
+
+### Tier-B items (implemented & tested)
+- SrJSu preconditioning: _scalar_row_scales + DRIFTJAX_ROW_EQUIL=1
+  gate. Floor 42->2 on stress Jacobian. Golden-safe tested. Default off.
+- Implicit Voc/MPP roots: refine_voc (bisection), calcPmax_smooth.
+  5 tests in test_implicit_roots.py all pass.
+
+### Tier-B items (genuinely open)
+- Band-storage pivoted GE in lax.scan (4-8 wk): for CPU throughput win
+  from native solver path. SVD native solve is correct but O(N^3).
+
+---
+
 # Changelog
 
 ## Unreleased (referee round 2 response; no solver change)

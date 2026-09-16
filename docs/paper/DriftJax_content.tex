@@ -846,9 +846,15 @@ original material identification and band-gap specification are
 inconsistent across the archived records (the label states silicon but the
 band gap is approximately 1.5~eV); the cross-code comparison therefore
 tests numerical consistency under shared inputs rather than a specific
-physical device. Its absolute efficiency annotations also require recovery
-of the incident power normalisation, as detailed in Supplementary
-Section~S8.
+physical device. Its absolute efficiency annotations require recovery
+of the incident power normalisation: the default AM1.5G table sums to
+899.9168~W\,m$^{-2}$ (not the conventional 1000~W\,m$^{-2}$);
+under the standard convention the same homojunction gives 17.90\%
+rather than 20.00\%. The \code{Solution.p\_in\_total\_wm2} field and
+\code{Solution.efficiency\_standard} property make the denominator
+explicit; \code{Sweep(mpp\_tau=\ldots)} provides a smooth MPP
+objective for gradient-based optimization (the default hard argmax is
+Lipschitz but not smooth).
 
 \paperfigure{research_01_device_iv.png}{Homojunction refinement example
 at five meshes ($N=62$--$1000$):
@@ -869,7 +875,14 @@ The retained comparison with $\partial\mathrm{PV}$ reports efficiency
 differences of 0.09 percentage points for the homojunction and less than
 0.01 percentage points for CdS/CdTe. The corresponding maximum absolute
 current-density differences are $4.2\times10^{-5}$ and
-$3.6\times10^{-3}$~A\,cm$^{-2}$ (Figure~\ref{fig:crosscode}). The latter
+$3.6\times10^{-3}$~A\,cm$^{-2}$ (Figure~\ref{fig:crosscode}). The
+homojunction PCE is $19.89$\% under the 25-step sweep used for the
+cross-code grid and $20.00$\% under the dense 101-step reference
+(\code{validation/ex1\_np\_junction.py}); the 0.11~pp gap is a
+sweep-density artifact (coarse-MPP undershoot), not a physics-level
+discrepancy, and both codes use the same raw AM1.5G denominator
+(899.9168~W\,m$^{-2}$, not 1000~W\,m$^{-2}$; see Section~S8 and
+\code{Solution.p\_in\_total\_wm2}). The latter
 is 3.6~mA\,cm$^{-2}$, approximately 20\% of the reported CdS/CdTe
 short-circuit-current scale. An independent pointwise-norm study on a
 common 200-point grid
