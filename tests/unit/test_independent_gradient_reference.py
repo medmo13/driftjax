@@ -24,12 +24,8 @@ independently computed derivatives. That is the certification.
 import numpy as np
 import pytest
 
-import jax
-import jax.numpy as jnp
-
 from driftjax.validation.analytic import (
     sq_efficiency_gradient,
-    sq_efficiency_limit,
     sq_ultimate_efficiency,
     ultimate_efficiency_gradient_closed_form,
 )
@@ -51,8 +47,7 @@ def test_ultimate_gradient_matches_fd_of_independent_model():
         closed = ultimate_efficiency_gradient_closed_form(Eg, "am15g")
         eps = 1e-5
         fd = (
-            sq_ultimate_efficiency(Eg + eps, "am15g")
-            - sq_ultimate_efficiency(Eg - eps, "am15g")
+            sq_ultimate_efficiency(Eg + eps, "am15g") - sq_ultimate_efficiency(Eg - eps, "am15g")
         ) / (2 * eps)
         # Off-edge the closed form is exact; near an edge FD straddles a step,
         # so allow a tolerance that admits one bin jump.
@@ -65,7 +60,7 @@ def test_sq_gradient_physical_monotonic_decay():
     Egs = (0.9, 1.3, 1.7, 2.1, 2.5)
     grads = [sq_efficiency_gradient(E, "am15g") for E in Egs]
     assert all(g > 0 for g in grads), grads  # no sign flip: eta->0 monotonically
-    for a, b in zip(grads, grads[1:]):
+    for a, b in zip(grads, grads[1:], strict=True):
         assert b < a, (Egs, grads)  # sensitivity decays with bandgap
 
 
@@ -82,7 +77,10 @@ def test_sq_gradient_matches_high_order_fd_of_same_model():
     """
     for Eg in (0.9, 1.1, 1.3, 1.5):
         closed = ultimate_efficiency_gradient_closed_form(Eg, "am15g")
-        f = lambda E: sq_ultimate_efficiency(E, "am15g")
+
+        def f(E):
+            return sq_ultimate_efficiency(E, "am15g")
+
         # Richardson-extrapolated central difference (O(h^4) in the smooth
         # off-edge regions).
         h = 1e-4
@@ -90,4 +88,9 @@ def test_sq_gradient_matches_high_order_fd_of_same_model():
         d2 = (f(Eg + 2 * h) - f(Eg - 2 * h)) / (4 * h)
         rich = (4 * d1 - d2) / 3.0
         assert abs(closed - rich) < 5e-3 or np.isclose(closed, rich, rtol=0.1), (
-            Eg, closed, rich, d1, d2)
+            Eg,
+            closed,
+            rich,
+            d1,
+            d2,
+        )

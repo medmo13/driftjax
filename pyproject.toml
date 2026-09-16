@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "driftjax"
-version = "0.1.17"
+version = "0.1.18"
 description = "driftjax — modern 1-D drift-diffusion–Poisson solar-cell simulator in JAX"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -86,6 +86,7 @@ exclude = [
   "resources",
   ".benchmarks",
   ".hypothesis",
+  "validation",  # analysis/demo scripts: run, do not lint
 ]
 
 [tool.ruff.lint]

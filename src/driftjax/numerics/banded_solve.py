@@ -286,12 +286,14 @@ def adjoint_banded_solve_blocks(A, B, C, g, tol=1e-8):
     maxima of J) is the open B4 experiment. Returns (lam, used_fallback);
     used_fallback True routes the caller to dense LU.
     """
-    import jax, os
+    import os
+
+    import jax
 
     from driftjax.numerics.analytic_jacobian import blockwise_matvec_transpose
 
     n = A.shape[0]
-    if os.environ.get("DRIFTJAX_ROW_EQUIL","0") == "1":
+    if os.environ.get("DRIFTJAX_ROW_EQUIL", "0") == "1":
         dr = _scalar_row_scales(A, B, C)  # (N,) per-scalar-row
         dr_blk = dr.reshape(n, 3)
         Ae = A * dr_blk[:, :, None]
@@ -333,7 +335,7 @@ def adjoint_banded_solve_blocks(A, B, C, g, tol=1e-8):
 
     has_nan = ~jnp.all(jnp.isfinite(banded_t))
     y = jax.lax.cond(has_nan, _zeros, _do_solve, None)
-    if os.environ.get("DRIFTJAX_ROW_EQUIL","0") == "1":
+    if os.environ.get("DRIFTJAX_ROW_EQUIL", "0") == "1":
         lam = (dr * y).reshape(g.shape)  # dr is (N,) per-scalar
     else:
         dr_tiled = jnp.repeat(dr, 3)
@@ -451,7 +453,7 @@ def _scalar_row_scales(A, B, C):
     Cuts the stress Jacobian floor 42 -> 1 (see srjsu_2x2_diagnostic.json).
     Returns (N,) diagonal Dr.
     """
-    n = A.shape[0]; N = 3 * n
+    n = A.shape[0]
     rmax = jnp.max(jnp.abs(A), axis=2)  # (n,3)
     if n > 1:
         bmax = jnp.max(jnp.abs(B), axis=2)

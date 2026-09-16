@@ -767,8 +767,9 @@ def _mpp(voltages, currents, tau=None):
     soft-maximum is smooth everywhere and recovers the hard MPP as
     ``tau -> 0``.
     """
-    from driftjax.numerics.spline import calcPmax_cubic, calcPmax_smooth
     import warnings
+
+    from driftjax.numerics.spline import calcPmax_cubic, calcPmax_smooth
 
     if tau is None:
         # Warn only on the concrete path: inside jit/grad/vmap the voltages

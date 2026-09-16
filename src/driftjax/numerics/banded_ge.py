@@ -10,9 +10,9 @@ no SVD computation needed for well-conditioned systems.
 
 See: tests/unit/test_banded_ge.py, tests/unit/test_banded_native.py
 """
+
 from __future__ import annotations
 
-import jax
 import jax.numpy as jnp
 from jax import lax
 
@@ -49,9 +49,7 @@ def _block_thomas(A, B, C, b):
         det_next = jnp.linalg.det(Ai_next)
         return (Ai_next, bi_next), (Ai, bi, det_next)
 
-    (A_last, b_last), (A_mod, b_mod, dets) = lax.scan(
-        _forward, (A[0], b[0]), jnp.arange(n - 1)
-    )
+    (A_last, b_last), (A_mod, b_mod, dets) = lax.scan(_forward, (A[0], b[0]), jnp.arange(n - 1))
 
     A_mod_full = jnp.concatenate([A_mod, A_last[None, :, :]], axis=0)
     b_mod_full = jnp.concatenate([b_mod, b_last[None, :]], axis=0)
@@ -138,10 +136,14 @@ def _dense_from_blocks(A, B, C):
         si = 3 * ip
         rioB = si[:, None, None] + off[None, :, None]
         cjoB = (3 * (ip + 1))[:, None, None] + off[None, None, :]
-        M = M.at[jnp.broadcast_to(rioB, (n - 1, 3, 3)).reshape(-1),
-                 jnp.broadcast_to(cjoB, (n - 1, 3, 3)).reshape(-1)].set(B.reshape(-1))
+        M = M.at[
+            jnp.broadcast_to(rioB, (n - 1, 3, 3)).reshape(-1),
+            jnp.broadcast_to(cjoB, (n - 1, 3, 3)).reshape(-1),
+        ].set(B.reshape(-1))
         rioC = (3 * (ip + 1))[:, None, None] + off[None, :, None]
         cjoC = si[:, None, None] + off[None, None, :]
-        M = M.at[jnp.broadcast_to(rioC, (n - 1, 3, 3)).reshape(-1),
-                 jnp.broadcast_to(cjoC, (n - 1, 3, 3)).reshape(-1)].set(C.reshape(-1))
+        M = M.at[
+            jnp.broadcast_to(rioC, (n - 1, 3, 3)).reshape(-1),
+            jnp.broadcast_to(cjoC, (n - 1, 3, 3)).reshape(-1),
+        ].set(C.reshape(-1))
     return M

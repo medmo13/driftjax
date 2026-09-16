@@ -43,7 +43,6 @@ from __future__ import annotations
 
 import jax.numpy as jnp
 
-
 _TANDEM_WARNED = False
 
 
@@ -63,6 +62,7 @@ def _warn_tandem_experimental():
             stacklevel=3,
         )
         _TANDEM_WARNED = True
+
 
 def series_two_terminal(iv_top, iv_bottom, v_out=None):
     """Series-connect two simulated sub-cells into one 2-terminal IV curve.

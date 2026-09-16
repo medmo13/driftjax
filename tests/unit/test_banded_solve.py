@@ -139,10 +139,15 @@ def test_failed_linear_solve_never_certifies():
         from driftjax.science.spectrum import spectrum as _spec
         from driftjax.simulator import init_cell
 
-        mat = dj.material(Eg=1.4, Chi=3.0, eps=10.0, Nc=1e18, Nv=1e18,
-                          mn=130.0, mp=160.0, A=2e4)
-        dev = dj.Device(n_points=8, layers=[(1e-4, mat, 1e17), (1e-4, mat, -1e17)],
-                        Snl=1e7, Snr=0.0, Spl=0.0, Spr=1e7)
+        mat = dj.material(Eg=1.4, Chi=3.0, eps=10.0, Nc=1e18, Nv=1e18, mn=130.0, mp=160.0, A=2e4)
+        dev = dj.Device(
+            n_points=8,
+            layers=[(1e-4, mat, 1e17), (1e-4, mat, -1e17)],
+            Snl=1e7,
+            Snr=0.0,
+            Spl=0.0,
+            Spr=1e7,
+        )
         cell = init_cell(dev.design(), _spec(normalize=False))
         bound = boundary_bias(cell, 0.1)
         from driftjax.solvers.continuation import equilibrium_guess

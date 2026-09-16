@@ -1,4 +1,4 @@
-# Pinned environment for DriftJax v0.1.17 CPC submission
+# Pinned environment for DriftJax v0.1.18 CPC submission
 # Generated: 2026-09-14, Python 3.13, CPU float64
 # Install: pip install -r requirements-pinned.txt
 # Every entry is exact-pinned (==); CI has a pin-check job enforcing this.

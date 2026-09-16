@@ -21,9 +21,9 @@ authors:
   - family-names: Noua
     given-names: Abd Elouahab
     affiliation: "Research Center in Semiconductor Technology for Energetics (CRTSE), 02 Bd. Frantz Fanon, B.P. 140, Alger - 7 Merveilles 16038, Algiers, Algeria"
-version: 0.1.17
+version: 0.1.18
 doi: 10.5281/zenodo.22762675
-date-released: 2026-09-15
+date-released: 2026-09-16
 license: MIT
 repository-artifact: "https://zenodo.org/records/22762675"
 repository-code: "https://github.com/medmo13/driftjax"

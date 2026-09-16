@@ -25,7 +25,10 @@ def _three_layer():
     return dj.Device(
         n_points=15,
         layers=[(2e-5, mt, 1e18), (6e-5, mat, -1e18), (2e-5, mat, 1e18)],
-        Snl=1e7, Snr=0.0, Spl=0.0, Spr=1e7,
+        Snl=1e7,
+        Snr=0.0,
+        Spl=0.0,
+        Spr=1e7,
     )
 
 
@@ -34,7 +37,9 @@ def _three_layer():
 def test_three_layer_converges_with_default_spectrum():
     """Archived outcome: fallback fires on all 5 biases, residual ~1e-8."""
     s = dj.simulate(_three_layer(), dj.Sweep(n_steps=5, vmax=1.0))
-    assert bool(s.converged), f"expected convergence with default spectrum, max|F|={float(s.max_residual)}"
+    assert bool(s.converged), (
+        f"expected convergence with default spectrum, max|F|={float(s.max_residual)}"
+    )
     assert all(bool(x) for x in s.fallback_used), s.fallback_used
     assert float(s.max_residual) < 1e-6, float(s.max_residual)
 
@@ -59,5 +64,5 @@ def test_three_layer_is_not_a_physical_cell():
     """With the default (converging) spectrum, Jsc is ~0 and Voc=nan: the
     n-p-n structure with an n+ layer at the hole contact has no hole path."""
     s = dj.simulate(_three_layer(), dj.Sweep(n_steps=5, vmax=1.0))
-    assert abs(float(s.jsc) * 1e4) < 1.0, f"Jsc should be ~0, got {float(s.jsc)*1e4:.2f} A/m2"
+    assert abs(float(s.jsc) * 1e4) < 1.0, f"Jsc should be ~0, got {float(s.jsc) * 1e4:.2f} A/m2"
     assert not bool(jnp.isfinite(s.voc)), "Voc should be nan for this non-collecting structure"

@@ -7,13 +7,9 @@ Both differentiable end-to-end via jax.grad/jax.jvp.
 
 from __future__ import annotations
 
-import jax
 import jax.numpy as jnp
-from jax import lax
 
 from driftjax.numerics.banded_ge import (
-    _block_thomas,
-    _dense_from_blocks,
     banded_ge_solve,
 )
 

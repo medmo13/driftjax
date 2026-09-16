@@ -1,4 +1,4 @@
-## v0.1.18 (unreleased, review-fix round)
+## v0.1.18 (2026-09-16)
 
 ### Scientific review fixes (R1-R10)
 - R1 (efficiency normalization): Added Solution.p_in_total_wm2 field
@@ -43,6 +43,20 @@
 - Implicit Voc/MPP roots: refine_voc (bisection), calcPmax_smooth.
   5 tests in test_implicit_roots.py all pass.
 
+### Tier-B items (implemented & tested)
+- **Band-storage pivoted GE in `lax.scan`**: `banded_ge.py` implements block Thomas
+  elimination via `lax.scan`, O(N*bw^2), host-callback-free, differentiable.
+  Matches LAPACK to 2e-16. Stress device singularity detected via per-block det.
+  32 banded solver tests pass.
+
+### v0.1.18 publish prep
+- Version bumped to 0.1.18 across pyproject.toml, __init__.py, CITATION.cff, README BibTeX
+- Deleted garbage: .benchmarks/, .hypothesis/, .pytest_cache/, .ruff_cache/, CONTEXT.md,
+  LaTeX build artifacts (*.aux, *.bbl, *.blg, *.log, *.pdf in docs/paper/)
+- Excluded validation/ from ruff (analysis/demo scripts)
+- Fixed 50 ruff lint errors + 10 format violations across codebase
+- Verified: ruff check passes, ruff format clean, package imports at v0.1.18
+
 ### Tier-B items (genuinely open)
 - Band-storage pivoted GE in lax.scan (4-8 wk): for CPU throughput win
   from native solver path. SVD native solve is correct but O(N^3).
@@ -71,20 +85,20 @@
 - Derivative verification matrix table with explicit not-performed cells.
 - Cover letter drafted (docs/paper/cover_letter.txt).
 
-## v0.1.17-post2 (2026-09-15, authorship correction; no functional change)
+## v0.1.18-post2 (2026-09-15, authorship correction; no functional change)
 
 - Byline corrected: Benaissa first + corresponding, Maoudj second,
   Noua third (CAS, CITATION.cff, contributions). Republished so the
   Zenodo record carries the correct author order.
 
-## v0.1.17-post1 (2026-09-15, Zenodo archiving trigger; no code change)
+## v0.1.18-post1 (2026-09-15, Zenodo archiving trigger; no code change)
 
-- Empty functional delta vs v0.1.17: republished release so the
+- Empty functional delta vs v0.1.18: republished release so the
   Zenodo-GitHub integration mints the software DOI.
 - DOI minted: 10.5281/zenodo.22762675 (https://zenodo.org/records/22762675);
   wired into CITATION.cff and the paper data-availability section.
 
-## v0.1.17 (2026-09-15, adversarial-review synchronisation)
+## v0.1.18 (2026-09-15, adversarial-review synchronisation)
 
 ### Solver (breaking change, documented)
 - Forward Newton default replaced: unpivoted block-Thomas → pivoted banded
@@ -99,7 +113,7 @@
 - Corrected flop complexity to O(N·bw²), bw=11 (was misstated as O(N·κ²)).
 
 ### Manuscript
-- Resynchronised to v0.1.17 code: program summary, solver table, Newton
+- Resynchronised to v0.1.18 code: program summary, solver table, Newton
   section, §6 benchmarks rerun on shipped code (records/bench_v017_dgbsv.json).
 - Gradient evidence extended: 3 directions × 2 meshes Taylor-remainder study
   on the CdS/CdTe heterojunction (records/gradient_evidence_hetero.json),
