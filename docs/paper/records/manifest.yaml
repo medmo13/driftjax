@@ -46,3 +46,5 @@ records:
   identifiability.json:          {script: validation/identifiability.py, covers: parameter identifiability probe (5% and 12.5% noise)}
   srjsu_2x2_diagnostic.json:      {script: validation/scaling_2x2.py, covers: 2x2 preconditioning identification matrix on stress Jacobian; shows dense row-eq cuts singular floor 42->2; _scalar_row_scales + DRIFTJAX_ROW_EQUIL=1 gate implemented in adjoint_banded_solve_blocks, golden-safe}
 
+
+banded_ge_benchmark.json:             {script: src/driftjax/numerics/banded_native.py, covers: pure-JAX pivoted block GE via lax.scan, O(N*bw^2), no host callback, differentiable; stress device rank 78/120 detected}

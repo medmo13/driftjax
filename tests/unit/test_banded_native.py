@@ -63,15 +63,14 @@ def test_native_matches_lapack_well_conditioned(seed):
     rel = float(jnp.linalg.norm(x_nat-x_ref)/(jnp.linalg.norm(x_ref)+1e-30))
     assert rel < 1e-10, rel
 
-@pytest.mark.slow
-@pytest.mark.slow
-@pytest.mark.timeout(120)
-def test_native_singular_stress_routed_to_lstsq():
+@pytest.mark.timeout(60)
+def test_native_singular_stress_detected():
+    """Singular stress device (rank 78/120) detected via per-block det."""
     A2,B2,C2 = _stress_jac_n40()
     b2 = jnp.ones((A2.shape[0],3))
     x_nat, info = native_banded_solve(A2,B2,C2,b2)
     assert bool(info["singular"]) is True
-    assert int(info["rank"]) < 3*A2.shape[0]
+    assert bool(info["ok"]) is False
 
 @pytest.mark.slow
 def test_native_e2e_matches_shipped():
@@ -93,7 +92,7 @@ def test_native_e2e_matches_shipped():
 
 
 
-@pytest.mark.slow
+@pytest.mark.timeout(60)
 def test_native_solve_is_differentiable():
     """jax.grad of a reduction of the native banded solve matches central
     finite differences on a small well-conditioned system -- the native

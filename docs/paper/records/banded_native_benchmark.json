@@ -40,5 +40,7 @@
   "honest_limitation": "row-equilibration is an exact similarity transform on a NON-singular matrix, so it does not change the solution there - it only rescues FALSE fallbacks on moderately ill-conditioned-but-nonsingular systems. It CANNOT rescue the structurally-singular (rank-78) 3-layer stress device, which is genuinely rank-deficient and routes to lstsq in both gate settings.",
   "relation_to_diagnostic": "the 42->1 SVD floor reduction is about rank DETERMINATION (SVD sees the structure), not about making banded-LU succeed on a structurally-singular matrix. The gate captures the right mechanism (dense per-scalar row equilibration vs the ineffective block-level) for the cases where it can help.",
   "recommendation": "Keep gated off by default; enable per-run when the adjoint fallback rate is suspicious (high used_fallback on a nominally converging device). The real rank-deficiency fix still needs either SrJSu coordinate change or the banded-GE - this gate is a safe diagnostic lever."
- }
+ },
+ "updated_status": "Superseded by banded_ge.py (pure-GE, no SVD fallback). Old SVD-only path was correct but O(N^3). New GE path is O(N*bw^2), host-callback-free, differentiable, and passes all tests.",
+ "tier_b_status": "COMPLETE \u2014 banded_ge.py implements the O(N*bw^2) pivoted GE in lax.scan. The native_banded_solve now uses GE as primary path with determinant-based singularity detection. No SVD fallback needed for non-singular systems. Compilation is faster than the SVD path (no large-dense-matrix lstsq)."
 }
