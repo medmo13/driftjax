@@ -108,6 +108,18 @@ residual ~1e-9 (see the main article, structured-solver diagnosis).
 
 **Code:** `numerics/banded_solve.py:banded_solve()`
 
+### Native JAX GE (opt-in)
+
+For GPU-residency and free end-to-end autodiff of the linear solve,
+`DRIFTJAX_NATIVE_BANDED=1` switches to the pure-JAX block Thomas
+algorithm in `lax.scan` (`numerics/banded_ge.py:banded_ge_solve()`).
+This uses 3×3 partial pivoting (`jnp.linalg.solve` at each block)
+with O(N·bw²) complexity — asymptotically faster than the SVD
+fallback and fully traceable inside XLA. Singularity is detected via
+per-block determinant threshold.
+
+**Code:** `numerics/banded_ge.py:banded_ge_solve()`
+
 ### Non-finite / singular guard
 
 Near degenerate conditions (e.g., equilibrium Jacobian at flatband) the
@@ -117,10 +129,12 @@ falls back to pivoted dense `JAX.linalg.solve` when either check trips.
 
 **Code:** `numerics/banded_solve.py:banded_solve()`, `solvers/newton.py:_step_newton_impl()`
 
-**Differentiability note:** the forward solve runs through a host
+**Differentiability note:** the forward LAPACK path runs through a host
 callback opaque to AD — forward Newton steps are not differentiable
-through. Gradients flow exclusively through the `custom_vjp`
-implicit-adjoint path.
+through. The native GE path (`DRIFTJAX_NATIVE_BANDED=1`) is fully
+differentiable. Gradients otherwise flow through the `custom_vjp`
+implicit-adjoint path, which uses `adjoint_dense_solve` for the
+transpose system.
 
 ## Dense Fallback
 

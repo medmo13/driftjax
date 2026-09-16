@@ -65,9 +65,18 @@ The adjoint solve uses `jax.vmap` over bias points — a single trace, batched e
 
 **Code:** `simulate.py:_sweep_bwd()`
 
-### Dense-Only Adjoint
+### Dense Adjoint
 
-The adjoint solve uses pivoted dense LU unconditionally (`adjoint_dense_solve`). The banded transpose was removed after FD validation showed silent 10--30% gradient errors under ill-conditioning ($\kappa(J)\sim10^{14}$) that no cheap residual gate could certify.
+The adjoint solve uses pivoted dense LU unconditionally
+(`adjoint_dense_solve`). The banded transpose was removed after FD
+validation showed silent 10--30% gradient errors under ill-conditioning
+($\kappa(J)\sim10^{14}$) that no cheap residual gate could certify.
+
+An opt-in row-equilibration gate (`DRIFTJAX_ROW_EQUIL=1`,
+`numerics/banded_solve.py:adjoint_banded_solve_blocks`) applies
+per-scalar row scaling from the blocks alone — golden-safe on
+well-conditioned systems (bit-identical), with the dense dense-LU
+adjoint remaining the production default.
 
 **Code:** `adjoint/api.py:ImplicitAdjoint()`, `numerics/mixed_precision.py:adjoint_dense_solve()`
 

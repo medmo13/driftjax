@@ -9,6 +9,7 @@ All hot-path functions are decorated with `@jax.jit`, which compiles them to opt
 - `comp_F` / `fused_residual` — residual assembly
 - `banded_jacobian` / `fused_jacobian_banded` — Jacobian assembly
 - `banded_solve` — linear solver (LAPACK dgbsv via host callback)
+- `banded_ge_solve` — native JAX block Thomas GE in `lax.scan` (opt-in via `DRIFTJAX_NATIVE_BANDED=1`)
 - `_step_newton_impl` — full Newton step (residual + Jacobian + solve)
 
 The first call triggers compilation (typically 1–5 seconds); subsequent calls reuse the compiled program.
