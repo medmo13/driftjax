@@ -1,33 +1,36 @@
 {
- "ex1": {
-  "grid": [
-   0.0,
-   1.1,
-   200
-  ],
-  "linf_dJ": 0.004004282099937292,
-  "l2_dJ": 0.00055866675028279,
-  "rel_l2": 0.02468177944115131,
-  "jsc_driftjax": 0.020254954672680583,
-  "jsc_ref": 0.020254954672729628,
-  "pce_pct_driftjax": 19.889099648245768,
-  "voc_driftjax": 1.049549541671341,
-  "wall_s": 6.795065821002936
- },
- "ex2": {
-  "grid": [
-   0.0,
-   0.9,
-   200
-  ],
-  "linf_dJ": 0.001551761257120492,
-  "l2_dJ": 0.00021218359156376015,
-  "rel_l2": 0.013478324061534453,
-  "jsc_driftjax": 0.01816375437281546,
-  "jsc_ref": 0.01816377774518947,
-  "pce_pct_driftjax": 13.27301694136454,
-  "voc_driftjax": 0.892232473487177,
-  "wall_s": 5.918638600000122
- },
- "note": "Cross-code J(V) on a common 200-point bias grid (ex1: 0..1.1V, ex2: 0..0.9V). Jsc matches to machine precision (ex1: 4.9e-14, ex2: 2.3e-08). The 0.11 pp PCE difference between DriftJax (19.889%) and the dPV reference (20.00%) is a SWEEP-DENSITY artifact: the cross-code script uses n_steps=25 (coarse), while ex1_np_junction.py uses n_steps=101 (dense) and reproduces the 20.000% PCE bit-for-bit. This is NOT a normalization artifact (both use raw AM1.5G = 899.9168 W/m2); it is the MPP hard-argmax missing the true maximum at coarse sampling. See R5 (non-smooth objective warning)."
+  "ex1": {
+    "grid": [
+      0.0,
+      1.1,
+      200
+    ],
+    "linf_dJ": 0.004004282099937292,
+    "l2_dJ": 0.00055866675028279,
+    "rel_l2": 0.02468177944115131,
+    "jsc_driftjax": 0.020254954672680583,
+    "jsc_ref": 0.020254954672729628,
+    "pce_pct_driftjax": 19.889099648245768,
+    "voc_driftjax": 1.049549541671341,
+    "wall_s": 6.795065821002936
+  },
+  "ex2": {
+    "grid": [
+      0.0,
+      0.9,
+      200
+    ],
+    "linf_dJ": 0.001551761257120492,
+    "l2_dJ": 0.00021218359156376015,
+    "rel_l2": 0.013478324061534453,
+    "jsc_driftjax": 0.01816375437281546,
+    "jsc_ref": 0.01816377774518947,
+    "pce_pct_driftjax": 13.27301694136454,
+    "voc_driftjax": 0.892232473487177,
+    "wall_s": 5.918638600000122
+  },
+  "note": "Cross-code J(V) on a common 200-point bias grid (ex1: 0..1.1V, ex2: 0..0.9V). Jsc matches to machine precision (ex1: 4.9e-14, ex2: 2.3e-08). The 0.11 pp PCE difference between DriftJax (19.889%) and the dPV reference (20.00%) is a SWEEP-DENSITY artifact: the cross-code script uses n_steps=25 (coarse), while ex1_np_junction.py uses n_steps=101 (dense) and reproduces the 20.000% PCE bit-for-bit. This is NOT a normalization artifact (both use raw AM1.5G = 899.9168 W/m2); it is the MPP hard-argmax missing the true maximum at coarse sampling. See R5 (non-smooth objective warning).",
+  "metadata": {
+    "driftjax": "0.1.18"
+  }
 }

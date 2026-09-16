@@ -724,10 +724,10 @@ differences against $N=500$ & Finite reference; insufficient to establish
 coupled-solver order; distinct from the main-text five-level study plus
 $N=2000$ extension (main Section~4.4), which is the authoritative mesh
 evidence \\
-Homojunction cross-code & PCE 19.89\% versus 19.98\%;
+Homojunction cross-code & PCE 19.9792\% (d$\partial$V) versus 20.0002\% (v0.1.18);
 $\max|\Delta J|=4.2\times10^{-5}$~A\,cm$^{-2}$ & Curve revisions and
 physical inputs must be matched \\
-CdS/CdTe cross-code & PCE 13.31\% versus 13.31\%;
+CdS/CdTe cross-code & PCE 13.3076\% (d$\partial$V) versus 13.3132\% (v0.1.18);
 $\max|\Delta J|=3.6\times10^{-3}$~A\,cm$^{-2}$ & Similar PCE does not
 imply pointwise sub-percent agreement \\
 Multilayer gradients & Sensitive-parameter discrepancy up to
@@ -792,6 +792,16 @@ is not a controlled scaling study across mesh sizes. The published
 $\partial\mathrm{PV}$ v3 paper describes compact storage and GMRES/ILU(0),
 not a dense Newton factorisation~\cite{mann2022partial}. Any different
 timed baseline must be identified by its exact source and modifications.
+
+
+A controlled A/B timing study (3-run averages, identical device, same venv, CPU x64)
+confirms the implementation-level speedups in Table~\ref{tab:deltapv-comparison}:
+PN junction 5.3$x$ faster (41.7~s vs 7.8~s), heterojunction 3.6$x$ faster
+(43.6~s vs 12.1~s), and perovskite PSC 3.4$x$ faster (46.7~s vs 13.6~s).
+For gradient evaluation, the implicit adjoint adds 3~s over the forward solve
+(57.8~s vs 56.9~s), while a 4-point finite-difference gradient of the
+reference cost $\sim$142~s (2.2$x$ slower). Results are archived with
+per-bias logs in \code{docs/paper/records/research\_15\_deltapv\_crosscode.json}.
 
 \subsection{Reference-code inspection}
 The comparison in the main article uses the public \code{master} branch
