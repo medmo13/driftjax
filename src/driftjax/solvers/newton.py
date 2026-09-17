@@ -317,6 +317,79 @@ def _step_newton_impl(cell, bound, x, dense, refinement, analytic, fused):
     )
 
 
+# ---------------------------------------------------------------------------
+# Fully-fused Newton step with native GE (v0.1.18b)
+#
+# Collapses residual + Jacobian + row-equilibrated GE solve + damped update
+# into a SINGLE XLA program — zero host callbacks, optimal for GPU residency.
+# Use via: solver = Newton(backend="native_ge_eq")
+# Falls back to LAPACK path by default (unchanged behavior).
+# ---------------------------------------------------------------------------
+
+
+def _fused_newton_step_ge(cell, bound, x, n):
+    """Fully-fused Newton step: F + analytic Jacobian + native GE + damped update.
+
+    ALL operations (residual assembly, Jacobian assembly, row-equilibrated
+    banded GE, logdamp, x update) are inlined into one XLA program.
+    No host callbacks, no scipy LAPACK round-trips.
+
+    The row equilibration (D from block max-abs) is computed from the Jacobian
+    blocks directly — O(N*bw) with no dense Jacobian materialization — and
+    applied to both A/B/C blocks and the RHS before the scan-based GE.
+
+    Args:
+        cell: PVCell with boltzmann statistics
+        bound: BoundaryConditions
+        x: dimensionless potential vector (3n,)
+        n: number of mesh points (static)
+
+    Returns:
+        (x_new, step_norm, residual_norm, max_abs_F, linresid, backend_code, lstsq_used)
+    """
+    from driftjax.numerics.analytic_jacobian import banded_jacobian, blockwise_residual
+    from driftjax.numerics.banded_ge import (
+        _apply_row_equil,
+        _scalar_row_scales,
+        banded_ge_solve,
+    )
+    from driftjax.numerics.residual import comp_F_precomputed
+
+    pot = vec2pot(x)
+
+    # --- Fused residual + Jacobian (shared carrier statistics) ---
+    F, _pre_n, _pre_p, _pre_ni = comp_F_precomputed(cell, bound, pot)
+    A, B, C = banded_jacobian(cell, bound, pot, n_v=_pre_n, p_v=_pre_p, ni_v=_pre_ni)
+
+    # --- Native GE solve with row equilibration (entirely in-XLA) ---
+    dr = _scalar_row_scales(A, B, C)  # (N,) per-scalar-row
+    Ae, Be, Ce, be = _apply_row_equil(A, B, C, (-F).reshape(n, 3), dr)
+    p_b, info_ge = banded_ge_solve(Ae, Be, Ce, be, equilibrate=False)  # already equilibrated
+    p_b = p_b.reshape(-1)
+
+    # --- Residual certification on ORIGINAL blocks (un-equilibrated check) ---
+    linresid = jnp.linalg.norm(blockwise_residual(A, B, C, F, p_b)) / (jnp.linalg.norm(F) + 1e-30)
+
+    # --- Damped update + stats ---
+    lstsq_used = ~info_ge["ok"]
+    backend_code = jnp.where(info_ge["ok"], jnp.int32(0), jnp.int32(9))
+    dx = logdamp(p_b)
+    x_new = x + dx
+
+    return (
+        x_new,
+        jnp.max(jnp.abs(dx)),
+        jnp.linalg.norm(F),
+        jnp.max(jnp.abs(F)),
+        linresid,
+        backend_code,
+        lstsq_used,
+    )
+
+
+_fused_newton_step_ge_jit = jax.jit(_fused_newton_step_ge, static_argnames=("n",))
+
+
 _step_newton_jit = jax.jit(
     _step_newton_impl, static_argnames=("dense", "refinement", "analytic", "fused")
 )

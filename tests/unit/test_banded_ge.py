@@ -203,3 +203,42 @@ def test_ge_equilibrate_with_singular():
 
     x, info = banded_ge_solve(A, B, C, b, equilibrate=True)
     assert not bool(info["ok"]), "Singular first block should be detected even with equilibration"
+
+
+def test_fused_newton_step_ge_correctness():
+    """Fused Newton step with native GE produces identical results to traditional step."""
+    import driftjax as dj
+    from driftjax.fields import pot2vec, vec2pot
+    from driftjax.science.contacts import boundary_eq
+    from driftjax.solvers.newton import _fused_newton_step_ge_jit
+
+    Si = dj.material(
+        Chi=3.9, Eg=1.5, eps=9.4, Nc=8e17, Nv=1.8e19, mn=100, mp=100, tn=1e-8, tp=1e-8, A=2e4
+    )
+    dev = dj.Device(
+        n_points=50, layers=[(1e-4, Si, 1e17), (1e-4, Si, -1e17)], Snl=1e7, Snr=0, Spl=0, Spr=1e7
+    )
+    sol = dj.simulate(dev, dj.Sweep(n_steps=3))
+    cell = sol.cell
+    pot = sol.potentials[-1]
+    bound = boundary_eq(cell)
+    n = pot.n
+
+    # Traditional step (LAPACK banded)
+    from driftjax.solvers.newton import step_newton
+
+    pot_old, err_old, stats_old = step_newton(cell, bound, pot, fused=False, analytic=True)
+
+    # Fused GE step (native GE with equilibration)
+    x_fused, err_fused, resid_fused, _, linres_fused, _, _ = _fused_newton_step_ge_jit(
+        cell, bound, pot2vec(pot), n
+    )
+    pot_fused = vec2pot(x_fused)
+
+    # Both should produce nearly identical steps
+    diff = float(jnp.max(jnp.abs(pot_old.phi - pot_fused.phi)))
+    print(f"  Step diff (LAPACK vs fused-GE): {diff:.4e}")
+    print(
+        f"  Linear residual: old={float(stats_old['linresid']):.4e}  fused={float(linres_fused):.4e}"
+    )
+    assert diff < 1e-8, f"Fused GE step differs from LAPACK: {diff}"
