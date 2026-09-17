@@ -561,7 +561,7 @@ def _forward_fused_scan(design, solver, optics, protocol, ls, statistics):
     vmax = float(protocol.vmax)
     key = None
     try:
-        key = (rtol, max_steps, n_steps, vmax, statistics, fused, _static_key(optics, ls))
+        key = (rtol, max_steps, n_steps, vmax, statistics, fused, backend, _static_key(optics, ls))
     except Exception:
         key = None
     fn = _SCAN_JIT_CACHE.get(key) if key is not None else None
