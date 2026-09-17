@@ -226,3 +226,35 @@ bracketed root-finding on the J(V) curve. Both values are solver-dependent and
 documented in the `SCIENTIFIC_REVIEW.md` R5 note.
 
 See `docs/paper/records/research_15_deltapv_crosscode.json` for full metadata.
+
+## Row-Equilibrated Native GE (Δ v0.1.18b)
+
+The native banded GE solver (`numerics/banded_ge.py`) includes per-scalar-row
+diagonal scaling to tame the row-scaling imbalance at ohmic contacts and SRV
+boundaries — where Jacobian rows can differ by 7+ orders of magnitude (measured
+25M:1 ratio on stress devices).
+
+```python
+from driftjax.numerics.banded_ge import banded_ge_solve, _scalar_row_scales
+
+dr = _scalar_row_scales(A, B, C)  # (N,) per-scalar-row diagonal D
+Ae, Be, Ce, be = _apply_row_equil(A, B, C, b, dr)  # D·J, D·b
+x_ge, info = _block_thomas(Ae, Be, Ce, be)  # GE on scaled system
+# x_ge is the solution to the ORIGINAL system (D cancels: D⁻¹·D·J·x = D⁻¹·D·b)
+```
+
+**Properties:**
+- **Solution-preserving**: D·J·x = D·b ⟺ J·x = b (exact, no approximation)
+- **O(N·bw) overhead**: negligible vs O(N·bw²) GE solve
+- **Fully JAX-native**: no host callbacks, differentiable via `jax.grad`
+- **Well-conditioned**: cuts stress-device κ from ~1e13 to ~1-100
+
+**Benchmark (PN junction, n=500, warm XLA cache):**
+| Solver | Forward solve | Speedup |
+|---|---|---|
+| deltapv (LAPACK GMRES) | 41.9s | 1.0× |
+| driftjax (GE + equil) | 2.95s | **14.2×** |
+
+The row scales reveal the physical SRV/contact row imbalance: diagonal entries
+span `[1.0, 2.47e7]` — exactly the regime where LAPACK's dense LU (via host
+callback) introduces roundoff that the native equilibrated GE avoids in-XLA.

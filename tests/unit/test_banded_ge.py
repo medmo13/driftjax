@@ -140,3 +140,66 @@ def test_ge_block_dets_returned():
     x_ge, A_mod, b_mod, dets = _block_thomas(A, B, C, b)
     assert dets.shape == (10,)
     assert jnp.all(jnp.isfinite(dets))
+
+
+# --- Row equilibration tests (v0.1.18b) ---
+
+
+def test_ge_equilibration_solution_preserving():
+    """Row equilibration D·J·x = D·b produces identical x to unequilibrated solve."""
+    from driftjax.numerics.banded_ge import banded_ge_solve
+
+    A, B, C, b = _rand_banded(30, seed=42)
+
+    x_noeq, info_noeq = banded_ge_solve(A, B, C, b, equilibrate=False)
+    x_eq, info_eq = banded_ge_solve(A, B, C, b, equilibrate=True)
+
+    assert bool(info_noeq["ok"]) and bool(info_eq["ok"])
+    # Solutions should be identical (D cancels in D^{-1} D J x = D^{-1} D b)
+    rel_diff = float(jnp.linalg.norm(x_eq - x_noeq) / (jnp.linalg.norm(x_noeq) + 1e-30))
+    assert rel_diff < 1e-12, f"Equilibration changed solution: rel_diff={rel_diff}"
+
+
+def test_ge_equilibration_row_scales_span():
+    import numpy as np
+
+    """Row scales correctly capture block-row max-abs magnitudes."""
+    from driftjax.numerics.banded_ge import _scalar_row_scales
+
+    # Construct blocks with known scale disparity
+    n = 10
+    A = jnp.zeros((n, 3, 3))
+    B = jnp.zeros((n - 1, 3, 3))
+    C = jnp.zeros((n - 1, 3, 3))
+    b = jnp.ones((n, 3))
+
+    # First half: small blocks (~1e-15)
+    A = A.at[:5].set(jnp.eye(3) * 1e-15)
+    # Second half: large blocks (~1e15)
+    A = A.at[5:].set(jnp.eye(3) * 1e15)
+
+    dr = _scalar_row_scales(A, B, C)
+    dr_np = np.array(dr)
+
+    # Small blocks → large scale (1/1e-15 = 1e15)
+    # Large blocks → small scale (1/1e15 = 1e-15)
+    assert dr_np[0] > 1e14, f"Expected large scale for small block, got {dr_np[0]}"
+    assert dr_np[-1] < 1e-14, f"Expected small scale for large block, got {dr_np[-1]}"
+    print(f"  Scale spread: [{dr_np.min():.4e}, {dr_np.max():.4e}]")
+
+
+def test_ge_equilibrate_with_singular():
+    """Equilibration does not mask singularity detection on the first block.
+
+    Setting the first block to zeros makes it singular; jnp.linalg.solve
+    on a zero block produces NaN, which propagates through the scan and
+    is caught by the finite-check + determinant-gate.
+    """
+    from driftjax.numerics.banded_ge import banded_ge_solve
+
+    A, B, C, b = _rand_banded(10, seed=7)
+    # Make the first block exactly singular (used directly in forward scan)
+    A = A.at[0].set(jnp.zeros((3, 3)))
+
+    x, info = banded_ge_solve(A, B, C, b, equilibrate=True)
+    assert not bool(info["ok"]), "Singular first block should be detected even with equilibration"

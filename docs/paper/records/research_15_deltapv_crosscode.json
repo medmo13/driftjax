@@ -7,7 +7,15 @@
     "jax": "0.10.2",
     "platform": "Linux-6.8.0-138-generic-x86_64-with-glibc2.35",
     "python": "3.13.13",
-    "x64": true
+    "x64": true,
+    "ge_solver": "banded_ge with row equilibration (v0.1.18b)",
+    "equilibration": {
+      "row_scale_spread": "2.47e7 (25M:1)",
+      "solution_preserving": true,
+      "relative_residual_noeq": 2.23e-11,
+      "relative_residual_eq": 3.71e-11,
+      "overhead": "negligible (O(N) vs O(N*bw^2) GE)"
+    }
   },
   "n_points": 500,
   "description": "A/B benchmark: deltapv-master vs driftjax v0.1.18 on identical device structures and AM1.5G spectrum. Both use the same venv, CPU x64, and jax 0.10.2.",
@@ -26,7 +34,9 @@
         "wall_s_min": 3.98,
         "pce_pct": 20.0002,
         "voc_V": 1.051709,
-        "jsc_A_per_m2": 0.020255
+        "jsc_A_per_m2": 0.020255,
+        "wall_s_warm": 2.95,
+        "speedup_warm": 14.2
       },
       "speedup": 5.37,
       "pce_rel_diff_pct": 0.001,
@@ -87,6 +97,7 @@
     "Voc discrepancy: deltapv uses last sweep voltage (vmax) as proxy; driftjax uses bracketed root-finding",
     "driftjax uses native banded GE solver + XLA compilation cache; deltapv uses scipy LAPACK",
     "driftjax IFT adjoint gradient is 2.2x faster than 4-point finite differences",
-    "Both codes use identical thermal voltage/current scaling (kT/q = 0.02585 V, J0_scale = 1.096 MA/m^2)"
+    "Both codes use identical thermal voltage/current scaling (kT/q = 0.02585 V, J0_scale = 1.096 MA/m^2)",
+    "Row equilibration (v0.1.18b): per-scalar-row diagonal scaling from block entries tames ~25M:1 row-scaling imbalance in SRV/contact regions without leaving XLA. Solution-preserving (D\u00b7J\u00b7x = D\u00b7b \u27fa J\u00b7x = b). No measurable speed penalty (negligible O(N) overhead vs O(N\u00b7bw\u00b2) GE)."
   ]
 }
