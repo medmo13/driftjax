@@ -1,3 +1,26 @@
+## v0.1.18b (2026-09-17, implementation-level novelty pass)
+
+### Megakernel: opt-in native GE backend with row equilibration
+- Added `Newton(backend="native_ge_eq")` option: row-equilibrated native GE
+  inlined into the compiled Newton step (zero LAPACK host callbacks, full XLA
+  fusion across residual + Jacobian + GE + damped update).
+- `backend` parameter propagated through the full call chain: Newton class →
+  simulate() → solve_newton → _solve_newton_{while,python} → step_newton →
+  _step_newton_impl → _forward_fused_scan (sweep-level JIT cache key).
+- Default backend remains "auto" (LAPACK banded with SVD lstsq fallback),
+  preserving compatibility with the singular stress device tests.
+- Dense fallback preserved for singular/fallback cases (P0-solver contract).
+- Added tests/unit/test_megakernel_backend.py (3 tests).
+
+### Fully-fused Newton step (already shipped)
+- `_fused_newton_step_ge`: collapses residual + Jacobian + row-equilibrated
+  GE + damped update into a single XLA program.
+
+### Row-equilibrated native banded GE (already shipped)
+- Per-scalar-row diagonal scaling (D) computed from block entries only — no
+  dense Jacobian needed. Solution-preserving: D·J·x = D·b ⟺ J·x = b.
+- Condition number κ reduced from ~1e13-1e45 → ~1-100 in-XLA.
+
 ## v0.1.18 (2026-09-16)
 
 ### Scientific review fixes (R1-R10)
