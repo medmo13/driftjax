@@ -30,7 +30,14 @@ class AbstractSolver(eqx.Module):
 
 
 class Newton(AbstractSolver):
-    """Damped Newton solver with analytic banded Jacobian + pivoted LAPACK banded."""
+    """Damped Newton solver with analytic banded Jacobian + pivoted LAPACK banded.
+
+    ``backend="auto"`` (default): LAPACK banded solve with truncated-SVD fallback.
+    ``backend="native_ge_eq"`` (v0.1.18b megakernel): row-equilibrated native GE
+    inlined into the compiled Newton step — zero LAPACK host callbacks, full XLA
+    fusion across residual + Jacobian + GE + update. Falls back to dense solve
+    when GE fails on singular blocks.
+    """
 
     rtol: float = 1e-8
     max_steps: int = 100
@@ -39,4 +46,5 @@ class Newton(AbstractSolver):
     dense: bool = False
     refinement: bool = False
     fused: bool = True
+    backend: str = "auto"
     linear_solver: AbstractLinearSolver = eqx.field(default_factory=BandedLapack)

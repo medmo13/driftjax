@@ -224,6 +224,7 @@ def _forward(
         refinement=refinement,
         fused=fused,
         globalization=globalization,
+        backend=getattr(solver, "backend", "auto"),
     )
     cell = init_cell(
         design, ls, alpha_mode=optics.alpha_mode, statistics=statistics, optics=optics, fused=fused
@@ -552,6 +553,7 @@ def _forward_fused_scan(design, solver, optics, protocol, ls, statistics):
         ls = _spec(normalize=False)
     statistics = statistics or "boltzmann"
     fused = bool(solver.fused or getattr(protocol, "fused", False))
+    backend = getattr(solver, "backend", "auto")
     rtol = float(solver.rtol)
     max_steps = int(solver.max_steps)
     alpha_mode = optics.alpha_mode
@@ -574,10 +576,21 @@ def _forward_fused_scan(design, solver, optics, protocol, ls, statistics):
             )
             sc = thermal_scales(d.T)
             pot_eq0 = _solve_eq_fused(
-                cell, boundary_eq(cell), _eg(cell).phi, allow_trace=True, loop="while"
+                cell,
+                boundary_eq(cell),
+                _eg(cell).phi,
+                allow_trace=True,
+                loop="while",
+                backend=backend,
             )
             pot_eq, _ = _solve_newton_fused(
-                cell, boundary_eq(cell), pot_eq0, allow_trace=True, loop="while", fused=fused
+                cell,
+                boundary_eq(cell),
+                pot_eq0,
+                allow_trace=True,
+                loop="while",
+                fused=fused,
+                backend=backend,
             )
             vmax_dim = vmax / sc["energy"]
             vs = jnp.linspace(0.0, vmax_dim, n_steps)
@@ -594,6 +607,7 @@ def _forward_fused_scan(design, solver, optics, protocol, ls, statistics):
                     fused=fused,
                     tol=rtol,
                     max_steps=max_steps,
+                    backend=backend,
                 )
                 cur = _tc(cell, pot_new)
                 # R2: per-bias lstsq flag rides the scan outputs (tracer

@@ -162,6 +162,7 @@ def solve_eq(
     iter_cb=None,
     allow_trace: bool = False,
     loop=None,
+    backend: str | None = None,
 ) -> Potentials:
     """Solve F_eq(φ) = 0 with damped Newton (φn = φp = 0 frozen).
 
@@ -180,11 +181,13 @@ def solve_eq(
         loop = "python" if not allow_trace else "while"
     if loop == "while":
         # Trace-safe: ONE compiled body, runtime early-exit -> small jaxpr.
-        return _solve_eq_while(cell, bound, phi_ini, tol, max_iter, dense, analytic, allow_trace)
+        return _solve_eq_while(
+            cell, bound, phi_ini, tol, max_iter, dense, analytic, allow_trace, backend
+        )
     # "python" (eager): fast for-loop with early-exit (mirrors v0.0.x). Only
     # used when not tracing, so float()/break are concrete-safe.
     return _solve_eq_python(
-        cell, bound, phi_ini, tol, max_iter, dense, analytic, allow_trace, iter_cb
+        cell, bound, phi_ini, tol, max_iter, dense, analytic, allow_trace, iter_cb, backend
     )
 
 
@@ -193,7 +196,7 @@ def solve_eq(
 # ---------------------------------------------------------------------------
 
 
-def _step_newton_impl(cell, bound, x, dense, refinement, analytic, fused):
+def _step_newton_impl(cell, bound, x, dense, refinement, analytic, fused, backend=None):
     """Pure per-iteration body (jittable): F, Jacobian, damped step, stats."""
     from driftjax.numerics.analytic_jacobian import banded_jacobian
     from driftjax.numerics.fused_kernels import (
@@ -210,6 +213,7 @@ def _step_newton_impl(cell, bound, x, dense, refinement, analytic, fused):
         and not refinement
         and getattr(cell, "statistics", "boltzmann") == "boltzmann"
     )
+    use_native_ge = backend == "native_ge_eq"
     _fused_pair = None
     _pre_n = _pre_p = _pre_ni = None
     if fused and use_analytic:
@@ -235,59 +239,94 @@ def _step_newton_impl(cell, bound, x, dense, refinement, analytic, fused):
                 A, B, C = banded_jacobian(cell, bound, pot, n_v=_pre_n, p_v=_pre_p, ni_v=_pre_ni)
             else:
                 A, B, C = banded_jacobian(cell, bound, pot)
-        # Pivoted banded solve (LAPACK dgbsv): works on all devices including
-        # ill-conditioned heterojunctions where unpivoted elimination fails.
-        # R2 provenance: with_info reports whether the truncated-SVD (lstsq)
-        # fallback fired; the flag rides into step stats and the loop carry.
-        from driftjax.numerics.analytic_jacobian import blockwise_residual
-        from driftjax.numerics.banded_solve import banded_solve_with_info
 
-        # Check for non-finite Jacobian blocks (e.g. NaN from bad init).
-        blocks_finite = (
-            jnp.all(jnp.isfinite(A)) & jnp.all(jnp.isfinite(B)) & jnp.all(jnp.isfinite(C))
-        )
-
-        def _do_banded(_):
-            p_b, _info = banded_solve_with_info(A, B, C, (-F).reshape(n, 3))
-            p_b = p_b.reshape(-1)
-            lin_b = jnp.linalg.norm(blockwise_residual(A, B, C, F, p_b)) / (
-                jnp.linalg.norm(F) + 1e-30
+        if use_native_ge:
+            # v0.1.18b megakernel: native GE with row equilibration — zero
+            # LAPACK host callbacks, full XLA fusion across residual +
+            # Jacobian + GE + update. Entire Newton step is one XLA program.
+            from driftjax.numerics.analytic_jacobian import blockwise_residual
+            from driftjax.numerics.banded_ge import (
+                _apply_row_equil,
+                _scalar_row_scales,
+                banded_ge_solve,
             )
-            return p_b, lin_b, _info["used_lstsq"]
 
-        def _do_fallback(_):
-            Jf = F_jacobian(cell, bound, pot)
-            pf = jnp.linalg.solve(Jf, -F)
-            lin = jnp.linalg.norm(Jf @ pf + F) / (jnp.linalg.norm(F) + 1e-30)
-            return pf, lin, jnp.array(False)
+            blocks_finite = (
+                jnp.all(jnp.isfinite(A)) & jnp.all(jnp.isfinite(B)) & jnp.all(jnp.isfinite(C))
+            )
 
-        # P0-solver contract (why a zeros/nonfinite banded step can NEVER
-        # masquerade as a valid Newton step): a zero step yields relative
-        # linear residual EXACTLY 1.0 (||F||/||F|| for F != 0), which always
-        # trips the use_dense gate (1.0 > 1e-4), so the dense fallback
-        # engages; if dense also fails the step is NaN and the NaN/
-        # best-iterate machinery handles it. The only zeros-kept case is
-        # F == 0 (already at the root), which is correct convergence.
-        # No separate failure flag is needed: the gate IS the detector
-        # (pinned by test_failed_linear_solve_never_certifies).
-        p_a, lin_a, lstsq_a = jax.lax.cond(blocks_finite, _do_banded, _do_fallback, None)
-        use_dense = (~jnp.isfinite(lin_a)) | (lin_a > 1e-4)
-        p, linresid, _ = jax.lax.cond(
-            use_dense, _do_fallback, lambda _: (p_a, lin_a, lstsq_a), None
-        )
-        # R2: lstsq flag is only meaningful when the banded path was taken and
-        # kept (not overridden by the dense fallback); trace-safe boolean.
-        lstsq_used = lstsq_a & (~use_dense)
-        # Use integer code for stats (trace-safe); 0=banded, 2=dense
-        backend_code = jnp.where(use_dense, 2, 0)
-        dx = logdamp(p)
+            def _do_native_ge(_):
+                dr = _scalar_row_scales(A, B, C)
+                Ae, Be, Ce, be = _apply_row_equil(A, B, C, (-F).reshape(n, 3), dr)
+                p_b, info_ge = banded_ge_solve(Ae, Be, Ce, be, equilibrate=False)
+                p_b = p_b.reshape(-1)
+                lin_b = jnp.linalg.norm(blockwise_residual(A, B, C, F, p_b)) / (
+                    jnp.linalg.norm(F) + 1e-30
+                )
+                ge_ok = info_ge["ok"] & jnp.isfinite(lin_b) & blocks_finite
+                return p_b, lin_b, ge_ok
+
+            def _do_dense_fallback(_):
+                Jf = F_jacobian(cell, bound, pot)
+                pf = jnp.linalg.solve(Jf, -F)
+                lin = jnp.linalg.norm(Jf @ pf + F) / (jnp.linalg.norm(F) + 1e-30)
+                return pf, lin
+
+            # P0-solver contract: zero/nonfinite GE step -> gate -> dense fallback
+            p_a, lin_a, _ge_ok = jax.lax.cond(
+                blocks_finite,
+                _do_native_ge,
+                lambda _: (jnp.zeros_like(F), jnp.inf, jnp.array(False)),
+                None,
+            )
+            use_dense = (~_ge_ok) | (~jnp.isfinite(lin_a)) | (lin_a > 1e-4)
+            p_f, lin_f = jax.lax.cond(
+                use_dense,
+                _do_dense_fallback,
+                lambda _: (p_a, lin_a),
+                None,
+            )
+            lstsq_used = (~use_dense) & (~_ge_ok)
+            backend_code = jnp.where(use_dense, 2, 0)
+        else:
+            # Default path: LAPACK banded solve with truncated-SVD lstsq fallback.
+            from driftjax.numerics.analytic_jacobian import blockwise_residual
+            from driftjax.numerics.banded_solve import banded_solve_with_info
+
+            blocks_finite = (
+                jnp.all(jnp.isfinite(A)) & jnp.all(jnp.isfinite(B)) & jnp.all(jnp.isfinite(C))
+            )
+
+            def _do_banded(_):
+                p_b, _info = banded_solve_with_info(A, B, C, (-F).reshape(n, 3))
+                p_b = p_b.reshape(-1)
+                lin_b = jnp.linalg.norm(blockwise_residual(A, B, C, F, p_b)) / (
+                    jnp.linalg.norm(F) + 1e-30
+                )
+                return p_b, lin_b, _info["used_lstsq"]
+
+            def _do_fallback(_):
+                Jf = F_jacobian(cell, bound, pot)
+                pf = jnp.linalg.solve(Jf, -F)
+                lin = jnp.linalg.norm(Jf @ pf + F) / (jnp.linalg.norm(F) + 1e-30)
+                return pf, lin, jnp.array(False)
+
+            p_a, lin_a, lstsq_a = jax.lax.cond(blocks_finite, _do_banded, _do_fallback, None)
+            use_dense = (~jnp.isfinite(lin_a)) | (lin_a > 1e-4)
+            p_f, lin_f, _ = jax.lax.cond(
+                use_dense, _do_fallback, lambda _: (p_a, lin_a, lstsq_a), None
+            )
+            lstsq_used = lstsq_a & (~use_dense)
+            backend_code = jnp.where(use_dense, 2, 0)
+
+        dx = logdamp(p_f)
         x_new = x + dx
         return (
             x_new,
             jnp.max(jnp.abs(dx)),
             jnp.linalg.norm(F),
             jnp.max(jnp.abs(F)),
-            linresid,
+            lin_f,
             backend_code,
             lstsq_used,
         )
@@ -391,7 +430,7 @@ _fused_newton_step_ge_jit = jax.jit(_fused_newton_step_ge, static_argnames=("n",
 
 
 _step_newton_jit = jax.jit(
-    _step_newton_impl, static_argnames=("dense", "refinement", "analytic", "fused")
+    _step_newton_impl, static_argnames=("dense", "refinement", "analytic", "fused", "backend")
 )
 
 
@@ -405,6 +444,7 @@ def step_newton(
     analytic=True,
     fused=False,
     allow_trace: bool = False,
+    backend: str | None = None,
 ):
     """One damped Newton step; returns (pot_new, error, stats).
 
@@ -417,7 +457,7 @@ def step_newton(
     the un-jitted loop ~4× slower than prime1/previous's `@jit step`).
     """
     x_new, err, resid, resid_f, linres, backend_code, lstsq_used = _step_newton_jit(
-        cell, bound, pot2vec(pot), dense, refinement, analytic, fused
+        cell, bound, pot2vec(pot), dense, refinement, analytic, fused, backend
     )
     pot_new = vec2pot(x_new)
     stats = {
@@ -450,6 +490,7 @@ def solve_newton(
     iter_cb=None,
     allow_trace: bool = False,
     loop=None,
+    backend: str | None = None,
 ):
     """Solve comp_F = 0.
 
@@ -516,6 +557,7 @@ def solve_newton(
             fused,
             allow_trace,
             iter_cb,
+            backend,
         )
     else:  # "python" (eager): fast for-loop with early-exit (v0.0.x path)
         pot, last_stats = _solve_newton_python(
@@ -530,6 +572,7 @@ def solve_newton(
             fused,
             allow_trace,
             iter_cb,
+            backend,
         )
 
     # Eager-only line-search fallback (robust out-of-basin recovery). Skipped
@@ -553,7 +596,9 @@ def solve_newton(
     return pot, last_stats
 
 
-def _solve_eq_while(cell, bound, phi_ini, tol, max_iter, dense, analytic, allow_trace):
+def _solve_eq_while(
+    cell, bound, phi_ini, tol, max_iter, dense, analytic, allow_trace, backend=None
+):
     """Trace-safe equilibrium solve via lax.while_loop (ONE compiled body,
     runtime early-exit -> small jaxpr). Used under jit/grad."""
     phi = jnp.asarray(phi_ini, dtype=jnp.float64)
@@ -580,7 +625,9 @@ def _solve_eq_while(cell, bound, phi_ini, tol, max_iter, dense, analytic, allow_
     return Potentials(jnp.zeros_like(phi), jnp.zeros_like(phi), phi)
 
 
-def _solve_eq_python(cell, bound, phi_ini, tol, max_iter, dense, analytic, allow_trace, iter_cb):
+def _solve_eq_python(
+    cell, bound, phi_ini, tol, max_iter, dense, analytic, allow_trace, iter_cb, backend=None
+):
     """Eager equilibrium solve: Python for-loop with early-exit (v0.0.x path).
     Only used when not tracing, so float()/break are concrete-safe and fast."""
     phi = jnp.asarray(phi_ini, dtype=jnp.float64)
@@ -605,7 +652,18 @@ def _solve_eq_python(cell, bound, phi_ini, tol, max_iter, dense, analytic, allow
 
 
 def _solve_newton_while(
-    cell, bound, pot_ini, tol, max_steps, f_tol, dense, refinement, fused, allow_trace, iter_cb
+    cell,
+    bound,
+    pot_ini,
+    tol,
+    max_steps,
+    f_tol,
+    dense,
+    refinement,
+    fused,
+    allow_trace,
+    iter_cb,
+    backend=None,
 ):
     """Trace-safe coupled-Newton solve via lax.while_loop (ONE compiled body,
     runtime early-exit -> small jaxpr, trace-safe). Used under jit/grad.
@@ -655,9 +713,9 @@ def _solve_newton_while(
             refinement=refinement,
             fused=fused,
             allow_trace=allow_trace,
+            backend=backend,
         )
         # resid_f is max|F| at the INPUT state (the state stepped FROM), so it
-        # is meaningful even when the step itself produced NaN — mirror the
         # eager loop, which updates best before checking for NaN. A NaN
         # resid_f itself is never an improvement (NaN < x is False), so the
         # clean best survives NaN tails.
@@ -741,7 +799,18 @@ def _solve_newton_while(
 
 
 def _solve_newton_python(
-    cell, bound, pot_ini, tol, max_steps, f_tol, dense, refinement, fused, allow_trace, iter_cb
+    cell,
+    bound,
+    pot_ini,
+    tol,
+    max_steps,
+    f_tol,
+    dense,
+    refinement,
+    fused,
+    allow_trace,
+    iter_cb,
+    backend=None,
 ):
     """Eager coupled-Newton solve: Python for-loop with early-exit (v0.0.x
     path). Only used when not tracing, so float()/break are concrete-safe and
@@ -770,6 +839,7 @@ def _solve_newton_python(
             refinement=refinement,
             fused=fused,
             allow_trace=allow_trace,
+            backend=backend,
         )
         try:
             any_lstsq = any_lstsq or bool(stats.get("lstsq", False))
