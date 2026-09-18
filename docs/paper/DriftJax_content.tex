@@ -2,7 +2,7 @@
 \noindent\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash\bfseries}p{0.24\linewidth}X@{}}
 \toprule
 Program title & DriftJax \\
-Version described & v0.1.17, release notes dated 15 September 2026 \\
+Version described & v0.1.18, release notes dated 15 September 2026 \\
 Programming language & Python with JAX \\
 Licensing provisions & MIT, as specified by the release documentation \\
 Nature of problem & Coupled electrostatics and carrier transport in layered
@@ -59,7 +59,7 @@ Analytical assembly and a direct pivoted banded solve (LAPACK
 \code{dgbsv} via \code{scipy.linalg.solve_banded}) exploit this structure
 during Newton iteration, at $O(N\cdot\mathrm{kl}\cdot\mathrm{ku})$ flop
 cost. An earlier unpivoted block-Thomas implementation was replaced in
-v0.1.17 after controlled comparisons showed it failing on
+v0.1.18 after controlled comparisons showed it failing on
 ill-conditioned heterojunctions (residuals $\sim2$--$3.7\times10^{2}$)
 while the pivoted banded solver remained accurate
 ($\sim10^{-9}$; Section~\ref{sec:conditioning}).
@@ -153,7 +153,7 @@ supplied release documentation, not an independently inspected source tree.
 \begin{papertable}
 \centering
 \caption{Implementation comparison. The reference column describes inspected
-$\partial\mathrm{PV}$ source; the DriftJax column describes v0.1.17
+$\partial\mathrm{PV}$ source; the DriftJax column describes v0.1.18
 code as released. Shared components are not claimed as new methods.}
 \label{tab:deltapv-comparison}
 \small
@@ -210,7 +210,7 @@ an option without claiming thermodynamic consistency of the resulting
 flux. The analysis of inexact implicit gradients~\cite{ehrhardt2024}
 is directly relevant to the reported adjoint errors and to the choice
 between iterative and direct transpose solves. The pivoted banded solver
-(LAPACK's \code{dgbsv}) used as the v0.1.17 forward default was compared
+(LAPACK's \code{dgbsv}) used as the v0.1.18 forward default was compared
 against the former unpivoted block-Thomas elimination and dense LU on
 identical saved matrices in Section~\ref{sec:conditioning}; pivoting
 proved essential on the heterojunction Jacobians. Bank et al.~\cite{bank1983}
@@ -441,7 +441,7 @@ algorithm permits direct Jacobian testing and avoids differentiating
 through the entire Newton iteration history~\cite{blondel2022}.
 \begin{papertable}
 \centering\small
-\caption{Mapping of mathematical responsibilities to the v0.1.17
+\caption{Mapping of mathematical responsibilities to the v0.1.18
 implementation.}
 \label{tab:architecture}
 \begin{tabularx}{\linewidth}{@{}p{0.35\linewidth}X@{}}
@@ -695,8 +695,8 @@ Interface affinity & Heterojunction & --- & --- & Not performed \\
 Six physical-consistency tests were performed on three device types
 (homojunction, heterojunction, perovskite) using the v0.1.16 release
 code; these assert residual identities (mass action, conservation,
-contact residuals) that are independent of the v0.1.17 linear-solver
-change, and the full 15-example gallery was re-executed on the v0.1.17
+contact residuals) that are independent of the v0.1.18 linear-solver
+change, and the full 15-example gallery was re-executed on the v0.1.18
 tree with matching metrics (Section~\ref{sec:applications} and
 \code{docs/paper/records/}). Dark-equilibrium carrier densities satisfy the mass-action law
 $np=n_i^2$ to machine precision: maximum relative errors of
@@ -716,13 +716,13 @@ implemented residual represents the stated physical model; they do not
 independently verify the numerical accuracy of the Newton convergence
 or the derivative computation~\cite{kerkhoven1988}.
 
-\subsection{Structured-solver diagnosis and the v0.1.17 switch}\label{sec:conditioning}
+\subsection{Structured-solver diagnosis and the v0.1.18 switch}\label{sec:conditioning}
 A systematic comparison of the former unpivoted block-Thomas solver,
 pivoted banded (\code{dgbsv}), and dense-LU solves on identical
 saved Jacobians and right-hand sides from five test devices (homojunction
 $N$=200 and 500, heterojunction $N$=500, highly-doped $N$=500, and
 ill-conditioned SRV-contrast $N$=500) reveals the following. This
-comparison motivated the v0.1.17 replacement of block-Thomas with the
+comparison motivated the v0.1.18 replacement of block-Thomas with the
 pivoted banded solver as the production forward default.
 
 The analytic and AD Jacobians agree to $<5\times10^{-17}$ relative error
@@ -757,7 +757,7 @@ fails completely (residuals $\sim2$--$3.7\times10^{2}$), while the
 pivoted banded solver remains accurate ($\sim10^{-9}$). The dense LU
 solutions agree with the banded results to $<10^{-9}$ on all devices.
 This confirms that pivoting is essential for the heterojunction Jacobian
-and motivated the v0.1.17 production default (Section~\ref{sec:newton});
+and motivated the v0.1.18 production default (Section~\ref{sec:newton});
 the dense fallback is retained for singular or non-finite blocks.
 
 Trusted-envelope boundary (N3/M2): the results above distinguish three
@@ -1109,7 +1109,7 @@ these correspond to approximately 108~kB and 18~MB in float64, a
 $167\times$ storage ratio, before factorisation workspace or
 compiler-managed intermediates.
 
-Controlled benchmarks of the shipped v0.1.17 code on an x86-64 CPU
+Controlled benchmarks of the shipped v0.1.18 code on an x86-64 CPU
 (Linux 6.8.0, Python 3.13.13, JAX 0.10.2, float64; machine-readable
 record in \code{docs/paper/records/bench\_v017\_dgbsv.json}) yield the
 following. A full single-bias Newton solve (tolerance $10^{-10}$,
@@ -1300,7 +1300,7 @@ by six orders of magnitude, confirming that the issue is structural
 scaling rather than a fundamental factorisation failure.
 
 \textbf{Performance.} Controlled single-architecture benchmarks of the
-shipped v0.1.17 code show a full single-bias Newton solve costing
+shipped v0.1.18 code show a full single-bias Newton solve costing
 49.9--106.0~ms warm from $N=50$ to $N=1600$ (sublinear scaling: fixed
 JIT/host-callback overhead dominates at these sizes). The adjoint
 gradient costs approximately $14$--$15\times$ the forward sweep.
@@ -1343,11 +1343,11 @@ The release documentation identifies
 \url{https://github.com/medmo13/driftjax} as the source repository and
 specifies an MIT licence. The archived software releases are available on Zenodo under the
 version-independent concept DOI~\url{https://doi.org/10.5281/zenodo.22762674};
-the v0.1.17-post1 snapshot cited here is version DOI~\url{https://doi.org/10.5281/zenodo.22762675}.
+the v0.1.18-post1 snapshot cited here is version DOI~\url{https://doi.org/10.5281/zenodo.22762675}.
 \code{CITATION.cff} carries the version DOI for machine-readable citation. The implementation description in this article
-is based on the v0.1.17 source tree described here (HEAD \code{b7e80ae}
-plus the v0.1.17 synchronisation revision); the repository should be
-pinned to the v0.1.17 release tag for reproducibility. Raw test logs,
+is based on the v0.1.18 source tree described here (HEAD \code{b7e80ae}
+plus the v0.1.18 synchronisation revision); the repository should be
+pinned to the v0.1.18 release tag for reproducibility. Raw test logs,
 per-example JSON sidecars and execution logs, and the machine-readable
 benchmark record (\code{docs/paper/records/bench\_v017\_dgbsv.json})
 are archived with the revision. No independent external validation

@@ -14,7 +14,7 @@ class AbstractLinearSolver(eqx.Module):
 
 
 class BandedLapack(AbstractLinearSolver):
-    """Pivoted banded solve (LAPACK dgbsv) — DriftJax default linear solver."""
+    """Banded linear solver with native GE + LAPACK dgbsv fallback."""
 
     batched: bool = False
 
@@ -32,15 +32,11 @@ class AbstractSolver(eqx.Module):
 class Newton(AbstractSolver):
     """Damped Newton solver with analytic banded Jacobian + pivoted LAPACK banded.
 
-    ``backend="native_ge_eq"`` (default, megakernel): row-equilibrated native GE
-    inlined into the compiled Newton step — zero LAPACK host callbacks, full XLA
+    ``backend="native_ge_eq"`` (default, v0.1.18b megakernel): row-equilibrated native GE
+    inlined into the compiled Newton step --- pure JAX native GE, full XLA
     fusion across residual + Jacobian + GE + update. Falls back to dense solve
     when GE fails on singular blocks.
     ``backend="auto"``: LAPACK banded solve with truncated-SVD fallback.
-    ``backend="native_ge_eq"`` (v0.1.18b megakernel): row-equilibrated native GE
-    inlined into the compiled Newton step — zero LAPACK host callbacks, full XLA
-    fusion across residual + Jacobian + GE + update. Falls back to dense solve
-    when GE fails on singular blocks.
     """
 
     rtol: float = 1e-8

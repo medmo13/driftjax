@@ -65,7 +65,8 @@ re-ran the headline claims as a skeptic rather than a defender:
 What did *not* change (structural, disclosed, not fixable in-revision):
 What did *not* change (structural, disclosed, not fixable in-revision):** zero physical
 experimental validation; the O(N) forward benefit remains asymptotic on CPU; GPU support
-is precluded by the host callback. These are scope limitations, not correctness defects.
+is now enabled via the native XLA megakernel (v0.1.18b); the previous
+host-callback barrier for LAPACK banded solves has been eliminated.
 
 ---
 

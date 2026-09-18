@@ -68,7 +68,7 @@ XLA's Common Subexpression Elimination (CSE) can theoretically share identical s
 | N=100 time | ~27ms | ~861ms |
 | N=100 memory | 21 KB | 703 KB |
 
-The analytic Jacobian + pivoted banded path is the default and should be used whenever possible. (Timings above predate the v0.1.17 solver switch; current controlled numbers are in the main article §6 and `docs/paper/records/bench_v017_dgbsv.json`.)
+The analytic Jacobian + pivoted banded path is the default and should be used whenever possible. (Timings above predate the v0.1.18 solver switch; current controlled numbers are in the main article §6 and `docs/paper/records/bench_v017_dgbsv.json`.)
 
 ## O(N) Block Operations
 

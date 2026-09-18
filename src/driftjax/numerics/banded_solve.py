@@ -95,11 +95,12 @@ def banded_solve_with_info(A, B, C, b):
     are trace-safe boolean arrays so they can ride a ``lax.while_loop`` carry
     into Newton statistics (R2 provenance: which solver actually ran).
 
-    Opt-in native path (``DRIFTJAX_NATIVE_BANDED=1``): tries the JAX-native
-    Givens QR solver first (no host callback); on ``ok=False`` falls through
-    to the callback path below, preserving all flags and fallbacks. The env
-    var is read at trace time (static); the default path is bit-identical
-    to before.
+    Native GE path is now the default (DRIFTJAX_NATIVE_BANDED defaults to
+    "1"). The pure-JAX block-Thomas GE uses lax.scan internally---no host
+    callbacks, fully trace-safe, and differentiable through implicit
+    adjoint. The scipy.linalg fallback path remains available by setting
+    DRIFTJAX_NATIVE_BANDED=0 for backward compatibility, and the
+    truncated-SVD least-squares fallback still handles singular blocks.
     """
     import os
 
@@ -149,7 +150,7 @@ def banded_solve_with_info(A, B, C, b):
     x = out[:-1].reshape(n, 3)
     flag = out[-1]
     info = {"used_lstsq": flag == 1, "used_zeros": (flag == 2) | has_nan}
-    if os.environ.get("DRIFTJAX_NATIVE_BANDED", "0") == "1":
+    if os.environ.get("DRIFTJAX_NATIVE_BANDED", "1") == "1":
         from driftjax.numerics.banded_native import native_banded_solve as _nbs
 
         x_nat, info_nat = _nbs(A, B, C, b)

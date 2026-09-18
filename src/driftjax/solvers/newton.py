@@ -242,7 +242,7 @@ def _step_newton_impl(cell, bound, x, dense, refinement, analytic, fused, backen
 
         if use_native_ge:
             # v0.1.18b megakernel: native GE with row equilibration — zero
-            # LAPACK host callbacks, full XLA fusion across residual +
+            # Pure-JAX native GE, full XLA fusion across residual +
             # Jacobian + GE + update. Entire Newton step is one XLA program.
             from driftjax.numerics.analytic_jacobian import blockwise_residual
             from driftjax.numerics.banded_ge import (
@@ -388,7 +388,7 @@ def _step_newton_impl(cell, bound, x, dense, refinement, analytic, fused, backen
 # Fully-fused Newton step with native GE (v0.1.18b)
 #
 # Collapses residual + Jacobian + row-equilibrated GE solve + damped update
-# into a SINGLE XLA program — zero host callbacks, optimal for GPU residency.
+# into a SINGLE XLA program — pure JAX, optimal for GPU residency.
 # Use via: solver = Newton(backend="native_ge_eq")
 # Falls back to LAPACK path by default (unchanged behavior).
 # ---------------------------------------------------------------------------
@@ -399,7 +399,7 @@ def _fused_newton_step_ge(cell, bound, x, n):
 
     ALL operations (residual assembly, Jacobian assembly, row-equilibrated
     banded GE, logdamp, x update) are inlined into one XLA program.
-    No host callbacks, no scipy LAPACK round-trips.
+    No host callbacks, no scipy LAPACK round-trips. Pure JAX.
 
     The row equilibration (D from block max-abs) is computed from the Jacobian
     blocks directly — O(N*bw) with no dense Jacobian materialization — and

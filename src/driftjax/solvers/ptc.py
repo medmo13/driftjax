@@ -17,7 +17,7 @@ recommendation (Armijo on ‖F‖₂²) and doubles as ``auto`` recovery.
 
 MEGAKERNEL (v0.1.18b): Both PTC and line-search now have traced
 (``lax.while_loop``) implementations that use native GE inlined Newton
-steps — fully traceable under jit/grad/vmap with zero host callbacks.
+steps — fully traceable under jit/grad/vmap with zero host callbacks (pure JAX).
 ``backend="native_ge_eq"`` fuses residual + Jacobian + GE + update into
 one XLA program per Newton step; the outer globalization loop is also a
 single compiled program.
@@ -120,7 +120,7 @@ def _solve_ptc_while(
     shrinks on reject, with bounded rejects; Phase 2 (Newton tail) starts
     automatically once f < switch_f.
 
-    All control flow in XLA (no host callbacks). Fully traceable.
+    All control flow in XLA (no scipy callbacks). Fully traceable.
     """
     from driftjax.solvers.newton import step_newton
 
@@ -222,7 +222,7 @@ def _solve_newton_ls_while(
     2. Armijo backtracking (inner while_loop)
     3. Update
 
-    All control flow in XLA (no host callbacks). Fully traceable.
+    All control flow in XLA (no scipy callbacks). Fully traceable.
     """
     from driftjax.solvers.newton import step_newton
 
@@ -329,7 +329,7 @@ def solve_ptc(
 
     MEGAKERNEL (v0.1.18b): when ``allow_trace=True`` or ``pot_ini`` is a
     tracer, uses ``lax.while_loop`` with native GE inlined Newton step —
-    fully traceable under jit/grad/vmap with zero host callbacks.
+    fully traceable under jit/grad/vmap with zero host callbacks (pure JAX).
     ``backend="native_ge_eq"`` fuses residual + Jacobian + GE + update
     into one XLA program per Newton step; the outer PTC loop is also
     a single compiled program.
@@ -487,7 +487,7 @@ def solve_newton_ls(
 
     MEGAKERNEL (v0.1.18b): when ``allow_trace=True`` or ``pot_ini`` is a
     tracer, uses ``lax.while_loop`` with native GE inlined Newton step —
-    fully traceable under jit/grad/vmap with zero host callbacks.
+    fully traceable under jit/grad/vmap with zero host callbacks (pure JAX).
     ``backend="native_ge_eq"`` fuses residual + Jacobian + GE + update
     into one XLA program per Newton step; the outer line-search loop is
     also a single compiled program.

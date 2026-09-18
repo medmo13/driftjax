@@ -431,7 +431,7 @@ def _simulate_sweep(
                 # Under JIT: no bool() validation possible. Trust the
                 # fused scan (all ops are trace-safe: lax.scan + lax.while_loop
                 # + native GE).  No serial fallback — Python for-loops
-                # would unroll at trace time and produce host callbacks.
+                # would unroll at trace time and produce host callbacks (scipy fallback only).
                 fast_ok = True
             else:
                 fast_ok = bool(jnp.isfinite(vd).all()) and bool(jnp.isfinite(cd).all())
@@ -655,7 +655,7 @@ def _sweep_fwd(design, solver, optics, protocol, progress, ls, statistics, init=
                 # Under JIT: no bool() validation possible. Trust the
                 # fused scan (all ops are trace-safe: lax.scan + lax.while_loop
                 # + native GE).  No serial fallback — Python for-loops
-                # would unroll at trace time and produce host callbacks.
+                # would unroll at trace time and produce host callbacks (scipy fallback only).
                 fast_ok = True
             else:
                 fast_ok = bool(jnp.isfinite(vd).all()) and bool(jnp.isfinite(cd).all())
@@ -784,7 +784,7 @@ def _sweep_bwd(solver, optics, protocol, progress, ls, statistics, init, fused, 
     _F_all = jax.vmap(lambda pv, vb: _comp_F_bwd(cell, boundary_bias(cell, vb), vec2pot(pv)))(
         pot_arr, voltages_dim
     )
-    # Under JIT/tracer: skip runtime warning (would cause host callback).
+    # Under JIT/tracer: skip runtime warning (would cause host callback in scipy path).
     # The warning is advisory; numerical correctness is unaffected.
     if not allow_trace:
         jax.debug.callback(_warn_uncertified_primal_if, jnp.max(jnp.abs(_F_all)))

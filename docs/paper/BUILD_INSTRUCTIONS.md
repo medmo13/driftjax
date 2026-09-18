@@ -16,7 +16,7 @@ tlmgr install collection-fontsrecommended collection-latexrecommended collection
 ## Compilation Steps
 
 ```bash
-cd /home/med/Desktop/final/open14/driftjax_v0.1.17/docs/paper
+cd /home/med/Desktop/final/open14/driftjax_v0.1.18/docs/paper
 
 # Compile main paper (3 passes for references)
 pdflatex DriftJax_paper.tex
