@@ -46,11 +46,12 @@ from examples.support import (
 
 
 def main():
-    example_args("13_target_iv_structure")
-    points = 500
-    steps_opt = 61
-    steps_fine = 61
-    maxiter_opt = 200
+    args = example_args("13_target_iv_structure")
+    backend = args.backend
+    points = 250
+    steps_opt = 21
+    steps_fine = 21
+    maxiter_opt = 30
 
     material = dj.material(
         Chi=3.9,
@@ -79,7 +80,7 @@ def main():
         )
 
     adjoint = ImplicitAdjoint()
-    solver = Newton()
+    solver = Newton(backend=backend)
     optics = BeerLambert()
     protocol_coarse = Sweep(vmax=1.5, n_steps=steps_opt)
     protocol_fine = Sweep(vmax=1.5, n_steps=steps_fine)

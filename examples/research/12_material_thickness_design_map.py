@@ -35,8 +35,8 @@ def device_from(x, points, window):
 
 
 def main():
-    example_args("12_material_thickness_design_map")
-    # Production mesh N=500 (gallery standard).
+    args = example_args("12_material_thickness_design_map")
+    backend = args.backend
     points = 500
     steps = 41
     # Constant electron-transport layer: identical across all probe designs.
@@ -50,6 +50,7 @@ def main():
             device_from(x, points, window),
             dj.Sweep(vmax=1.4, n_steps=steps),
             optics=dj.BeerLambert("tauc"),
+            solver=dj.Newton(backend=backend),
         ).efficiency
 
     eg = np.linspace(*BOUNDS[0], 11)
@@ -66,6 +67,7 @@ def main():
                 device_from(d, points, window),
                 dj.Sweep(vmax=1.4, n_steps=steps),
                 optics=dj.BeerLambert("tauc"),
+                solver=dj.Newton(backend=backend),
             ).efficiency
         )
     )

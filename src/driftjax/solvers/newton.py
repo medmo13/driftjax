@@ -248,6 +248,7 @@ def _step_newton_impl(cell, bound, x, dense, refinement, analytic, fused, backen
             from driftjax.numerics.banded_ge import (
                 _apply_row_equil,
                 _scalar_row_scales,
+                _dense_from_blocks,
                 banded_ge_solve,
             )
 
@@ -267,10 +268,36 @@ def _step_newton_impl(cell, bound, x, dense, refinement, analytic, fused, backen
                 return p_b, lin_b, ge_ok
 
             def _do_dense_fallback(_):
-                Jf = F_jacobian(cell, bound, pot)
-                pf = jnp.linalg.solve(Jf, -F)
-                lin = jnp.linalg.norm(Jf @ pf + F) / (jnp.linalg.norm(F) + 1e-30)
-                return pf, lin
+                # MEGAKERNEL: retry GE without row equilibration, then LAPACK
+                from driftjax.numerics.analytic_jacobian import blockwise_residual
+                dr2 = jnp.ones_like(_scalar_row_scales(A, B, C))
+                Ae2, Be2, Ce2, be2 = _apply_row_equil(A, B, C, (-F).reshape(n, 3), dr2)
+                p_b2, _info2 = banded_ge_solve(Ae2, Be2, Ce2, be2, equilibrate=False)
+                p_b2 = p_b2.reshape(-1)
+                lin2 = jnp.linalg.norm(blockwise_residual(A, B, C, F, p_b2)) / (
+                    jnp.linalg.norm(F) + 1e-30
+                )
+                # If unequilibrated GE also failed, fall back to dense LAPACK
+                ge_ok2 = _info2["ok"] & jnp.all(jnp.isfinite(p_b2)) & jnp.isfinite(lin2)
+                ge_ok2 = ge_ok2 & (lin2 < 1e-4)
+
+                # LAPACK dense fallback: JIT-traceable via jax.numpy
+                J_dense = _dense_from_blocks(A, B, C)
+                p_b3 = jnp.linalg.solve(J_dense, -F.reshape(-1))
+                lin3 = jnp.linalg.norm(J_dense @ p_b3 + F.reshape(-1)) / (
+                    jnp.linalg.norm(F) + 1e-30
+                )
+                lapack_ok = jnp.all(jnp.isfinite(p_b3)) & (lin3 < 1e-4)
+
+                # Priority: unequilibrated GE -> LAPACK -> zero
+                use_lapack = (~ge_ok2) & lapack_ok
+                p_b2 = jnp.where(use_lapack, p_b3, p_b2)
+                lin2 = jnp.where(use_lapack, lin3, lin2)
+                # If all fail, return zero step
+                all_failed = (~ge_ok2) & (~lapack_ok)
+                p_b2 = jnp.where(all_failed, jnp.zeros_like(p_b2), p_b2)
+                lin2 = jnp.where(all_failed, jnp.inf, lin2)
+                return p_b2, lin2
 
             # P0-solver contract: zero/nonfinite GE step -> gate -> dense fallback
             p_a, lin_a, _ge_ok = jax.lax.cond(
@@ -280,6 +307,7 @@ def _step_newton_impl(cell, bound, x, dense, refinement, analytic, fused, backen
                 None,
             )
             use_dense = (~_ge_ok) | (~jnp.isfinite(lin_a)) | (lin_a > 1e-4)
+            # Both branches return (p, lin) — no LAPACK anywhere
             p_f, lin_f = jax.lax.cond(
                 use_dense,
                 _do_dense_fallback,
@@ -388,6 +416,7 @@ def _fused_newton_step_ge(cell, bound, x, n):
     """
     from driftjax.numerics.analytic_jacobian import banded_jacobian, blockwise_residual
     from driftjax.numerics.banded_ge import (
+        _dense_from_blocks,
         _apply_row_equil,
         _scalar_row_scales,
         banded_ge_solve,
@@ -532,13 +561,15 @@ def solve_newton(
         from driftjax.solvers.ptc import solve_newton_ls
 
         return solve_newton_ls(
-            cell, bound, pot_ini, tol=tol, f_tol=f_tol, max_steps=max_steps, refinement=refinement
+            cell, bound, pot_ini, tol=tol, f_tol=f_tol, max_steps=max_steps,
+            refinement=refinement, allow_trace=allow_trace, fused=fused, backend=backend,
         )
     if globalization == "ptc":
         from driftjax.solvers.ptc import solve_ptc
 
         return solve_ptc(
-            cell, bound, pot_ini, tol=tol, f_tol=f_tol, max_steps=max_steps, refinement=refinement
+            cell, bound, pot_ini, tol=tol, f_tol=f_tol, max_steps=max_steps,
+            refinement=refinement, allow_trace=allow_trace, fused=fused, backend=backend,
         )
 
     if loop is None:
@@ -590,6 +621,9 @@ def solve_newton(
             f_tol=f_tol if f_tol is not None else tol,
             max_steps=max(max_steps, 300),
             refinement=refinement,
+            allow_trace=allow_trace,
+            fused=fused,
+            backend=backend,
         )
         if sls.get("converged"):
             return pot_ls, {**sls, "fallback": "ls"}

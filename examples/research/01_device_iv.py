@@ -30,7 +30,7 @@ from examples.support import (
 
 
 def main():
-    example_args("01_device_iv")
+    args = example_args("01_device_iv")
     resolutions = (62, 125, 250, 500, 1000)
     results = []
     solutions = []
@@ -39,6 +39,7 @@ def main():
             dj.simulate,
             ex1_device(points),
             dj.Sweep(vmax=1.1, n_steps=61),
+            solver=dj.Newton(backend=args.backend),
         )
         results.append({"n_points": points, "wall_s": wall, **solution_metrics(solution)})
         solutions.append(solution)

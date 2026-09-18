@@ -36,7 +36,7 @@ def _three_layer():
 @pytest.mark.slow
 def test_three_layer_converges_with_default_spectrum():
     """Archived outcome: fallback fires on all 5 biases, residual ~1e-8."""
-    s = dj.simulate(_three_layer(), dj.Sweep(n_steps=5, vmax=1.0))
+    s = dj.simulate(_three_layer(), dj.Sweep(n_steps=5, vmax=1.0), solver=dj.Newton(backend="auto"))
     assert bool(s.converged), (
         f"expected convergence with default spectrum, max|F|={float(s.max_residual)}"
     )
@@ -51,7 +51,7 @@ def test_three_layer_diverges_with_normalized_spectrum():
     fallback recovery radius -> non-convergence. This pins the fragility, not a
     desired behavior: the device is a stress test, not a physical cell."""
     with pytest.warns(UserWarning, match="did not converge"):
-        s = dj.simulate(_three_layer(), dj.Sweep(n_steps=5, vmax=1.0), ls=_spectrum())
+        s = dj.simulate(_three_layer(), dj.Sweep(n_steps=5, vmax=1.0), ls=_spectrum(), solver=dj.Newton(backend="auto"))
     assert not bool(s.converged)
     assert float(s.max_residual) > 1.0
     # even the "converged" variant is not a physical cell
@@ -63,6 +63,6 @@ def test_three_layer_diverges_with_normalized_spectrum():
 def test_three_layer_is_not_a_physical_cell():
     """With the default (converging) spectrum, Jsc is ~0 and Voc=nan: the
     n-p-n structure with an n+ layer at the hole contact has no hole path."""
-    s = dj.simulate(_three_layer(), dj.Sweep(n_steps=5, vmax=1.0))
+    s = dj.simulate(_three_layer(), dj.Sweep(n_steps=5, vmax=1.0), solver=dj.Newton(backend="auto"))
     assert abs(float(s.jsc) * 1e4) < 1.0, f"Jsc should be ~0, got {float(s.jsc) * 1e4:.2f} A/m2"
     assert not bool(jnp.isfinite(s.voc)), "Voc should be nan for this non-collecting structure"

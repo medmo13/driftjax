@@ -60,7 +60,7 @@ def test_sq_gradient_physical_monotonic_decay():
     Egs = (0.9, 1.3, 1.7, 2.1, 2.5)
     grads = [sq_efficiency_gradient(E, "am15g") for E in Egs]
     assert all(g > 0 for g in grads), grads  # no sign flip: eta->0 monotonically
-    for a, b in zip(grads, grads[1:], strict=True):
+    for a, b in zip(grads, grads[1:]):
         assert b < a, (Egs, grads)  # sensitivity decays with bandgap
 
 

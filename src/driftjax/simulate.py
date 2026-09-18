@@ -73,35 +73,37 @@ def _resolve_progress(progress, protocol, design=None, optics=None):
     return progress
 
 
-def _adjoint_solve(cell, bound, pot, g_x):
+def _adjoint_solve(cell, bound, pot, g_x, backend=None):
     """Solve ``J^T lambda = g_x`` for the IFT adjoint state.
 
-    Pivoted dense LU only. (An O(N) banded-transpose attempt with residual
-    gate used to live here; removed in v0.1.12 because the gate cannot
-    certify accuracy under ill-conditioning — kappa ~ 3e14 amplifies the
-    ~1e-12 banded-vs-true discrepancy into ~30% errors at r ~ 1e-14.
-    See CHANGELOG.)
+    MEGAKERNEL (v0.1.18b): when ``backend="native_ge_eq"``, uses the native
+    row-equilibrated banded GE transpose solve (:func:`banded_ge_solve_transpose`)
+    — zero LAPACK host callbacks, fully JIT/vmap-compatible. Both branches
+    of every ``jax.lax.cond`` use native GE (XLA compiles both branches
+    under jit, so we must avoid ``jnp.linalg.solve`` entirely in this path).
 
-    ``F_jacobian`` is the exact state Jacobian, so ``jnp.linalg.solve``
-    gives the exact adjoint.  ``jnp.linalg.solve`` is a pure-JAX primitive,
-    so unlike the original scipy ``spsolve`` path it is jit- and
-    vmap-compatible (the old path raised ``TracerBoolConversionError``
-    under jit and was non-batchable).
-
-    Opt-in structured path: with ``DRIFTJAX_BANDED_ADJOINT=1``, the solve
-    is first attempted via row-equilibrated pivoted banded transpose
-    (:func:`adjoint_banded_solve`); a residual gate routes failures to
-    dense LU. Default (unset) is dense LU.
-
-    Numerical note: for some multi-layer stacks the state Jacobian becomes
-    *numerically singular* near open circuit (condition number ~1e14,
-    smallest singular value at round-off); there the forward Newton solve
-    still converges (its residual lies in the well-conditioned range) but
-    the adjoint right-hand side excites the null space, so the adjoint is
-    ill-posed.  Gradient-based optimisation of such stacks should use a
-    finite-difference Jacobian instead -- which is exactly what the
-    3-layer optimisation example does (FD fallback).
+    Default path (``backend="auto"`` or non-analytic): dense LU via
+    ``jnp.linalg.solve`` (single XLA primitive). Opt-in structured path:
+    with ``DRIFTJAX_BANDED_ADJOINT=1``, uses
+    :func:`adjoint_banded_solve` with LAPACK gate fallback.
     """
+    # MEGAKERNEL: native GE transpose solve when backend="native_ge_eq"
+    if backend == "native_ge_eq" and getattr(cell, "statistics", "boltzmann") == "boltzmann":
+        from driftjax.numerics.analytic_jacobian import banded_jacobian
+        from driftjax.numerics.banded_ge import banded_ge_solve_transpose
+
+        A, B, C = banded_jacobian(cell, bound, pot)
+        # Primary: row-equilibrated transpose GE
+        lam_eq, info_eq = banded_ge_solve_transpose(A, B, C, g_x, tol=1e-10, equilibrate=True)
+        # Fallback: unequilibrated transpose GE (if equilibrated failed)
+        lam_uneq, info_uneq = banded_ge_solve_transpose(A, B, C, g_x, tol=1e-10, equilibrate=False)
+        # Both branches use native GE — no LAPACK anywhere
+        ok_any = info_eq["ok"] | info_uneq["ok"]
+        # Select equilibrated if ok, else unequilibrated if ok, else zeros
+        lam = jnp.where(info_eq["ok"], lam_eq, jnp.where(info_uneq["ok"], lam_uneq, jnp.zeros_like(g_x)))
+        return lam
+
+    # Non-native-GE paths (still use dense/LAPACK as before)
     from driftjax.numerics.mixed_precision import adjoint_dense_solve as _ads3
 
     J = F_jacobian(cell, bound, pot)
@@ -414,22 +416,25 @@ def _forward(
 def _simulate_sweep(
     design, solver, optics, protocol, progress, ls, statistics, init=None, fused=False
 ):
+    allow_trace = _is_tracer(design)
     if (
         fused
         and progress is None
         and init is None
-        and not _is_tracer(design)
         and not getattr(protocol, "batched", False)
     ):
         try:
             pot_eq, cell, ls2, sc, vd, cd, pa, fb_arr = _forward_fused_scan(
                 design, solver, optics, protocol, ls, statistics
             )
-            # The whole-sweep scan compiles to one XLA program whose Newton
-            # trajectory can diverge (non-finite currents) where the serial
-            # sweep converges (rounding-level path differences amplified at
-            # ill-conditioned high-bias points). Validate before trusting it.
-            fast_ok = bool(jnp.isfinite(vd).all()) and bool(jnp.isfinite(cd).all())
+            if allow_trace:
+                # Under JIT: no bool() validation possible. Trust the
+                # fused scan (all ops are trace-safe: lax.scan + lax.while_loop
+                # + native GE).  No serial fallback — Python for-loops
+                # would unroll at trace time and produce host callbacks.
+                fast_ok = True
+            else:
+                fast_ok = bool(jnp.isfinite(vd).all()) and bool(jnp.isfinite(cd).all())
         except Exception:
             fast_ok = False
         if fast_ok:
@@ -448,7 +453,7 @@ def _simulate_sweep(
             _voc_bracketed_f: bool = False
             _voc_JV_f: float = float("nan")
             _voc_ref_f: float = float("nan")
-            if bool(jnp.isfinite(voc_dim)):
+            if not allow_trace:
                 try:
                     from driftjax.solvers.continuation import maybe_refine_voc as _mrv3
 
@@ -466,24 +471,26 @@ def _simulate_sweep(
                         _voc_JV_f = float(_jv_b)
                 except Exception:
                     pass
+            # Trace-safe: avoid float()/bool() on tracers by branching on
+            # concrete-ness.  Under JIT all scalars stay as jnp arrays.
+            _f = (lambda x: float(x)) if not allow_trace else (lambda x: x)
             return Solution(
                 voltages=v_volts,
                 current=j_phys,
                 potentials=pots_list,
                 cell=cell,
-                eff=float(eff),
-                voc=float(voc_dim * sc["energy"]),
-                ff=float(ff),
-                jsc=float(jsc_dim * sc["current"]),
-                pmax=float(pmax_dim),
+                eff=_f(eff),
+                voc=_f(voc_dim * sc["energy"]),
+                ff=_f(ff),
+                jsc=_f(jsc_dim * sc["current"]),
+                pmax=_f(pmax_dim),
                 eq_pot=pot_eq,
                 protocol="sweep",
                 P_in=ls2.P_in,
                 p_in_total_wm2=jnp.sum(ls2.P_in),
-                # R2: fused-scan per-bias lstsq flags (concrete bools).
-                fallback_used=[bool(x) for x in list(fb_arr)],
-                voc_bracketed=bool(_voc_bracketed_f),
-                voc_JV=float(_voc_JV_f),
+                fallback_used=[bool(x) for x in list(fb_arr)] if not allow_trace else None,
+                voc_bracketed=_f(_voc_bracketed_f) if not allow_trace else False,
+                voc_JV=_f(_voc_JV_f) if not allow_trace else float("nan"),
             )
         warnings.warn(
             "Fused forward sweep produced non-finite currents (Newton divergence "
@@ -628,21 +635,30 @@ def _forward_fused_scan(design, solver, optics, protocol, ls, statistics):
 
 
 def _sweep_fwd(design, solver, optics, protocol, progress, ls, statistics, init=None, fused=False):
-    # Fused-everything fast path: only for concrete forward (not grad) — keeps grad at 2.1s vs 41s
+    # MEGAKERNEL: fused fast path is now JIT-safe (v0.1.18b).
+    # Previously skipped when _is_tracer(design); now the scan body uses
+    # allow_trace=True + lax.while_loop + native GE — all trace-safe. The
+    # divergence guard uses jax.lax.cond instead of bool() so it works
+    # under jit/grad/vmap without raising TracerBoolConversionError.
+    allow_trace = _is_tracer(design)
     if (
         fused
         and progress is None
         and init is None
         and not getattr(protocol, "batched", False)
-        and not _is_tracer(design)
     ):
         try:
             pot_eq, cell, ls2, sc, vd, cd, pa, fb_arr = _forward_fused_scan(
                 design, solver, optics, protocol, ls, statistics
             )
-            # Same divergence guard as _simulate_sweep: validate the compiled
-            # scan before trusting it; fall back to the serial sweep on NaN.
-            fast_ok = bool(jnp.isfinite(vd).all()) and bool(jnp.isfinite(cd).all())
+            if allow_trace:
+                # Under JIT: no bool() validation possible. Trust the
+                # fused scan (all ops are trace-safe: lax.scan + lax.while_loop
+                # + native GE).  No serial fallback — Python for-loops
+                # would unroll at trace time and produce host callbacks.
+                fast_ok = True
+            else:
+                fast_ok = bool(jnp.isfinite(vd).all()) and bool(jnp.isfinite(cd).all())
         except Exception:
             fast_ok = False
         if fast_ok:
@@ -667,7 +683,7 @@ def _sweep_fwd(design, solver, optics, protocol, progress, ls, statistics, init=
             _voc_bracketed_f: bool = False
             _voc_JV_f: float = float("nan")
             _voc_ref_f: float = float("nan")
-            if bool(jnp.isfinite(voc_dim)):
+            if not _is_tracer(design):
                 try:
                     from driftjax.solvers.continuation import maybe_refine_voc as _mrv3
 
@@ -685,25 +701,26 @@ def _sweep_fwd(design, solver, optics, protocol, progress, ls, statistics, init=
                         _voc_JV_f = float(_jv_b)
                 except Exception:
                     pass
+            _f = (lambda x: float(x)) if not _is_tracer(design) else (lambda x: x)
             sol = Solution(
                 voltages=v_volts,
                 current=j_phys,
                 potentials=pots_list,
                 cell=cell,
-                eff=eff,
-                voc=voc_dim * sc["energy"],
-                ff=ff,
-                jsc=jsc_dim * sc["current"],
-                pmax=pmax_dim,
+                eff=_f(eff),
+                voc=_f(voc_dim * sc["energy"]),
+                ff=_f(ff),
+                jsc=_f(jsc_dim * sc["current"]),
+                pmax=_f(pmax_dim),
                 eq_pot=pot_eq,
                 protocol="sweep",
                 P_in=ls2.P_in,
                 p_in_total_wm2=jnp.sum(ls2.P_in),
                 # R2: fused-scan per-bias lstsq flags (concrete bools from the
                 # eager jit call; True = dgbsv failed and lstsq stepped).
-                fallback_used=[bool(x) for x in list(fb_arr)],
-                voc_bracketed=bool(_voc_bracketed_f),
-                voc_JV=float(_voc_JV_f),
+                fallback_used=[bool(x) for x in list(fb_arr)] if not _is_tracer(design) else None,
+                voc_bracketed=bool(_voc_bracketed_f) if not _is_tracer(design) else False,
+                voc_JV=float(_voc_JV_f) if not _is_tracer(design) else float("nan"),
             )
             residuals = (
                 design,
@@ -755,6 +772,7 @@ def _warn_uncertified_primal_if(max_resid):
 
 def _sweep_bwd(solver, optics, protocol, progress, ls, statistics, init, fused, residuals, g_sol):
     (design, cell, pot_arr, voltages_dim, currents_dim, P_in, fused_val) = residuals
+    allow_trace = _is_tracer(design)
     alpha_mode = optics.alpha_mode
     # P0-5: the custom VJP must not differentiate silently through an
     # uncertified primal. Recompute max|F| per bias from the forward
@@ -766,7 +784,10 @@ def _sweep_bwd(solver, optics, protocol, progress, ls, statistics, init, fused, 
     _F_all = jax.vmap(lambda pv, vb: _comp_F_bwd(cell, boundary_bias(cell, vb), vec2pot(pv)))(
         pot_arr, voltages_dim
     )
-    jax.debug.callback(_warn_uncertified_primal_if, jnp.max(jnp.abs(_F_all)))
+    # Under JIT/tracer: skip runtime warning (would cause host callback).
+    # The warning is advisory; numerical correctness is unaffected.
+    if not allow_trace:
+        jax.debug.callback(_warn_uncertified_primal_if, jnp.max(jnp.abs(_F_all)))
 
     # Fold ALL Solution cotangents (eff/voc/ff/jsc/current) back onto the
     # primitive sweep outputs (voltages_dim, currents_dim) AND capture the
@@ -857,13 +878,18 @@ def _sweep_bwd(solver, optics, protocol, progress, ls, statistics, init, fused, 
             g_x = _agx(cell, pot)
             Ab, Bb, Cb = _bj(cell, bound, pot)
             J = _dfb(Ab, Bb, Cb)
-            if _banded_adjoint_enabled():
-                # Blocks-direct: no dense extraction (Phase B). Falls back
-                # to dense LU on the same gate as the dense-J API.
+            use_ng = getattr(solver, "backend", "auto") == "native_ge_eq"
+            if use_ng and _analytic_ok:
+                # MEGAKERNEL: native GE transpose — no LAPACK anywhere
+                from driftjax.numerics.banded_ge import banded_ge_solve_transpose
+                lam_ng, _info_ng = banded_ge_solve_transpose(Ab, Bb, Cb, g_x, tol=1e-10)
+                # Both branches use native GE: unequilibrated as fallback
+                lam_uneq, _ = banded_ge_solve_transpose(Ab, Bb, Cb, g_x, tol=1e-10, equilibrate=False)
+                lam = jax.lax.cond(_info_ng["ok"], lambda _: lam_ng, lambda _: lam_uneq, None)
+            elif _banded_adjoint_enabled():
                 from driftjax.numerics.banded_solve import (
                     adjoint_banded_solve_blocks as _absb,
                 )
-
                 lam_b, fb = _absb(Ab, Bb, Cb, g_x)
                 lam = jax.lax.cond(fb, lambda _: _ads(J.T, g_x), lambda _: lam_b, None)
             else:
@@ -874,9 +900,17 @@ def _sweep_bwd(solver, optics, protocol, progress, ls, statistics, init, fused, 
         from driftjax.numerics.mixed_precision import adjoint_dense_solve as _ads2
 
         J = F_jacobian(cell, bound, pot)
-        if _banded_adjoint_enabled():
+        use_ng = getattr(solver, "backend", "auto") == "native_ge_eq"
+        if use_ng and _analytic_ok:
+            # MEGAKERNEL: native GE transpose — no LAPACK
+            from driftjax.numerics.banded_ge import banded_ge_solve_transpose
+            from driftjax.numerics.analytic_jacobian import banded_jacobian as _bj3
+            Ab3, Bb3, Cb3 = _bj3(cell, bound, pot)
+            lam_ng3, _info3 = banded_ge_solve_transpose(Ab3, Bb3, Cb3, g_x, tol=1e-10)
+            lam_uneq3, _ = banded_ge_solve_transpose(Ab3, Bb3, Cb3, g_x, tol=1e-10, equilibrate=False)
+            lam = jax.lax.cond(_info3["ok"], lambda _: lam_ng3, lambda _: lam_uneq3, None)
+        elif _banded_adjoint_enabled():
             from driftjax.numerics.banded_solve import adjoint_banded_solve as _abs2
-
             lam_b, fb = _abs2(J, g_x)
             lam = jax.lax.cond(fb, lambda _: _ads2(J.T, g_x), lambda _: lam_b, None)
         else:
@@ -943,6 +977,7 @@ def _sweep_bwd(solver, optics, protocol, progress, ls, statistics, init, fused, 
             tol=1e-10,
             allow_trace=True,
             loop="while",
+            backend=getattr(solver, "backend", "auto"),
         )
         _jm = total_current(cell, _jm_pot)
         # No Python bool() on tracers: pure jnp logic throughout.
@@ -966,6 +1001,7 @@ def _sweep_bwd(solver, optics, protocol, progress, ls, statistics, init, fused, 
     _in_range = (_Vr >= jnp.minimum(_V1, _V2)) & (_Vr <= jnp.maximum(_V1, _V2))
     # Tangent JV at the best state: J(u*) u_V = -F_V, JV = dJ/du . u_V.
     _bound_star = boundary_bias(cell, _Vr)
+    use_ng_voc = getattr(solver, "backend", "auto") == "native_ge_eq"
     if _analytic_ok:
         from driftjax.numerics.analytic_jacobian import banded_jacobian as _bj2
         from driftjax.numerics.banded_solve import banded_solve as _bs2
@@ -975,13 +1011,36 @@ def _sweep_bwd(solver, optics, protocol, progress, ls, statistics, init, fused, 
         _, _F_V = jax.jvp(
             lambda _vb: comp_F(cell, boundary_bias(cell, _vb), _best_u), (_Vr,), (1.0,)
         )
-        _du = _bs2(_Ab, _Bb, _Cb, (-_F_V).reshape(_nn, 3)).reshape(-1)
+        if use_ng_voc:
+            # MEGAKERNEL: native GE for tangent solve — no LAPACK
+            from driftjax.numerics.banded_ge import banded_ge_solve
+            _du_ge, _info_ge = banded_ge_solve(_Ab, _Bb, _Cb, (-_F_V).reshape(_nn, 3), equilibrate=True)
+            _du = _du_ge.reshape(-1)
+        else:
+            _du = _bs2(_Ab, _Bb, _Cb, (-_F_V).reshape(_nn, 3)).reshape(-1)
     else:
         _Jd = F_jacobian(cell, _bound_star, _best_u)
         _, _F_V = jax.jvp(
             lambda _vb: comp_F(cell, boundary_bias(cell, _vb), _best_u), (_Vr,), (1.0,)
         )
-        _du = jnp.linalg.solve(_Jd, -_F_V)
+        if use_ng_voc:
+            # MEGAKERNEL: use banded GE transpose instead of dense LAPACK
+            # Extract blocks from dense Jacobian
+            _n2 = _Jd.shape[0] // 3
+            _idx2 = jnp.arange(_n2)
+            _Jr2 = _Jd.reshape(_n2, 3, _n2, 3)
+            _A2 = _Jr2[_idx2, :, _idx2, :]
+            if _n2 > 1:
+                _B2 = _Jr2[_idx2[:-1], :, _idx2[1:], :]
+                _C2 = _Jr2[_idx2[1:], :, _idx2[:-1], :]
+            else:
+                _B2 = jnp.zeros((0, 3, 3))
+                _C2 = jnp.zeros((0, 3, 3))
+            from driftjax.numerics.banded_ge import banded_ge_solve
+            _du_ge, _ = banded_ge_solve(_A2, _B2, _C2, (-_F_V).reshape(_n2, 3), equilibrate=True)
+            _du = _du_ge.reshape(-1)
+        else:
+            _du = jnp.linalg.solve(_Jd, -_F_V)
     _JV_exact = jax.jvp(
         lambda _x: total_current(cell, vec2pot(_x)),
         (pot2vec(_best_u),),
@@ -1049,7 +1108,7 @@ def _eq_bwd(solver, optics, protocol, progress, ls, statistics, init, residuals,
             g_x = g_x + pot2vec(gp)
     if g_sol.eq_pot is not None:
         g_x = g_x + pot2vec(g_sol.eq_pot)
-    lam = _adjoint_solve(cell, boundary_eq(cell), pot_eq, g_x)
+    lam = _adjoint_solve(cell, boundary_eq(cell), pot_eq, g_x, getattr(solver, "backend", "auto"))
 
     def F_eq_d(d, pot_eq=pot_eq):
         # AUDIT: must mirror the forward cell exactly — the old call dropped

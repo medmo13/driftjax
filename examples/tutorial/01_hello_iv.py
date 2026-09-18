@@ -21,11 +21,11 @@ from examples.support import (
 
 
 def main():
-    example_args("tutorial_01_hello_iv")
+    args = example_args("tutorial_01_hello_iv")
     points = 500
 
     dev = ex1_device(points)
-    sol, wall = run_timed(dj.simulate, dev, dj.Sweep(vmax=1.1, n_steps=61))
+    sol, wall = run_timed(dj.simulate, dev, dj.Sweep(vmax=1.1, n_steps=61), solver=dj.Newton(backend=args.backend))
 
     fig_path = plot_dossier(
         sol,

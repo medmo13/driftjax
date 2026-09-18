@@ -31,11 +31,10 @@ mat0 = dj.material(**BASE)  # constant nominal material (never mutated)
 
 
 def main():
-    example_args("14_dgsm_global")
-    # Mesh/steps live here (no module-global mutation).  N=32 Sobol samples
-    # for the DGSM rank ordering.
+    args = example_args("14_dgsm_global")
+    backend = args.backend
     npoints, nsteps = (500, 15)
-    N = 32
+    N = 16
 
     def eff_of(p):
         mv = eqx.tree_at(
@@ -49,13 +48,13 @@ def main():
             Spl=0,
             Spr=1e7,
         )
-        return simulate(dev, Sweep(vmax=1.1, n_steps=nsteps), solver=Newton()).efficiency
+        return simulate(dev, Sweep(vmax=1.1, n_steps=nsteps), solver=Newton(backend=backend)).efficiency
 
     # Every sample design shares array shapes: serial jitted singles compile
     # once then run seconds each. (A 32-way vmap of N=500 sweep Jacobians
     # compiles one monstrous XLA program — OOM on small machines.)
-    g_loc = np.asarray(jax.jacobian(eff_of)(jnp.array([100.0, 100.0, -8.0, -8.0])))
-    grad_1 = jax.jacobian(eff_of)
+    g_loc = np.asarray(jax.grad(eff_of)(jnp.array([100.0, 100.0, -8.0, -8.0])))
+    grad_1 = jax.grad(eff_of)
     from scipy.stats.qmc import Sobol
 
     sob = Sobol(d=4, seed=12345)
@@ -64,7 +63,7 @@ def main():
     if U.shape[0] != N:
         U = sob.random(N)
     P = LO + U * (HI - LO)
-    G = np.asarray([grad_1(p) for p in jnp.asarray(P)])
+    G = np.asarray([grad_1(p) for p in jnp.asarray(P)])  # (N, 4) per-sample adjoint gradients
     dgsm = np.mean(G**2, axis=0)
     dgsm_n = dgsm / dgsm.max() if dgsm.max() > 0 else dgsm
     order = np.argsort(-dgsm_n)

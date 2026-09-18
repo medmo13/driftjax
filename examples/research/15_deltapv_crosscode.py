@@ -13,8 +13,10 @@ runs uniform here, so small knee differences are discretization, not
 physics (interior branches agree to ~1e-5 A/cm²).
 """
 
+import time
 from pathlib import Path
 
+import jax
 import numpy as np
 
 import driftjax as dj
@@ -75,12 +77,15 @@ def main():
     fig, axes = new_figure(nrows=1, ncols=2, width=9.0, height=3.8)
     axes = axes.ravel()
     summary, sols = {}, {}
+    # ex1 (homojunction) uses megakernel; ex2 (heterojunction) needs LAPACK
+    backends = {"ex1": "native_ge_eq", "ex2": "auto"}
     for i, (tag, dev) in enumerate([("ex1", _matched_ex1(points)), ("ex2", _matched_ex2(points))]):
         ref = np.load(RESOURCES / f"deltapv_{tag}_iv.npz")
         sol, wall = run_timed(
             dj.simulate,
             dev,
             dj.Sweep(vmax=1.1, n_steps=steps),
+            solver=dj.Newton(backend=backends[tag]),
             optics=dj.BeerLambert(alpha_mode="beer-lambert"),
         )
         v, j = np.asarray(sol.voltages), np.asarray(sol.current)
@@ -119,12 +124,27 @@ def main():
             "figure": fp.name,
         },
     )
+    # --- Gradient timing: megakernel adjoint vs reference ---
+    grad_walls = {}
+    for tag, dev in [("ex1", _matched_ex1(points)), ("ex2", _matched_ex2(points))]:
+        proto = dj.Sweep(vmax=1.1, n_steps=steps)
+        fwd = lambda d: dj.simulate(d, proto, solver=dj.Newton(backend=backends[tag]),
+                                     optics=dj.BeerLambert(alpha_mode="beer-lambert")).efficiency
+        grad_fn = jax.jit(jax.grad(fwd))
+        grad_fn(dev)  # compile
+        t0 = time.perf_counter()
+        grad_fn(dev)
+        grad_walls[tag] = time.perf_counter() - t0
+        summary[tag]["grad_wall_s_mk"] = grad_walls[tag]
+
     report(
         "research_15",
         ex1_eff_pct=summary["ex1"]["eff_pct"],
         ex2_eff_pct=summary["ex2"]["eff_pct"],
         ex1_maxdI=summary["ex1"]["max_abs_dI"],
         ex2_maxdI=summary["ex2"]["max_abs_dI"],
+        ex1_grad_wall_s_mk=summary["ex1"]["grad_wall_s_mk"],
+        ex2_grad_wall_s_mk=summary["ex2"]["grad_wall_s_mk"],
     )
     report_fom("research_15", **sols)
 

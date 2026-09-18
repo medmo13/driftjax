@@ -120,6 +120,131 @@ def _block_thomas(A, B, C, b):
     return x_ge, A_mod_full, b_mod_full, all_dets
 
 
+def _block_thomas_transpose(A, B, C, g):
+    """Transpose (adjoint) block Thomas elimination via lax.scan.
+
+    Solves J^T y = g where J is block-tridiagonal with blocks A (diag),
+    B (super-diagonal), C (sub-diagonal). The transpose J^T has the same
+    block structure but with transposed blocks and swapped B/C roles:
+        J^T diagonal blocks: A^T (at positions i)
+        J^T super-diagonal: C^T (C was sub-diagonal, transposed becomes super)
+        J^T sub-diagonal: B^T (B was super-diagonal, transposed becomes sub)
+
+    All in lax.scan, no host callbacks. Differentiable.
+
+    A: (n,3,3)  B: (n,3,3)  C: (n-1,3,3)  g: (n,3)
+    Returns (y, A_mod_full, g_mod_full, block_dets)
+    """
+    import jax.numpy as jnp
+    from jax import lax
+
+    n = A.shape[0]
+    # Transposed blocks
+    At = jnp.transpose(A, (0, 2, 1))  # A^T on diagonal
+    Ct = jnp.transpose(C, (0, 2, 1))  # C^T becomes super-diagonal
+    Bt = jnp.transpose(B, (0, 2, 1))  # B^T becomes sub-diagonal
+
+    def _forward(carry, i):
+        Ai, bi = carry
+        Bi = Bt[i]  # sub-diagonal of J^T (to be eliminated)
+        Ci = Ct[i]  # super-diagonal of J^T
+
+        # Forward elimination of sub-diagonal B^T:
+        # A_{i+1}^T' = A_{i+1}^T - B_i^T @ (A_i^T)^{-1} @ C_i^T
+        Mi = jnp.linalg.solve(Ai, Ci)  # (A_i^T)^{-1} @ C_i^T
+        zi = jnp.linalg.solve(Ai, bi)  # (A_i^T)^{-1} @ g_i'
+
+        Ai_next = At[i + 1] - Bi @ Mi  # A_{i+1}^T - B_i^T @ (A_i^T)^{-1} @ C_i^T
+        bi_next = g[i + 1] - Bi @ zi    # g_{i+1} - B_i^T @ (A_i^T)^{-1} @ g_i' 
+
+        det_next = jnp.linalg.det(Ai_next)
+        return (Ai_next, bi_next), (Ai, bi, det_next)
+
+    (A_last, b_last), (A_mod, b_mod, dets) = lax.scan(_forward, (At[0], g[0]), jnp.arange(n - 1))
+
+    A_mod_full = jnp.concatenate([A_mod, A_last[None, :, :]], axis=0)
+    b_mod_full = jnp.concatenate([b_mod, b_last[None, :]], axis=0)
+    all_dets = jnp.concatenate([jnp.linalg.det(At[0:1]), dets], axis=0)
+
+    def _backward(carry, i):
+        x_next = carry
+        Ai = A_mod_full[i]
+        Bi = Ct[i]  # super-diagonal of J^T (C^T) for back-substitution
+        rhs = b_mod_full[i] - Bi @ x_next
+        xi = jnp.linalg.solve(Ai, rhs)
+        return xi, xi
+
+    x_last = jnp.linalg.solve(A_mod_full[n - 1], b_mod_full[n - 1])
+    indices = jnp.arange(n - 2, -1, -1)
+    _, x_stacked = lax.scan(_backward, x_last, indices)
+    x_rest_rev = x_stacked[::-1]
+    y = jnp.concatenate([x_rest_rev, x_last[None, :]], axis=0)
+
+    return y, A_mod_full, b_mod_full, all_dets
+
+
+def banded_ge_solve_transpose(A, B, C, g, *, tol=1e-12, equilibrate=True):
+    """Native GE transpose solve for the adjoint: J^T y = g.
+
+    Same algorithm as ``banded_ge_solve`` but on the transposed system.
+    Row equilibration is applied to the FORWARD blocks (dr from A,B,C),
+    then D^T = D (diagonal), so the scaled adjoint system is:
+        (D J)^T y = g  =>  J^T y = g (solution-preserving).
+
+    The row scale D from the forward system becomes a column scale of J^T,
+    which is a valid (right) equilibration for the transpose solve.
+
+    No host callbacks. Differentiable via jax.grad/jax.jvp.
+
+    Returns (y, info) where info = {"ok", "singular", "method", "rank"}
+    """
+    n = A.shape[0]
+    N = 3 * n
+
+    if equilibrate:
+        dr = _scalar_row_scales(A, B, C)  # (N,) per-scalar-row
+        dr_blk = dr.reshape(n, 3)
+        # Apply row equilibration D to the matrix blocks: (D*J) has same null
+        # space as J but better-conditioned.  For the transpose we solve
+        # (D*J)^T z = g  ==>  J^T D z = g  ==>  y = D z  is the solution of J^T y = g.
+        Ae = A * dr_blk[:, :, None]
+        Be = B * dr_blk[:-1, :, None] if n > 1 else B
+        Ce = C * dr_blk[1:, :, None] if n > 1 else C
+    else:
+        dr = jnp.ones(N)
+        dr_blk = jnp.ones((n, 3))
+        Ae, Be, Ce = A, B, C
+
+    # Reshape g from flat (3n,) to block (n,3) for block-structured arithmetic.
+    g_blk = g.reshape(n, 3)
+
+    # Solve the EQUILIBRATED transposed system (D*J)^T z = g (original RHS).
+    y_ge, A_mod_full, g_mod_full, block_dets = _block_thomas_transpose(Ae, Be, Ce, g_blk)
+
+    # Recover solution of original system: y = D * z  (since J^T D z = g).
+    lam = y_ge * dr_blk  # (n,3)
+    lam = lam.reshape(N)  # back to flat (3n,)
+
+    ge_finite = (
+        jnp.all(jnp.isfinite(y_ge))
+        & jnp.all(jnp.isfinite(A_mod_full))
+        & jnp.all(jnp.isfinite(g_mod_full))
+    )
+
+    det_min = jnp.min(jnp.abs(block_dets))
+    det_scale = jnp.max(jnp.abs(block_dets)) + 1e-30
+    nonsingular_blocks = det_min / det_scale > tol
+    ok = ge_finite & nonsingular_blocks
+
+    info = {
+        "ok": ok,
+        "singular": ~ok,
+        "method": jnp.where(ok, jnp.int32(0), jnp.int32(1)),
+        "rank": jnp.where(ok, jnp.int32(N), jnp.int32(0)),
+    }
+    return lam, info
+
+
 def banded_ge_solve(A, B, C, b, *, tol=1e-12, equilibrate=True):
     """Pure-JAX pivoted block-banded GE via lax.scan, with optional row equilibration.
 

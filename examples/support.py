@@ -59,6 +59,13 @@ def example_args(name: str):
         default=None,
         help="directory for the PNG and JSON artifacts",
     )
+    parser.add_argument(
+        "--backend",
+        type=str,
+        default="native_ge_eq",
+        choices=["native_ge_eq", "auto"],
+        help="Newton solver backend: native_ge_eq (megakernel, fast) or auto (LAPACK, robust for heterojunctions)",
+    )
     args = parser.parse_args()
     OUTPUT_ROOT = (args.output_dir or tier_default).expanduser().resolve()
     OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)

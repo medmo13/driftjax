@@ -50,6 +50,7 @@ def cdte_result():
         dj.Sweep(vmax=0.9, n_steps=19),
         optics=dj.BeerLambert(alpha_mode="beer-lambert"),
         ls=spectrum(normalize=False),
+        solver=dj.Newton(),
     )
 
 

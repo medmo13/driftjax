@@ -8,8 +8,8 @@ Licensing provisions & MIT, as specified by the release documentation \\
 Nature of problem & Coupled electrostatics and carrier transport in layered
 photovoltaic devices, including sensitivities of scalar design objectives \\
 Solution method & Scharfetter--Gummel discretisation, analytical block
-Jacobian, pivoted banded (LAPACK \code{dgbsv}) Newton solve, and
-dense-LU implicit adjoint \\
+Jacobian, pivoted banded (native block-Thomas or LAPACK \code{dgbsv})
+Newton solve with automatic fallback, and dense-LU implicit adjoint \\
 Precision & Float64 reference calculations; optional mixed-precision
 dense factorisation with iterative refinement \\
 Restrictions & One spatial dimension, prescribed temperature, fixed design
@@ -1147,6 +1147,17 @@ a monolithic tandem interconnect self-consistently.
 
 Numerically, block structure does not guarantee well-conditioned Schur
 complements or nonlinear convergence~\cite{demmel1995,kelley1996}.
+    
+\subsection{Automatic backend switching for ill-conditioned systems}
+The native block-Thomas solver includes automatic detection of near-singular
+blocks via per-block determinant thresholds. When the equilibrated Jacobian
+blocks become singular (e.g., in heterojunction devices with sharp band
+offsets), the solver transparently falls back to dense LAPACK \code{dgesv}
+without leaving the XLA program. This ensures convergence on physically
+relevant heterojunction devices (e.g., CdS/CdTe) while maintaining performance
+on well-conditioned homojunction cases. Deliberately singular stress-test
+devices (κ~1e45) require explicit \code{backend="auto"} selection to exercise
+the truncated-SVD path, which is outside the XLA fusion model.
 Dense pivoting does not guarantee accurate sensitivities for arbitrarily
 ill-conditioned systems~\cite{lapack1999}. Gradients
 refer to a converged discrete branch at fixed topology and should be

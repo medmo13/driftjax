@@ -62,7 +62,7 @@ def device_from_thickness(s, n_points=N_POINTS):
 
 
 def _eff(dev):
-    return float(dj.simulate(dev, dj.Sweep(vmax=0.9, n_steps=N_STEPS)).efficiency)
+    return float(dj.simulate(dev, dj.Sweep(vmax=0.9, n_steps=N_STEPS), solver=dj.Newton()).efficiency)
 
 
 def test_posthoc_ns_mutation_is_inert():
@@ -75,7 +75,7 @@ def test_posthoc_ns_mutation_is_inert():
 
 def test_builder_thickness_grad_nonzero_matches_fd():
     def f(s):
-        return dj.simulate(device_from_thickness(s), dj.Sweep(vmax=0.9, n_steps=N_STEPS)).efficiency
+        return dj.simulate(device_from_thickness(s), dj.Sweep(vmax=0.9, n_steps=N_STEPS), solver=dj.Newton()).efficiency
 
     s0 = 1.0
     g = float(jax.grad(f)(s0))

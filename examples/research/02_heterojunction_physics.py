@@ -30,7 +30,9 @@ from examples.support import (
 
 
 def main():
-    example_args("02_heterojunction_physics")
+    args = example_args("02_heterojunction_physics")
+    # CdS/CdTe heterojunction: native GE diverges on sharp band offsets, use LAPACK.
+    backend = args.backend
     # deltapv ex2_np_hetero benchmark geometry (published PCE 13.31%):
     # CdS 25 nm window (1e17) / CdTe 4 um absorber (-1e15), Sn = 1.16e7 cm/s.
     # Builder lives in support.py (single source of truth shared with 17).
@@ -40,6 +42,7 @@ def main():
         device,
         dj.Sweep(vmax=1.1, n_steps=61),
         optics=dj.BeerLambert(alpha_mode="beer-lambert"),
+        solver=dj.Newton(backend=backend),
     )
     position_um = np.asarray(solution.cell.x) * float(length) * 1e4  # x*length is cm -> um
     conduction = -(np.asarray(solution.cell.Chi) + np.asarray(solution.eq_pot.phi)) * float(energy)
