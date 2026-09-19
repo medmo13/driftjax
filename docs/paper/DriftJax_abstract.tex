@@ -6,8 +6,8 @@ system, numerically verified against finite differences on selected
 configurations. The forward
 solver combines Scharfetter--Gummel fluxes, an analytically assembled
 block-tridiagonal Jacobian, and a direct globally-pivoted banded elimination
-(LAPACK \code{dgbsv}) as default, with an opt-in
-callback-free native block-Thomas GE backend that requires $O(N\cdot\mathrm{kl}\cdot
+(LAPACK \code{dgbsv}) as default, with an opt-in callback-free native row-equilibrated block-Thomas GE backend (local 3x3
+pivoted solves, not globally pivoted) that requires $O(N\cdot\mathrm{kl}\cdot
 \mathrm{ku})$ work per Newton step for $N$ mesh nodes. Reverse-mode
 sensitivities use pivoted dense-LU adjoint factorisation with
 $O(N^3)$ backward cost; row-equilibration diagnosis identifies the
@@ -20,8 +20,9 @@ $O(h)$ scaling. Controlled single-architecture (CPU) benchmarks quantify the
 forward and adjoint cost; the asymptotic $O(N^3)$--$O(N)$
 complexity gap is measured but not yet demonstrated to
 dominate end-to-end differentiable performance at the
-tested mesh sizes. Example applications
-demonstrate derivative-based sensitivity ranking, constrained
+tested mesh sizes. For the archived unnormalized AM1.5G spectrum ($899.92$ W/m^2), PCE values
+reported here use raw normalization; equivalent one-sun normalized values are
+0.8999x smaller. Example applications demonstrate derivative-based sensitivity ranking, constrained
 band-gap/thickness optimisation, and synthetic current--voltage
 curve recovery.
 \end{abstract}

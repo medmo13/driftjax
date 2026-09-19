@@ -1,12 +1,13 @@
-"""Pure-JAX pivoted banded GE via ``lax.scan`` (block Thomas algorithm).
+'''Pure-JAX row-equilibrated block Thomas GE via ``lax.scan`` (local 3x3 pivoted solves).
 
 Replaces the O(N^3) SVD native solve with O(N * bw^2) GE that stays
 inside XLA (no host callback) and is differentiable.
 
-Algorithm: block-tridiagonal Gaussian elimination with 3x3 partial
-pivoting (jnp.linalg.solve at each step) in lax.scan. Singularity is
-detected via per-block determinant threshold during forward elimination —
-no SVD computation needed for well-conditioned systems.
+Algorithm: block-tridiagonal Gaussian elimination with local 3x3
+pivoted solves (jnp.linalg.solve at each step) in lax.scan. Singularity is
+detected via per-block determinant ratio threshold during forward elimination
+— no SVD computation needed. The rank_flag field is binary (N or 0),
+NOT a numerically estimated rank (block-factorization singularity heuristic).
 
 Row equilibration (Δ — NEW in v0.1.18b): per-scalar-row diag(D) from block
 entries tames the ~30-order-of-magnitude SRV/carrier imbalance at ohmic
@@ -16,7 +17,7 @@ D is diagonal and non-singular); the GE operates on the scaled blocks and
 the solution is returned in original units.
 
 See: tests/unit/test_banded_ge.py, tests/unit/test_banded_native.py
-"""
+'''
 
 from __future__ import annotations
 
@@ -25,7 +26,7 @@ from jax import lax
 
 
 def _scalar_row_scales(A, B, C):
-    """Per-SCALAR-row row-equilibration from blocks alone (O(N·bw), no dense J).
+    '''Per-SCALAR-row row-equilibration from blocks alone (O(N·bw), no dense J).
 
     Returns (N,) diagonal D where D[i] = 1 / max|row_i of [A,B,C]|.
     One scale per scalar row (not per 3-row block) — the finer granularity
@@ -33,7 +34,7 @@ def _scalar_row_scales(A, B, C):
 
     Block-row i spans rows 3i, 3i+1, 3i+2 of the dense Jacobian, which
     receive contributions from A[i,:], B[i,:] (i < n-1), and C[i-1,:] (i > 0).
-    """
+    '''
     n = A.shape[0]
     # Per-scalar-row max-abs from A blocks: A is (n, 3, 3) → max over cols (axis=2)
     rmax = jnp.max(jnp.abs(A), axis=2)  # (n, 3)
@@ -52,7 +53,7 @@ def _scalar_row_scales(A, B, C):
 
 
 def _apply_row_equil(A, B, C, b, dr):
-    """Apply (N,) row scale D to block arrays. D reshapes to (n, 3, 3) → (n,3,1)."""
+    '''Apply (N,) row scale D to block arrays. D reshapes to (n, 3, 3) → (n,3,1).'''
     n = A.shape[0]
     dr_blk = dr.reshape(n, 3)  # (n, 3) per-scalar-row within each block
     Ae = A * dr_blk[:, :, None]  # (n,3,3) * (n,3,1)
@@ -63,7 +64,7 @@ def _apply_row_equil(A, B, C, b, dr):
 
 
 def _block_thomas(A, B, C, b):
-    """Block Thomas elimination + back-substitution, all in lax.scan.
+    '''Block Thomas elimination + back-substitution, all in lax.scan.
 
     Forward scan (blocks 0..n-2):
         M[i] = A_prime_i^{-1} @ B[i]     (3x3 pivoted solve)
@@ -77,7 +78,7 @@ def _block_thomas(A, B, C, b):
     A: (n,3,3)  B: (n,3,3)  C: (n-1,3,3)  b: (n,3)
     Returns (x_ge, A_mod_full, b_mod_full, block_dets).
     block_dets: (n,) per-block det for singularity check.
-    """
+    '''
     n = A.shape[0]
 
     def _forward(carry, i):
@@ -121,7 +122,7 @@ def _block_thomas(A, B, C, b):
 
 
 def _block_thomas_transpose(A, B, C, g):
-    """Transpose (adjoint) block Thomas elimination via lax.scan.
+    '''Transpose (adjoint) block Thomas elimination via lax.scan.
 
     Solves J^T y = g where J is block-tridiagonal with blocks A (diag),
     B (super-diagonal), C (sub-diagonal). The transpose J^T has the same
@@ -134,7 +135,7 @@ def _block_thomas_transpose(A, B, C, g):
 
     A: (n,3,3)  B: (n,3,3)  C: (n-1,3,3)  g: (n,3)
     Returns (y, A_mod_full, g_mod_full, block_dets)
-    """
+    '''
     import jax.numpy as jnp
     from jax import lax
 
@@ -184,7 +185,7 @@ def _block_thomas_transpose(A, B, C, g):
 
 
 def banded_ge_solve_transpose(A, B, C, g, *, tol=1e-12, equilibrate=True):
-    """Native GE transpose solve for the adjoint: J^T y = g.
+    '''Native GE transpose solve for the adjoint: J^T y = g.
 
     Same algorithm as ``banded_ge_solve`` but on the transposed system.
     Row equilibration is applied to the FORWARD blocks (dr from A,B,C),
@@ -196,8 +197,8 @@ def banded_ge_solve_transpose(A, B, C, g, *, tol=1e-12, equilibrate=True):
 
     No host callbacks. Differentiable via jax.grad/jax.jvp.
 
-    Returns (y, info) where info = {"ok", "singular", "method", "rank"}
-    """
+    Returns (y, info) where info = {'ok', 'singular', 'method', 'rank_flag'}
+    '''
     n = A.shape[0]
     N = 3 * n
 
@@ -237,16 +238,16 @@ def banded_ge_solve_transpose(A, B, C, g, *, tol=1e-12, equilibrate=True):
     ok = ge_finite & nonsingular_blocks
 
     info = {
-        "ok": ok,
-        "singular": ~ok,
-        "method": jnp.where(ok, jnp.int32(0), jnp.int32(1)),
-        "rank": jnp.where(ok, jnp.int32(N), jnp.int32(0)),
+        'ok': ok,
+        'singular': ~ok,
+        'method': jnp.where(ok, jnp.int32(0), jnp.int32(1)),
+        'rank_flag': jnp.where(ok, jnp.int32(N), jnp.int32(0)),  # binary: N if ok, 0 if singular (NOT a rank estimate)
     }
     return lam, info
 
 
 def banded_ge_solve(A, B, C, b, *, tol=1e-12, equilibrate=True):
-    """Pure-JAX pivoted block-banded GE via lax.scan, with optional row equilibration.
+    '''Pure-JAX pivoted block-banded GE via lax.scan, with optional row equilibration.
 
     No host callbacks. Differentiable via jax.grad/jax.jvp.
 
@@ -259,22 +260,24 @@ def banded_ge_solve(A, B, C, b, *, tol=1e-12, equilibrate=True):
     The scaled system D·J·x = D·b has the identical solution x (D is diagonal
     and non-singular), so equilibration is solution-preserving by construction.
 
-    Singularity is detected via per-block determinant threshold during
+    Singularity is detected via per-block determinant ratio threshold during
     forward elimination — no SVD fallback path is needed for the common
-    case. When a block is found singular (det near zero), ok=False
-    and the result may be non-finite; the caller routes to dense LU.
+    case. The rank_flag field in info is binary (N if ok, 0 if singular),
+    NOT a numerically estimated rank (block-factorization singularity heuristic).
+    When a block is found singular, ok=False and the result may be
+    non-finite; the caller routes to dense LU.
 
     Args:
         A: (n, 3, 3) diagonal blocks
         B: (n, 3, 3) super-diagonal blocks (B[-1] unused)
         C: (n-1, 3, 3) sub-diagonal blocks
         b: (n, 3) RHS
-        tol: determinant magnitude threshold for singularity
+        tol: per-block determinant ratio threshold for singularity
         equilibrate: whether to apply row equilibration (default True)
 
     Returns:
-        (x, info) where info = {"ok", "singular", "method", "rank"}
-    """
+        (x, info) where info = {'ok', 'singular', 'method', 'rank_flag'}
+    '''
     n = A.shape[0]
     N = 3 * n
 
@@ -298,16 +301,16 @@ def banded_ge_solve(A, B, C, b, *, tol=1e-12, equilibrate=True):
     ok = ge_finite & nonsingular_blocks
 
     info = {
-        "ok": ok,
-        "singular": ~ok,
-        "method": jnp.where(ok, jnp.int32(0), jnp.int32(1)),  # 0=GE, 1=failed
-        "rank": jnp.where(ok, jnp.int32(N), jnp.int32(0)),
+        'ok': ok,
+        'singular': ~ok,
+        'method': jnp.where(ok, jnp.int32(0), jnp.int32(1)),  # 0=GE, 1=failed
+        'rank_flag': jnp.where(ok, jnp.int32(N), jnp.int32(0)),  # binary: N if ok, 0 if singular (NOT a rank estimate)
     }
     return x_ge, info
 
 
 def _dense_from_blocks(A, B, C):
-    """(A,B,C) 3x3 blocks (n,3,3) -> full (3n,3n) dense banded matrix."""
+    '''(A,B,C) 3x3 blocks (n,3,3) -> full (3n,3n) dense banded matrix.'''
     n = A.shape[0]
     N = 3 * n
     M = jnp.zeros((N, N), dtype=A.dtype)

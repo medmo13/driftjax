@@ -8,8 +8,9 @@ Licensing provisions & MIT, as specified by the release documentation \\
 Nature of problem & Coupled electrostatics and carrier transport in layered
 photovoltaic devices, including sensitivities of scalar design objectives \\
 Solution method & Scharfetter--Gummel discretisation, analytical block
-Jacobian, pivoted banded (native block-Thomas or LAPACK \code{dgbsv})
-Newton solve with automatic fallback, and dense-LU implicit adjoint \\
+Jacobian, globally-pivoted banded LAPACK \code{dgbsv} Newton solve (default)
+with row-equilibrated native block-Thomas GE as opt-in backend and
+automatic fallback, and dense-LU implicit adjoint \\
 Precision & Float64 reference calculations; optional mixed-precision
 dense factorisation with iterative refinement \\
 Restrictions & One spatial dimension, prescribed temperature, fixed design
@@ -64,17 +65,18 @@ ill-conditioned heterojunctions (residuals $\sim2$--$3.7\times10^{2}$)
 while the pivoted LAPACK banded solver (dgbsv) remained accurate
 ($\sim10^{-9}$; Section~\ref{sec:conditioning}).
 The contribution of DriftJax is a structure-aware forward solver refactored into
-a callback-free XLA megakernel: Scharfetter--Gummel flux evaluation,
+a callback-free XLA structured Newton step: Scharfetter--Gummel flux evaluation,
 block-tridiagonal Jacobian assembly, and block-Thomas elimination via native GE
 (\code{banded_ge.py}, row-equilibrated \code{lax.scan} with
 \code{lax.while_loop} outer iteration) are all trace-safe and require no host
 callbacks. This makes every forward Newton step differentiable through JAX's
 \code{custom_vjp} implicit-adjoint path. The native block-Thomas GE solver
-is the production default on well-conditioned systems (block bandwidth
-kl=ku=5 for the interleaved 3×3 blocks); it differs from LAPACK's pivoted
-banded \code{dgbsv} in lacking inter-block pivoting, with automatic dense-LU
-fallback (\code{dgesv}) when per-block determinant thresholds flag
-near-singularity.
+is available opt-in \texttt{(backend="native_ge_eq")}, not as the production
+forward default (globally pivoted \code{dgbsv} is); it operates with block
+bandwidth kl=ku=5 for the interleaved 3×3 blocks) and differs from LAPACK's
+pivoted banded \code{dgbsv} in lacking global inter-block pivoting, with
+residual- and factorization-failure-based fallback (\code{dgesv}) when
+per-block determinant ratios flag near-singularity.
 
 The adjoint backward pass currently uses a separate pivoted banded transpose
 solve (\code{scipy.linalg.solve_banded}) via \code{jax.pure_callback}, which
@@ -97,8 +99,8 @@ The following table identifies, for each backend: default or experimental status
 \toprule
 Backend & Status & Forward & Adjoint & Pivoting & Differentiable & Hardware \\
 \midrule
-\texttt{native\_ge\_eq} & Default & Pure JAX (XLA) & Dense LU & Local 3×3 & Yes & CPU/GPU \\
-\texttt{auto} & Fallback & Callback (scipy) & Callback (scipy) & Band pivot & No & CPU \\
+\texttt{native\_ge\_eq} & Experimental & Pure JAX (XLA) & Dense LU & Local 3×3 & Yes & CPU/GPU \\
+\texttt{auto} & Default & Callback (scipy) & Callback (scipy) & Band pivot (dgbsv) & No & CPU \\
 Dense LU & Adjoint default & Callback (jax.scipy) & N/A & Full pivot & Yes & CPU/GPU \\
 \bottomrule
 \end{tabular}
@@ -127,7 +129,7 @@ Dense LU & None & Full & N/A & Yes & Yes & Adjoint default \\
 \end{table}
 
 
-The \texttt{native\_ge\_eq} backend (\code{banded\_ge.py}) performs row-equilibrated unpivoted block-Thomas elimination via \code{lax.scan}---no inter-block pivoting but per-element 3×3 pivoted local solves. When per-block determinant thresholds indicate near-singularity, it falls back to dense \code{dgesv} within the same XLA program. The \texttt{auto} backend is the scipy.linalg \code{solve_banded} path with truncated-SVD fallback, available by setting \code{DRIFTJAX_NATIVE_BANDED=0}. Dense LU (\code{dgesv}, via \code{jax.scipy.linalg}) is the production adjoint default.
+The \texttt{native\_ge\_eq} backend (\code{banded\_ge.py}) performs row-equilibrated block-Thomas elimination with local 3x3 pivoted solves via \code{lax.scan}---no inter-block pivoting but per-element 3×3 pivoted local solves. When per-block determinant thresholds indicate near-singularity, it falls back to dense \code{dgesv} within the same XLA program. The \texttt{auto} backend is the scipy.linalg \code{solve_banded} path with truncated-SVD fallback, available by setting \code{DRIFTJAX_NATIVE_BANDED=0}. Dense LU (\code{dgesv}, via \code{jax.scipy.linalg}) is the production adjoint default.
 
 \subsection{Relationship to \texorpdfstring{$\partial\mathrm{PV}$}{partial PV}}\label{sec:deltapv-comparison}
 Table~\ref{tab:deltapv-comparison} distinguishes shared methodology from
@@ -697,7 +699,7 @@ $2.3\times10^{-16}$ (homojunction), $7.7\times10^{-9}$
 heterojunction value reflects the wider bandgap discontinuity; all
 three are well below $10^{-6}$.
 Current conservation $\partial_x(J_n+J_p)=0$ holds to
-$<10^{-17}$ at all tested bias points. Contact residuals
+$<10^{-16}$--$10^{-13}$ depending on device topology at all tested bias points. Contact residuals
 (contact\_phin, contact\_phip, contact\_phi) are zero to machine
 precision at every contact for all devices. Carrier densities remain
 strictly positive throughout the voltage range. Unit conversions
@@ -1177,8 +1179,8 @@ Numerically, block structure does not guarantee well-conditioned Schur
 complements or nonlinear convergence~\cite{demmel1995,kelley1996}.
     
 \subsection{Automatic backend switching for ill-conditioned systems}
-The native block-Thomas solver includes automatic detection of near-singular
-blocks via per-block determinant thresholds. When the equilibrated Jacobian
+The native block-Thomas solver implements a block-factorization singularity heuristic using per-block determinant
+ratios. When the equilibrated Jacobian
 blocks become singular (e.g., in heterojunction devices with sharp band
 offsets), the solver transparently falls back to dense LAPACK \code{dgesv}
 without leaving the XLA program. This ensures convergence on physically
@@ -1301,8 +1303,7 @@ scaling rather than a fundamental factorisation failure.
 
 \textbf{Performance.} Controlled single-architecture benchmarks of the
 shipped v0.1.18 code show a full single-bias Newton solve costing
-49.9--106.0~ms warm from $N=50$ to $N=1600$ (sublinear scaling: fixed
-fixed JIT compilation and host-callback overhead in the adjoint transpose solve at these sizes). The adjoint
+49.9--106.0~ms warm from $N=50$ to $N=1600$ (sublinear scaling: fixed JIT compilation and host-callback overhead in the adjoint transpose solve at these sizes). The adjoint
 gradient costs approximately $14$--$15\times$ the forward sweep.
 Against finite differences, wall-clock break-even sits near $P\approx
 6$--$7$ parameters at $N=100$. Dense Jacobian storage is $167\times$
@@ -1315,7 +1316,8 @@ evaluations by $20\times$ compared with finite differences in a
 two-parameter design, with wall-clock break-even near $P\approx6$--$7$
 parameters. The sensitivity leader (hole lifetime) holds top rank in
 $100\%$ of bootstrap resamples at 256 samples in standardized
-coordinates (Spearman $\rho=0.80$ against the 32-sample ordering).
+coordinates (Spearman $\rho=0.80$ against the 32-sample ordering);
+the remaining ordering is unresolved at this sample count.
 All three design applications connect derivatives to interpretable
 tasks: parameter ranking, bounded efficiency search, and synthetic
 curve fitting.
@@ -1323,8 +1325,9 @@ curve fitting.
 The contribution is an empirical diagnosis of when structured block
 elimination fails in 1-D drift--diffusion simulation, with reproducible
 provenance records. The forward path is refactored into a callback-free
-XLA megakernel (native block Thomas, row-equilibrated, with automatic
-LAPACK fallback on ill-conditioned blocks), advancing on deltapv's
+XLA structured Newton step (native block Thomas, row-equilibrated, with
+residual- and factorization-failure-based LAPACK fallback on ill-conditioned blocks),
+advancing on deltapv's
 callback-GMRES forward solve. The adjoint path retains its
 scipy.linalg banded transpose callback; dense LU remains the robust
 production default. This is an engineering integration, not a new

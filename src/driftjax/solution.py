@@ -30,7 +30,7 @@ class Solution(eqx.Module):
     protocol: str = eqx.field(static=True, default="sweep")
     # R1 (scientific-review fix): the efficiency denominator, made explicit.
     # eta = Pmax / sum(P_in). The raw embedded AM1.5G table sums to
-    # 899.9168 W/m^2 (DriftJax default, preserves all goldens bit-for-bit);
+    # 899.9168 W/m^2 (DriftJax default, preserves all golden test outputs identical);
     # spectrum(normalize=True) gives the standard 1-sun 1000 W/m^2 value.
     # Read this before quoting an absolute efficiency: the two conventions
     # differ by ~11% relative.
