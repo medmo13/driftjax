@@ -1,16 +1,3 @@
-Running benchmarks...
-  newton_warm_n50: 30.72 ms
-  newton_warm_n100: 35.19 ms
-  newton_warm_n200: 37.19 ms
-  newton_warm_n400: 47.84 ms
-  simulate_warm_n100_steps10: 57.6 ms
-  simulate_warm_n100_steps20: 111.75 ms
-  gradient_warm_n100_steps10: 1003.71 ms
-  comp_F_n100: 23.818 ms
-  comp_F_precomputed_n100: 17.642 ms
-  banded_jacobian_n100: 24.1 ms
-  fused_pair_n100: 44.5 ms
-  peak_rss: 1655308 KB
 {
   "timestamp": "2026-09-15T00:21:23",
   "python": "3.13.13",
