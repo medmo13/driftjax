@@ -55,88 +55,34 @@ DriftJax addresses a specific numerical opportunity in the one-dimensional
 problem: each nodal residual couples only to neighbouring nodes. With
 three unknowns per node, the interleaved Jacobian consists of $3\times3$
 blocks on three block diagonals (bandwidth $\mathrm{kl}=\mathrm{ku}=5$).
-Analytical assembly and a direct pivoted banded solve (LAPACK
-\code{dgbsv} via \code{scipy.linalg.solve_banded}) exploit this structure
+Analytical assembly and a row-equilibrated native block-Thomas GE solve (with LAPACK
+\code{dgbsv} via \code{scipy.linalg.solve_banded} as a callback-bounded fallback) exploit this structure
 during Newton iteration, at $O(N\cdot\mathrm{kl}\cdot\mathrm{ku})$ flop
 cost. An earlier unpivoted block-Thomas implementation was replaced in
 v0.1.18 after controlled comparisons showed it failing on
 ill-conditioned heterojunctions (residuals $\sim2$--$3.7\times10^{2}$)
-while the pivoted banded solver remained accurate
+while the pivoted LAPACK banded solver (dgbsv) remained accurate
 ($\sim10^{-9}$; Section~\ref{sec:conditioning}).
-% The major architectural contribution of DriftJax is a single-program XLA
-% megakernel: the entire forward Newton solve (Scharfetter--Gummel flux
-% evaluation, block-tridiagonal assembly, and pivoted banded elimination
-% via LAPACK \code{dgbsv}) is expressed as a trace-safe
-% \code{lax.while_loop} with no host callbacks or Python-level control
-% flow. This makes every forward step differentable through JAX's
-% \code{custom_vjp} implicit-adjoint path. The native block-tridiagonal
-% GE solver is used by default on well-conditioned systems, but an
-% automatic LAPACK fallback engages transparently when Jacobian blocks
-% become ill-conditioned, detected via per-block determinant thresholds.
-% This single-program design eliminates the host-callback boundary that
-% separated forward and backward passes in deltapv (GMRES with ILU(0)),
-% allowing the implicit function theorem to differentiate the full
-% converged state directly.
 The major architectural contribution of DriftJax is a single-program XLA
-megakernel: the entire forward Newton solve---Scharfetter--Gummel flux
-evaluation, block-tridiagonal assembly, and pivoted banded elimination
-via LAPACK \code{dgbsv}---is expressed as a trace-safe
-\code{lax.while_loop} with no host callbacks or Python-level control
-flow. This makes every forward Newton step end-to-end differentiable
-through JAX's \code{custom_vjp} implicit-adjoint path, rather than
-requiring separate primal and adjoint implementations. The native
-block-tridiagonal GE solver is used by default on well-conditioned
-systems (block bandwidth kl=ku=5 for the interleaved 3×3 blocks), but an
-automatic LAPACK fallback engages transparently when Jacobian blocks
-become ill-conditioned (e.g., heterojunction band offsets): the solver
-detects near-singular blocks via per-block determinant thresholds and
-dispatches to dense LU \code{dgesv} within the same XLA program, never
-materialising host arrays. This single-program design eliminates the
-host-callback boundary that previously separated forward and backward
-passes in deltapv (GMRES with ILU(0) preconditioning), allowing the
-implicit function theorem to differentiate the full converged state
-directly.Solver-evolution arc (why each choice was made, not just what it is):
-unpivoted block-Thomas failed on row-scaled heterojunctions (residuals
-$\sim10^2$) while agreeing with dense LU below $10^{-16}$ on clean
-systems, which forced pivoted banded elimination for the forward path;
-the transpose then behaved differently (same $\kappa$, different
-stability), which forced dense LU for the production adjoint with the
-structured transpose retained opt-in; decomposing the transpose cost
-showed the raw \code{dgbsv} kernel already beats dense LU
-($0.10$--$0.22$~ms vs $1$--$2$~ms at $N=100$) and the measured gap is
-packing/callback overhead, not numerics; the resulting backend regimes
-are mapped empirically in $(N,\kappa)$ space
-(\code{docs/paper/records/solver\_phase\_map.json}). Rank-deficient
-systems ($\kappa\sim10^{45}$) are outside every backend's envelope and
-report explicit failure rather than a solution.
+megakernel for the forward Newton solve: Scharfetter--Gummel flux evaluation,
+block-tridiagonal Jacobian assembly, and block-Thomas elimination via native GE (\code{banded_ge.py}, row-equilibrated \code{lax.scan} block Thomas with
+\code{lax.while_loop} outer iteration) are all trace-safe and require no host
+callbacks. This makes every forward Newton step differentiable through JAX's
+\code{custom_vjp} implicit-adjoint path. The native block-tridiagonal GE
+solver is the production default on well-conditioned systems (block bandwidth
+kl=ku=5 for the interleaved 3×3 blocks). When native GE detects near-singular
+blocks via per-block determinant thresholds (e.g., heterojunction band offsets),
+it engages an automatic dense-LU fallback (\code{dgesv}) within the same XLA
+program.
 
-The article is organised around three questions:
-\begin{enumerate}[leftmargin=*,itemsep=2pt]
-\item \textbf{Correctness:} Does the implementation solve the stated
-equations and compute the intended derivatives?  (Sections~\ref{sec:model}--\ref{sec:verification}.)
-\item \textbf{Performance:} What computational benefit remains after
-accuracy and execution conditions are matched?
-(Section~\ref{sec:performance}.)
-\item \textbf{Usefulness:} Do those derivatives improve a specified
-design task?  (Section~\ref{sec:applications}.)
-\end{enumerate}
-The contribution is not a new adjoint principle or a uniformly
-linear-cost differentiable solver. Implicit differentiation, JAX
-integration, analytical Jacobians, and dense adjoints are inherited
-concepts, established for photovoltaic simulation by
-$\partial\mathrm{PV}$~\cite{mann2022partial}; they are used here, not
-The major contribution of this article is the single-program XLA megakernel
-architecture that unifies structured forward algebra, an explicit backward
-stability strategy, and verified end-to-end derivatives. Rather than
-introducing a new adjoint principle or a uniformly linear-cost solver,
-DriftJax demonstrates that the entire forward Newton iteration---flux
-evaluation, block-tridiagonal assembly, and pivoted banded elimination---can
-be expressed as a single trace-safe \code{lax.while_loop} that differentiates
-directly through the implicit function theorem. The automatic LAPACK fallback
-on ill-conditioned heterojunction blocks (detected via per-block determinant
-thresholds) is a consequence of this architecture rather than a separate code
-path: the fallback engages within the same XLA program, preserving
-differentiability and provenance tracking.
+The adjoint backward pass currently uses a separate pivoted banded transpose
+solve (\code{scipy.linalg.solve_banded}) via \code{jax.pure_callback}, which
+remains outside the single-program model. Dense LU remains the adjoint default
+for robustness on ill-conditioned systems; the equilibrated banded transpose
+is available opt-in (\code{DRIFTJAX_BANDED_ADJOINT=1}). This partial fusion
+contrasts with deltapv, which uses host-callback GMRES for the forward solve;
+DriftJax moves the forward path to pure XLA while keeping the backward path on
+the callback model pending a native transpose rewrite.
 \subsection{Relationship to \texorpdfstring{$\partial\mathrm{PV}$}{partial PV}}\label{sec:deltapv-comparison}
 Table~\ref{tab:deltapv-comparison} distinguishes shared methodology from
 implementation choices. The reference-code observations concern the
@@ -165,7 +111,7 @@ Component & $\partial\mathrm{PV}$~\cite{deltapvsource} & DriftJax \\
 Jacobian & Explicit analytical derivatives in compact band storage
 & Analytical $3\times3$ block-tridiagonal assembly \\
 Newton step & GMRES with incomplete-LU preconditioning; dense fallback
-& Direct pivoted banded elimination (LAPACK \code{dgbsv}),
+& Row-equilibrated native block-Thomas GE (LAPACK \code{dgbsv} fallback),
 $O(N\cdot\mathrm{kl}\cdot\mathrm{ku})$ per linear solve \\
 Implicit derivative & Custom JVP rules; explicit current adjoint uses
 a dense transpose solve & Custom VJP; production adjoint uses pivoted
@@ -764,7 +710,7 @@ Trusted-envelope boundary (N3/M2): the results above distinguish three
 device classes, and the released code records which one each bias falls
 into via the per-bias \code{fallback\_used} flags on \code{Solution}.
 (i)~Well-conditioned devices (homojunction, $\kappa\sim10^{23}$): clean
-pivoted-banded solves, no fallback, residuals $<10^{-16}$. (ii)~Severely
+pivoted-banded solves, no fallback (native GE default), residuals $<10^{-16}$. (ii)~Severely
 row-scaled but nonsingular heterojunctions ($\kappa\sim10^{12}$):
 row-equilibration restores banded accuracy (residual $5.6\times10^{-13}$),
 and the equilibrated banded transpose is available opt-in
@@ -1116,7 +1062,7 @@ following. A full single-bias Newton solve (tolerance $10^{-10}$,
 $\leq30$ steps, warm, mean of 3--5) costs 49.9~ms at $N=50$, 62.3~ms at
 $N=100$, 64.4~ms at $N=200$, 57.7~ms at $N=400$, 65.7~ms at $N=800$,
 and 106.0~ms at $N=1600$: sublinear scaling consistent with fixed
-JIT/host-callback overhead dominating the
+JIT compilation overhead dominating the
 $O(N\cdot\mathrm{kl}\cdot\mathrm{ku})$ factorisation at these sizes
 (non-monotonic entries reflect $\sim30\%$ machine variance across
 runs). Complete forward sweeps (10 biases) take 69.6~ms ($N=100$),
@@ -1128,7 +1074,7 @@ $O(KN^3)$ dense-adjoint accounting. An earlier harness run gave
 30.7--47.8~ms ($N=50$--$400$) and $\sim17\times$; both records are
 archived. These are single-architecture
 measurements; ratios would differ on GPU or with different JAX
-versions, and the host-callback round trip in each Newton iteration
+versions, and the host-callback round trip in the adjoint banded transpose solve
 precludes GPU-resident execution of the forward linear solve.
 
 Wall-clock break-even against central finite differences was measured
@@ -1157,7 +1103,7 @@ synchronised before stopping the timer~\cite{jaxbenchmark}. Peak process
 memory is a different quantity from matrix-storage estimates. The
 required metadata are listed in Supplementary Section S9. A controlled
 ablation study should separately measure the cost contributions of
-banded forward solving (including the host-callback round trip), dense
+banded forward solving (no callback, native GE) and adjoint transpose solving (callback-bounded), dense
 adjoint factorisation, assembly overhead, nonlinear iteration count,
 and JAX transformation effects. The saved-matrix comparison of
 Section~\ref{sec:conditioning} already isolates the factorisation
@@ -1211,7 +1157,7 @@ opt-in via \code{DRIFTJAX\_BANDED\_ADJOINT=1}. On a heterojunction
 device it reproduces dense-LU gradients to all reported digits, and
 19/19 gradient and analytic-adjoint tests pass with the flag engaged.
 It is not faster at tested sizes (warm 2.1--6.8~s vs dense 1.8~s at
-$N=100$--$400$): host-callback round trips plus $O(N^2)$ equilibration
+$N=100$--$400$): callback overhead in the banded transpose path plus $O(N^2)$ equilibration
 overhead exceed dense LU below the crossover. Dense LU therefore remains
 the default; the banded adjoint is available for larger systems where
 the $O(N^3)$--$O(N)$ gap dominates. A saved-Jacobian transpose benchmark
@@ -1302,7 +1248,7 @@ scaling rather than a fundamental factorisation failure.
 \textbf{Performance.} Controlled single-architecture benchmarks of the
 shipped v0.1.18 code show a full single-bias Newton solve costing
 49.9--106.0~ms warm from $N=50$ to $N=1600$ (sublinear scaling: fixed
-JIT/host-callback overhead dominates at these sizes). The adjoint
+fixed JIT compilation and host-callback overhead in the adjoint transpose solve at these sizes). The adjoint
 gradient costs approximately $14$--$15\times$ the forward sweep.
 Against finite differences, wall-clock break-even sits near $P\approx
 6$--$7$ parameters at $N=100$. Dense Jacobian storage is $167\times$
