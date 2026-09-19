@@ -5,18 +5,22 @@ in JAX with implicit-function-theorem gradients of the converged discrete
 system, numerically verified against finite differences on selected
 configurations. The forward
 solver combines Scharfetter--Gummel fluxes, an analytically assembled
-block-tridiagonal Jacobian, and a direct pivoted banded elimination
-(LAPACK \code{dgbsv}) that requires $O(N\cdot\mathrm{kl}\cdot
+block-tridiagonal Jacobian, and a direct globally-pivoted banded elimination
+(LAPACK \code{dgbsv}) as default, with an opt-in
+callback-free native block-Thomas GE backend that requires $O(N\cdot\mathrm{kl}\cdot
 \mathrm{ku})$ work per Newton step for $N$ mesh nodes. Reverse-mode
 sensitivities use pivoted dense-LU adjoint factorisation with
 $O(N^3)$ backward cost; row-equilibration diagnosis identifies the
  conditioning trade-off between structured and dense paths.
 Verification covers analytical--automatic-differentiation Jacobian
-agreement ($5\times10^{-17}$ relative), dark-equilibrium mass-action
-law consistency, current conservation ($<10^{-17}$), mesh convergence
+agreement (correct to machine representation), dark-equilibrium mass-action
+law consistency, current conservation ($<10^{-16}$--$10^{-13}$ depending on device topology), mesh convergence
 across five refinement levels, and directional Taylor tests with
-$O(h)$ scaling. Controlled single-architecture benchmarks quantify
-the forward and adjoint cost on a modern CPU. Example applications
+$O(h)$ scaling. Controlled single-architecture (CPU) benchmarks quantify the
+forward and adjoint cost; the asymptotic $O(N^3)$--$O(N)$
+complexity gap is measured but not yet demonstrated to
+dominate end-to-end differentiable performance at the
+tested mesh sizes. Example applications
 demonstrate derivative-based sensitivity ranking, constrained
 band-gap/thickness optimisation, and synthetic current--voltage
 curve recovery.

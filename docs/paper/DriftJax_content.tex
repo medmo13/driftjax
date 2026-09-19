@@ -104,6 +104,29 @@ Dense LU & Adjoint default & Callback (jax.scipy) & N/A & Full pivot & Yes & CPU
 \end{tabular}
 \end{table}
 
+\subsubsection{Solver A/B matrix}
+\label{sec:solver-ab-matrix}
+For the \emph{same saved Jacobians and RHS}, the following solver
+configuration matrix specifies which algorithm generates each result
+class. This disambiguates native block-Thomas GE from globally pivoted
+LAPACK banded LU.
+
+\begin{table}[tbp]
+\centering
+\caption{Solver A/B comparison: native block-Thomas vs. LAPACK dgbsv vs. dense LU.}
+\label{tab:solver-ab}
+\begin{tabular}{@{}lllllll@{}}
+\toprule
+Solver & Equilibration & Pivoting & Global band pivot & Callback & Diff & Production \\
+\midrule
+\texttt{native\_ge\_eq} & Row scale & Local 3x3 & No & None & Yes & Experimental \\
+\texttt{auto} & None & Global & Yes (dgbsv) & Yes & No & Default \\
+Dense LU & None & Full & N/A & Yes & Yes & Adjoint default \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
 The \texttt{native\_ge\_eq} backend (\code{banded\_ge.py}) performs row-equilibrated unpivoted block-Thomas elimination via \code{lax.scan}---no inter-block pivoting but per-element 3×3 pivoted local solves. When per-block determinant thresholds indicate near-singularity, it falls back to dense \code{dgesv} within the same XLA program. The \texttt{auto} backend is the scipy.linalg \code{solve_banded} path with truncated-SVD fallback, available by setting \code{DRIFTJAX_NATIVE_BANDED=0}. Dense LU (\code{dgesv}, via \code{jax.scipy.linalg}) is the production adjoint default.
 
 \subsection{Relationship to \texorpdfstring{$\partial\mathrm{PV}$}{partial PV}}\label{sec:deltapv-comparison}
@@ -695,7 +718,7 @@ comparison motivated the v0.1.18 replacement of block-Thomas with the
 pivoted banded solver as the production forward default.
 
 The analytic and AD Jacobians agree to $<5\times10^{-17}$ relative error
-in all cases, confirming the block assembly is bit-accurate. The forward
+in all cases, confirming the block assembly is correct to machine representation. The forward
 solve ($Jx=b$) is accurate to $<10^{-16}$ relative residual for both
 Block-Thomas and dense LU. The adjoint solve ($J^T\lambda=g$) shows larger
 residuals on the most ill-conditioned device: $4.2\times10^{-9}$ for
@@ -824,7 +847,7 @@ are listed as open.
 \subsection{Mesh refinement and cross-code comparison}
 Five systematic mesh refinements ($N=62$, 125, 250, 500, 1000) on a
 homojunction device demonstrate monotonic convergence. The efficiency
-error relative to $N=500$ decreases from $1.6\times10^{-3}$ at $N=62$
+error relative to the finest mesh ($N=1000$) decreases from $1.6\times10^{-3}$ at $N=62$
 to $1.0\times10^{-4}$ at $N=1000$, a $16\times$ improvement. The
 observed convergence order is approximately 1.8 between $N=250$ and
 $N=500$ and approximately 1.0 between $N=500$ and $N=1000$, indicating
@@ -1268,7 +1291,7 @@ usefulness.
 
 \textbf{Correctness.} The implemented residual satisfies the stated
 physical model: dark-equilibrium carrier densities obey the mass-action
-law to machine precision, current conservation holds to $<10^{-17}$,
+law to machine precision, current conservation holds to $<10^{-16}$--$10^{-13}$ depending on device topology,
 and contact residuals vanish. Analytical and AD Jacobians agree to
 $5\times10^{-17}$. The structured-adjoint accuracy loss is diagnosed as
 extreme row-scaling imbalance ($10^{11}$ row-norm ratio) caused by
