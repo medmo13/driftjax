@@ -63,17 +63,18 @@ v0.1.18 after controlled comparisons showed it failing on
 ill-conditioned heterojunctions (residuals $\sim2$--$3.7\times10^{2}$)
 while the pivoted LAPACK banded solver (dgbsv) remained accurate
 ($\sim10^{-9}$; Section~\ref{sec:conditioning}).
-The major architectural contribution of DriftJax is a single-program XLA
-megakernel for the forward Newton solve: Scharfetter--Gummel flux evaluation,
-block-tridiagonal Jacobian assembly, and block-Thomas elimination via native GE (\code{banded_ge.py}, row-equilibrated \code{lax.scan} block Thomas with
+The contribution of DriftJax is a structure-aware forward solver refactored into
+a callback-free XLA megakernel: Scharfetter--Gummel flux evaluation,
+block-tridiagonal Jacobian assembly, and block-Thomas elimination via native GE
+(\code{banded_ge.py}, row-equilibrated \code{lax.scan} with
 \code{lax.while_loop} outer iteration) are all trace-safe and require no host
 callbacks. This makes every forward Newton step differentiable through JAX's
-\code{custom_vjp} implicit-adjoint path. The native block-tridiagonal GE
-solver is the production default on well-conditioned systems (block bandwidth
-kl=ku=5 for the interleaved 3×3 blocks). When native GE detects near-singular
-blocks via per-block determinant thresholds (e.g., heterojunction band offsets),
-it engages an automatic dense-LU fallback (\code{dgesv}) within the same XLA
-program.
+\code{custom_vjp} implicit-adjoint path. The native block-Thomas GE solver
+is the production default on well-conditioned systems (block bandwidth
+kl=ku=5 for the interleaved 3×3 blocks); it differs from LAPACK's pivoted
+banded \code{dgbsv} in lacking inter-block pivoting, with automatic dense-LU
+fallback (\code{dgesv}) when per-block determinant thresholds flag
+near-singularity.
 
 The adjoint backward pass currently uses a separate pivoted banded transpose
 solve (\code{scipy.linalg.solve_banded}) via \code{jax.pure_callback}, which
@@ -83,6 +84,28 @@ is available opt-in (\code{DRIFTJAX_BANDED_ADJOINT=1}). This partial fusion
 contrasts with deltapv, which uses host-callback GMRES for the forward solve;
 DriftJax moves the forward path to pure XLA while keeping the backward path on
 the callback model pending a native transpose rewrite.
+
+\subsubsection{Backend matrix}
+\label{sec:backend-matrix}
+The following table identifies, for each backend: default or experimental status, Python versus XLA control flow, callback use, pivoting strategy, differentiability, fallback behavior, and supported hardware. This resolves the contradictions in \cite{mann2022partial} regarding which path is callback-free.
+
+\begin{table}[tbp]
+\centering
+\caption{Backend matrix: DriftJax v0.1.18 solver backends. ``Forward'' and ``Adjoint'' columns indicate whether the respective path is callback-free (pure XLA) or uses host callbacks.}
+\label{tab:backend-matrix}
+\begin{tabular}{@{}lllllll@{}}
+\toprule
+Backend & Status & Forward & Adjoint & Pivoting & Differentiable & Hardware \\
+\midrule
+\texttt{native\_ge\_eq} & Default & Pure JAX (XLA) & Dense LU & Local 3×3 & Yes & CPU/GPU \\
+\texttt{auto} & Fallback & Callback (scipy) & Callback (scipy) & Band pivot & No & CPU \\
+Dense LU & Adjoint default & Callback (jax.scipy) & N/A & Full pivot & Yes & CPU/GPU \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The \texttt{native\_ge\_eq} backend (\code{banded\_ge.py}) performs row-equilibrated unpivoted block-Thomas elimination via \code{lax.scan}---no inter-block pivoting but per-element 3×3 pivoted local solves. When per-block determinant thresholds indicate near-singularity, it falls back to dense \code{dgesv} within the same XLA program. The \texttt{auto} backend is the scipy.linalg \code{solve_banded} path with truncated-SVD fallback, available by setting \code{DRIFTJAX_NATIVE_BANDED=0}. Dense LU (\code{dgesv}, via \code{jax.scipy.linalg}) is the production adjoint default.
+
 \subsection{Relationship to \texorpdfstring{$\partial\mathrm{PV}$}{partial PV}}\label{sec:deltapv-comparison}
 Table~\ref{tab:deltapv-comparison} distinguishes shared methodology from
 implementation choices. The reference-code observations concern the
@@ -208,7 +231,7 @@ the corrected exact derivative of the implemented blend agrees with
 central differences to $7\times10^{-6}$ over $\eta\in[-20,50]$
 (\code{tests/unit/test\_statistics.py}).
 
-Recombination combines Shockley--Read--Hall~\cite{shockleyread1952,hall1952},
+Recombination combines Shockley--Read--Hall~\cite{shockleyrda988c2,hall1952},
 radiative, and Auger terms~\cite{gaury2019}.
 Optical generation is obtained from a Beer--Lambert model~\cite{mann2022partial} or a coherent
 transfer-matrix calculation~\cite{byrnes2016}. The latter resolves
@@ -747,6 +770,14 @@ plus UNVERIFIED means ``not audited,'' never ``verified.'' The backward
 pass additionally recomputes max$|F|$ from its own residuals and warns
 at runtime above the audit threshold, so no normal-looking gradient is
 returned silently on an uncertified primal.
+\\textbf{Formal fallback semantics:} when the Jacobian becomes singular and
+the solver resorts to a truncated-SVD least-squares step (not a Newton step
+for an isolated root), the implicit-function theorem is inapplicable and the
+gradient is declared UNRELIABLE. No certified derivative is returned for
+rank-deficient states; callers must check \code{gradient\_status} and
+treat UNRELIABLE gradients as diagnostics. This is enforced by
+\code{test\_native\_ge\_fallback.py} which checks both sides of every
+backend-selection threshold.
 
 A dedicated $S_rJS_u$ diagnostic (\code{validation/scaling\_2x2.py},
 \code{docs/paper/records/scaling\_2x2.json}) tests whether diagonal
@@ -1266,16 +1297,26 @@ All three design applications connect derivatives to interpretable
 tasks: parameter ranking, bounded efficiency search, and synthetic
 curve fitting.
 
-The contribution is an implementation that combines structured forward
-algebra, an explicit backward stability strategy, and verified
-derivatives---not a new adjoint principle or a uniformly linear-cost
-solver. Three limitations established here are results in their own
-right: a structured solver can be asymptotically optimal yet numerically
-inferior to a pivoted band solver on severely scaled semiconductor
-systems; gradient accuracy depends on more than linear-system residual,
-with parameter contraction and conditioning able to dominate; and for
-low-dimensional photovoltaic optimisation, adjoint evaluation-count
-advantages need not translate into wall-clock superiority
+The contribution is an empirical diagnosis of when structured block
+elimination fails in 1-D drift--diffusion simulation, with reproducible
+provenance records. The forward path is refactored into a callback-free
+XLA megakernel (native block Thomas, row-equilibrated, with automatic
+LAPACK fallback on ill-conditioned blocks), advancing on deltapv's
+callback-GMRES forward solve. The adjoint path retains its
+scipy.linalg banded transpose callback; dense LU remains the robust
+production default. This is an engineering integration, not a new
+adjoint theory or new discretization; banded solvers, block elimination,
+and row scaling are established numerical techniques. The novel element
+is the quantitative failure envelope---when block Thomas diverges from
+pivoted banded LU on heterojunction Jacobians---and the reproducible
+records that make that envelope checkable. Three limitations are
+established as results: (1) a structured solver can be asymptotically
+optimal yet numerically inferior to pivoted banded elimination on
+severely scaled systems; (2) gradient accuracy depends on more than
+linear-system residual, with parameter contraction and conditioning able
+to dominate; and (3) for low-dimensional photovoltaic optimisation,
+adjoint evaluation-count advantages need not translate into wall-clock
+superiority.
 (break-even near $P\approx6$--$7$ at the tested configuration). The evidence presented constitutes numerical verification and
 software validation, not experimental validation against measured
 devices: no J--V, EQE, temperature-dependent, transient, or impedance
@@ -1291,7 +1332,7 @@ specifies an MIT licence. The archived software releases are available on Zenodo
 version-independent concept DOI~\url{https://doi.org/10.5281/zenodo.22762674};
 the v0.1.18-post1 snapshot cited here is version DOI~\url{https://doi.org/10.5281/zenodo.22762675}.
 \code{CITATION.cff} carries the version DOI for machine-readable citation. The implementation description in this article
-is based on the v0.1.18 source tree described here (HEAD \code{a6fddbb}
+is based on the v0.1.18 source tree described here (HEAD \code{da988c2}
 plus the v0.1.18 synchronisation revision); the repository should be
 pinned to the v0.1.18 release tag for reproducibility. Raw test logs,
 per-example JSON sidecars and execution logs, and the machine-readable
