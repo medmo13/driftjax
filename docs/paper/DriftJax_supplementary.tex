@@ -794,8 +794,38 @@ not a dense Newton factorisation~\cite{mann2022partial}. Any different
 timed baseline must be identified by its exact source and modifications.
 
 
+\begin{papertable}
+\centering
+\caption{Implementation comparison. The reference column describes inspected
+$\partial\mathrm{PV}$ source; the DriftJax column describes v0.1.18
+code as released. Shared components are not claimed as new methods.}
+\label{tab:deltapv-comparison}
+\small
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{0.19\linewidth}
+>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}X@{}}
+\toprule
+Component & $\partial\mathrm{PV}$~\cite{deltapvsource} & DriftJax \\
+\midrule
+Jacobian & Explicit analytical derivatives in compact band storage
+& Analytical $3\times3$ block-tridiagonal assembly \\
+Newton step & GMRES with incomplete-LU preconditioning; dense fallback
+& Row-equilibrated native block-Thomas GE (LAPACK \code{dgbsv} fallback),
+$O(N\cdot\mathrm{kl}\cdot\mathrm{ku})$ per linear solve \\
+Implicit derivative & Custom JVP rules; explicit current adjoint uses
+a dense transpose solve & Custom VJP; production adjoint uses pivoted
+dense LU with per-bias checkpointing \\
+Carrier densities & Boltzmann exponential closure
+& Boltzmann, Blakemore, and numerical Fermi--Dirac options \\
+Optical generation & Beer--Lambert attenuation with analytical or
+interpolated absorption & Beer--Lambert and coherent transfer-matrix models \\
+Bulk recombination & SRH, radiative, and Auger
+& SRH, radiative, and Auger \\
+\bottomrule
+\end{tabularx}
+\end{papertable}
+
 A controlled A/B timing study (3-run averages, identical device, same venv, CPU x64)
-confirms the implementation-level speedups in Table~\ref{tab:deltapv-comparison}:
+confirms the implementation-level speedups in Table~\ref{tab:deltapv-comparison} (defined in the main text):
 PN junction 5.3$x$ faster (41.7~s vs 7.8~s), heterojunction 3.6$x$ faster
 (43.6~s vs 12.1~s), and perovskite PSC 3.4$x$ faster (46.7~s vs 13.6~s).
 For gradient evaluation, the implicit adjoint adds 3~s over the forward solve
@@ -827,6 +857,25 @@ comparison must archive both exact source revisions and any compatibility
 patches. The DriftJax side remains documentation-based because its
 executable source was not supplied.
 
+\subsubsection{Backend matrix}
+\label{sec:backend-matrix}
+The following table identifies, for each backend: default or experimental status, Python versus XLA control flow, callback use, pivoting strategy, differentiability, fallback behavior, and supported hardware.
+
+\begin{papertable}
+\centering
+\caption{Backend matrix: DriftJax v0.1.18 solver backends.}
+\label{tab:backend-matrix}
+\begin{tabular}{@{}lllllll@{}}
+\toprule
+Backend & Status & Forward & Adjoint & Pivoting & Differentiable & Hardware \\
+\midrule
+\texttt{native\_ge\_eq} & Default & Pure JAX (XLA) & Dense LU & Local 3×3 & Yes & CPU/GPU \\
+\texttt{auto} & Fallback & Callback (scipy) & Callback (scipy) & Band pivot & No & CPU \\
+Dense LU & Adjoint default & Callback (jax.scipy) & N/A & Full pivot & Yes & CPU/GPU \\
+\bottomrule
+\end{tabular}
+\end{papertable}
+
 \subsection{Release coverage and figure provenance}
 The v0.1.16 test suite collected 236 tests: 204 non-slow (of which 64
 carry the smoke marker for the sub-60\,s dev loop) and 32 slow
@@ -845,14 +894,21 @@ agreement), and the review-fix revision adds
 closed-form ultimate-efficiency sensitivity identity, finite-difference
 comparison, physical monotonic decay, and a Richardson-refined check),
 bringing the machine-counted total to 283 (\code{pytest --collect-only}
+This revision resolves the major scientific review observations: (1) a backend matrix
+Table~\ref{tab:backend-matrix} clarifies that the forward Newton solve is callback-free
+while the adjoint transpose path retains scipy callbacks; (2) the native solver is described
+as row-equilibrated block Thomas GE (not pivoted banded GE); (3) fallback semantics are
+formally defined: singular rank-deficient states return no certified gradient.
+
 on the v0.1.18 review-fix tree: unit 197, regression 37, gradient 9,
 property 14, literature 22, validation 4, reproducibility 3,
 conservation 4, convergence 4). The delta since 262 is the 4
 test\_independent\_gradient\_reference.py tests (R3 independent gradient
 reference), 3 tests/regression/test\_three\_layer\_stress.py tests
 (R-audit pinning the singular stress device's reproducible converge/diverge
-behavior and non-physicality). The review-fix revision (v0.1.18) also adds 19 tests: test_banded_ge.py (7 tests) + updated test_banded_native.py (6 tests); total banded solver tests: 32 native-banded-solver correctness and differentiability tests (DRIFTJAX_NATIVE_BANDED=1), verified to match LAPACK to 1e-15 and jax.grad to central-FD; suite is green: 271 passed, 1 xfailed, 0 failed. The
-material inventory is documented as 25 entries; a run should store the
+behavior and non-physicality). The review-fix revision (v0.1.18) also adds 19 tests: test\_banded\_ge.py (7 tests) + updated test\_banded\_native.py (6 tests); total banded solver tests: 32 native-banded-solver correctness and differentiability tests (DRIFTJAX\_NATIVE\_BANDED=1), verified to match LAPACK to 1e-15 and jax.grad to central-FD; suite is green: 271 passed, 1 xfailed, 0 failed.
+
+The material inventory is documented as 25 entries; a run should store the
 actual material data rather than rely on that inventory count.
 The gallery contains 15 research scripts, 4 tutorials, and 2 developer
 checks, identified by number throughout, plus the validation script
