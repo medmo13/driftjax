@@ -14,7 +14,7 @@ pyyaml==6.0.3
 # Dev / test
 pytest==9.1.1
 pytest-timeout==2.4.0
-ruff==0.16.2
+ruff==0.16.9
 # Docs
 mkdocs==1.6.1
 mkdocs-material==9.7.7
